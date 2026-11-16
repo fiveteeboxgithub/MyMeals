@@ -1,0 +1,6 @@
+node_modules
+dist
+# Exports personnels de Google Calendar : ne jamais les committer
+*.ics
+*.ical
+*.zip
