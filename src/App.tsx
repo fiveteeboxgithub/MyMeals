@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { addDays, dayName, longDate, mondayOf, shortDate, todayIso, weekday } from './lib/dates';
 import { useGoogleMeals } from './lib/googleStore';
 import { parseIcs } from './lib/ics';
-import { useMeals } from './lib/store';
+import { useMeals, useSkippedSlots } from './lib/store';
 import { buildIndex, fold, normalize, suggest, usualSlots, type Suggestion } from './lib/suggest';
 import { SLOTS, type Meal, type MealStore, type Slot } from './lib/types';
 
@@ -153,6 +153,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
   const [monday, setMonday] = useState(() => mondayOf(today));
   const [editing, setEditing] = useState<Editing | null>(null);
   const [skips, setSkips] = useState<Record<string, number>>({});
+  const { skipped, setSkip } = useSkippedSlots(today);
 
   const dishes = useMemo(() => buildIndex(meals), [meals]);
   const usual = useMemo(() => usualSlots(meals, today), [meals, today]);
@@ -188,7 +189,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
       if (date < today) continue;
       for (const slot of SLOTS) {
         const key = `${date}|${slot}`;
-        if (bySlot.has(key) || !usual.has(`${weekday(date)}-${slot}`)) continue;
+        if (bySlot.has(key) || skipped.has(key) || !usual.has(`${weekday(date)}-${slot}`)) continue;
         const ranked = suggest(dishes, date, slot, { exclude: used, weekWords }).slice(0, 12);
         if (ranked.length === 0) continue;
         const pick = ranked[(skips[key] ?? 0) % ranked.length];
@@ -197,7 +198,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
       }
     }
     return out;
-  }, [days, today, bySlot, usual, dishes, skips]);
+  }, [days, today, bySlot, usual, dishes, skips, skipped]);
 
   const sunday = days[6];
 
@@ -239,11 +240,23 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                     <button className="meal" onClick={() => setEditing({ date, slot })}>
                       {planned.map((m) => m.name).join(' + ')}
                     </button>
+                  ) : skipped.has(key) ? (
+                    <button className="add skipped" onClick={() => setEditing({ date, slot })}>
+                      Pas de repas
+                    </button>
                   ) : proposal ? (
                     <div className="proposal">
                       <button className="proposal-name" onClick={() => setEditing({ date, slot })}>
                         {proposal.label}
                         <small>{proposal.reason}</small>
+                      </button>
+                      <button
+                        className="icon"
+                        onClick={() => setSkip(key, true)}
+                        aria-label={`Pas de repas ${dayName(date)} ${SLOT_LABEL[slot]}`}
+                        title="Pas de repas sur ce créneau"
+                      >
+                        ✕
                       </button>
                       <button
                         className="icon"
@@ -287,8 +300,14 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
           slot={editing.slot}
           current={bySlot.get(`${editing.date}|${editing.slot}`)}
           suggestions={suggest(dishes, editing.date, editing.slot)}
+          skipped={skipped.has(`${editing.date}|${editing.slot}`)}
+          onSkip={(skip) => {
+            setSkip(`${editing.date}|${editing.slot}`, skip);
+            setEditing(null);
+          }}
           onPick={(name) => {
             setSlot(editing.date, editing.slot, name);
+            setSkip(`${editing.date}|${editing.slot}`, false);
             setEditing(null);
           }}
           onClear={() => {
@@ -307,12 +326,14 @@ interface SheetProps {
   slot: Slot;
   current: Meal[] | undefined;
   suggestions: Suggestion[];
+  skipped: boolean;
+  onSkip: (skip: boolean) => void;
   onPick: (name: string) => void;
   onClear: () => void;
   onClose: () => void;
 }
 
-function SlotSheet({ date, slot, current, suggestions, onPick, onClear, onClose }: SheetProps) {
+function SlotSheet({ date, slot, current, suggestions, skipped, onSkip, onPick, onClear, onClose }: SheetProps) {
   const [query, setQuery] = useState('');
   // Chaque mot saisi doit se retrouver dans une des écritures du plat, dans n'importe quel ordre.
   const needles = fold(query).split(/[\s/]+/).filter(Boolean);
@@ -342,6 +363,14 @@ function SlotSheet({ date, slot, current, suggestions, onPick, onClear, onClose 
             Prévu : <strong>{current.map((m) => m.name).join(' + ')}</strong>
             <button className="link danger" onClick={onClear}>
               Retirer
+            </button>
+          </p>
+        )}
+        {!current && (
+          <p className="current">
+            {skipped ? 'Créneau marqué sans repas.' : 'Pas besoin de repas ?'}
+            <button className="link skip-link" onClick={() => onSkip(!skipped)}>
+              {skipped ? 'Remettre ce créneau' : 'Retirer ce créneau'}
             </button>
           </p>
         )}

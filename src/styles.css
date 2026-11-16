@@ -316,3 +316,16 @@ small {
   color: var(--card);
   font-weight: 600;
 }
+
+.add.skipped {
+  text-decoration: line-through;
+}
+
+.skip-link {
+  margin-left: 12px;
+}
+
+.proposal .icon {
+  flex-basis: 36px;
+  height: 36px;
+}
