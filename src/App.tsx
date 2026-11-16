@@ -144,6 +144,16 @@ function LocalApp() {
   );
 }
 
+const PENDING_KEY = 'mymeals.pendingOnly';
+
+function loadPendingOnly(): boolean {
+  try {
+    return localStorage.getItem(PENDING_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 const RANDOMNESS_KEY = 'mymeals.randomness';
 
 function loadRandomness(): number {
@@ -181,6 +191,10 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
   const [randomness, setRandomness] = useState(loadRandomness);
   // Change à chaque ouverture de l'application, pour ne pas revoir le même tirage.
   const [seed] = useState(() => String(Math.random()));
+  const [pendingOnly, setPendingOnly] = useState(loadPendingOnly);
+  // Idées « Surprise Me » affichées à la place de la proposition, par créneau.
+  const [surprises, setSurprises] = useState<Record<string, Surprise>>({});
+  const surprisesShown = useRef(new Set<string>());
   const { skipped, setSkip } = useSkippedSlots(today);
 
   const dishes = useMemo(() => buildIndex(meals), [meals]);
@@ -233,6 +247,33 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
 
   const sunday = days[6];
 
+  /** Un créneau attend une décision s'il est à venir, vide, non retiré et habituellement rempli. */
+  const needsDecision = (date: string, slot: Slot) => {
+    const key = `${date}|${slot}`;
+    if (date < today || bySlot.has(key) || skipped.has(key)) return false;
+    return usual.size === 0 || usual.has(`${weekday(date)}-${slot}`);
+  };
+  const visibleDays = days
+    .map((date) => ({ date, slots: SLOTS.filter((slot) => !pendingOnly || needsDecision(date, slot)) }))
+    .filter((day) => day.slots.length > 0);
+
+  function surpriseSlot(key: string, date: string) {
+    const ideas = surpriseIdeas(dishes, date, loadPeriod(), today);
+    let pick = pickSurprise(ideas, surprisesShown.current);
+    if (!pick && ideas.length > 0) {
+      surprisesShown.current.clear();
+      pick = pickSurprise(ideas, surprisesShown.current);
+    }
+    if (!pick) return;
+    surprisesShown.current.add(pick.name);
+    setSurprises({ ...surprises, [key]: pick });
+  }
+
+  function dropSurprise(key: string) {
+    const { [key]: _dropped, ...rest } = surprises;
+    setSurprises(rest);
+  }
+
   return (
     <div className="app">
       <header className="top">
@@ -254,41 +295,61 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
         </button>
       </nav>
 
-      {meals.length > 0 && (
-        <label className="setting">
-          Hasard des propositions
-          <select
-            value={randomness}
+      <div className="settings">
+        <label className="switch">
+          <input
+            type="checkbox"
+            checked={pendingOnly}
             onChange={(e) => {
-              const level = Number(e.target.value);
-              setRandomness(level);
-              setRejected({});
+              setPendingOnly(e.target.checked);
               try {
-                localStorage.setItem(RANDOMNESS_KEY, String(level));
+                localStorage.setItem(PENDING_KEY, e.target.checked ? '1' : '0');
               } catch {
                 // le réglage vaudra pour cette session
               }
             }}
-          >
-            {RANDOMNESS_LEVELS.map((level, i) => (
-              <option key={level.label} value={i}>
-                {level.label}
-              </option>
-            ))}
-          </select>
+          />
+          <span className="switch-track" aria-hidden="true" />
+          À décider seulement
         </label>
-      )}
+        {meals.length > 0 && (
+          <label className="setting">
+            Hasard des propositions
+            <select
+              value={randomness}
+              onChange={(e) => {
+                const level = Number(e.target.value);
+                setRandomness(level);
+                setRejected({});
+                try {
+                  localStorage.setItem(RANDOMNESS_KEY, String(level));
+                } catch {
+                  // le réglage vaudra pour cette session
+                }
+              }}
+            >
+              {RANDOMNESS_LEVELS.map((level, i) => (
+                <option key={level.label} value={i}>
+                  {level.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
 
       <main className="week">
-        {days.map((date) => (
+        {visibleDays.length === 0 && <p className="all-done">Tout est décidé pour cette semaine.</p>}
+        {visibleDays.map(({ date, slots }) => (
           <section key={date} className={`day${date === today ? ' today' : ''}${date < today ? ' past' : ''}`}>
             <h2>
               {dayName(date)} <span>{shortDate(date)}</span>
             </h2>
-            {SLOTS.map((slot) => {
+            {slots.map((slot) => {
               const key = `${date}|${slot}`;
               const planned = bySlot.get(key);
               const proposal = proposals.get(key);
+              const surprise = surprises[key];
               return (
                 <div key={slot} className="slot">
                   <span className="slot-label">{SLOT_LABEL[slot]}</span>
@@ -303,8 +364,12 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                   ) : proposal ? (
                     <div className="proposal">
                       <button className="proposal-name" onClick={() => setEditing({ date, slot })}>
-                        {proposal.label}
-                        <small>{proposal.reason}</small>
+                        {surprise ? `✨ ${surprise.name}` : proposal.label}
+                        <small>
+                          {surprise
+                            ? ['Idée nouvelle', ...surprise.because].join(' · ')
+                            : proposal.reason}
+                        </small>
                       </button>
                       <button
                         className="icon"
@@ -316,16 +381,30 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                       </button>
                       <button
                         className="icon"
-                        onClick={() => setRejected({ ...rejected, [key]: [...(rejected[key] ?? []), proposal.key] })}
+                        onClick={() => {
+                          if (surprise) dropSurprise(key);
+                          else setRejected({ ...rejected, [key]: [...(rejected[key] ?? []), proposal.key] });
+                        }}
                         aria-label={`Autre proposition pour ${dayName(date)} ${SLOT_LABEL[slot]}`}
                         title="Autre proposition"
                       >
                         ↻
                       </button>
                       <button
+                        className="icon"
+                        onClick={() => surpriseSlot(key, date)}
+                        aria-label={`Surprise Me pour ${dayName(date)} ${SLOT_LABEL[slot]}`}
+                        title="Surprise Me : un plat jamais noté"
+                      >
+                        ✨
+                      </button>
+                      <button
                         className="icon accept"
-                        onClick={() => setSlot(date, slot, proposal.label)}
-                        aria-label={`Accepter ${proposal.label}`}
+                        onClick={() => {
+                          setSlot(date, slot, surprise?.name ?? proposal.label);
+                          if (surprise) dropSurprise(key);
+                        }}
+                        aria-label={`Accepter ${surprise?.name ?? proposal.label}`}
                         title="Accepter"
                       >
                         ✓
