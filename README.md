@@ -47,6 +47,12 @@ Il est moins bien classé :
 - s'il n'a plus été mangé depuis plus d'un an ;
 - si la semaine contient déjà un plat avec le même ingrédient.
 
+Le réglage « Hasard des propositions » décide comment ce classement est utilisé :
+sans hasard, la proposition est toujours la mieux classée ; sinon elle est tirée
+au sort parmi les 10, 30 ou 80 premières, les mieux classées gardant plus de
+chances. Le bouton ↻ écarte la proposition et en tire une autre, sans jamais
+reproposer un plat déjà écarté pour ce créneau.
+
 Les créneaux rarement remplis sur les 12 derniers mois (par exemple le midi en
 semaine) ne reçoivent pas de proposition.
 

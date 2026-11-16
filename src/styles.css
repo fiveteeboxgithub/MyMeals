@@ -376,6 +376,7 @@ small {
   gap: 8px;
 }
 
+.setting select,
 .surprise-period select {
   font: inherit;
   color: var(--text);
@@ -388,4 +389,14 @@ small {
 .choices button > span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.85rem;
 }

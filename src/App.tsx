@@ -3,7 +3,18 @@ import { addDays, dayName, longDate, mondayOf, shortDate, todayIso, weekday } fr
 import { useGoogleMeals } from './lib/googleStore';
 import { parseIcs } from './lib/ics';
 import { useMeals, useSkippedSlots } from './lib/store';
-import { buildIndex, fold, normalize, suggest, usualSlots, type DishIndex, type Suggestion } from './lib/suggest';
+import {
+  DEFAULT_RANDOMNESS,
+  RANDOMNESS_LEVELS,
+  buildIndex,
+  fold,
+  normalize,
+  pickProposal,
+  suggest,
+  usualSlots,
+  type DishIndex,
+  type Suggestion,
+} from './lib/suggest';
 import { DEFAULT_PERIOD_MONTHS, PERIODS, pickSurprise, surpriseIdeas, type Surprise } from './lib/surprise';
 import { SLOTS, type Meal, type MealStore, type Slot } from './lib/types';
 
@@ -133,6 +144,18 @@ function LocalApp() {
   );
 }
 
+const RANDOMNESS_KEY = 'mymeals.randomness';
+
+function loadRandomness(): number {
+  try {
+    const stored = localStorage.getItem(RANDOMNESS_KEY);
+    const level = stored === null ? NaN : Number(stored);
+    return Number.isInteger(level) && level >= 0 && level < RANDOMNESS_LEVELS.length ? level : DEFAULT_RANDOMNESS;
+  } catch {
+    return DEFAULT_RANDOMNESS;
+  }
+}
+
 interface Editing {
   date: string;
   slot: Slot;
@@ -153,7 +176,11 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
   const today = todayIso();
   const [monday, setMonday] = useState(() => mondayOf(today));
   const [editing, setEditing] = useState<Editing | null>(null);
-  const [skips, setSkips] = useState<Record<string, number>>({});
+  // Propositions déjà écartées avec ↻, par créneau.
+  const [rejected, setRejected] = useState<Record<string, string[]>>({});
+  const [randomness, setRandomness] = useState(loadRandomness);
+  // Change à chaque ouverture de l'application, pour ne pas revoir le même tirage.
+  const [seed] = useState(() => String(Math.random()));
   const { skipped, setSkip } = useSkippedSlots(today);
 
   const dishes = useMemo(() => buildIndex(meals), [meals]);
@@ -191,15 +218,18 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
       for (const slot of SLOTS) {
         const key = `${date}|${slot}`;
         if (bySlot.has(key) || skipped.has(key) || !usual.has(`${weekday(date)}-${slot}`)) continue;
-        const ranked = suggest(dishes, date, slot, { exclude: used, weekWords }).slice(0, 12);
-        if (ranked.length === 0) continue;
-        const pick = ranked[(skips[key] ?? 0) % ranked.length];
+        const ranked = suggest(dishes, date, slot, { exclude: used, weekWords });
+        const tried = new Set(rejected[key]);
+        const fresh = ranked.filter((s) => !tried.has(s.key));
+        // Quand tout a été écarté, on repart du classement complet.
+        const pick = pickProposal(fresh.length > 0 ? fresh : ranked, randomness, `${seed}|${key}`);
+        if (!pick) continue;
         out.set(key, pick);
         count(pick.key);
       }
     }
     return out;
-  }, [days, today, bySlot, usual, dishes, skips, skipped]);
+  }, [days, today, bySlot, usual, dishes, rejected, skipped, randomness, seed]);
 
   const sunday = days[6];
 
@@ -223,6 +253,31 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
           ›
         </button>
       </nav>
+
+      {meals.length > 0 && (
+        <label className="setting">
+          Hasard des propositions
+          <select
+            value={randomness}
+            onChange={(e) => {
+              const level = Number(e.target.value);
+              setRandomness(level);
+              setRejected({});
+              try {
+                localStorage.setItem(RANDOMNESS_KEY, String(level));
+              } catch {
+                // le réglage vaudra pour cette session
+              }
+            }}
+          >
+            {RANDOMNESS_LEVELS.map((level, i) => (
+              <option key={level.label} value={i}>
+                {level.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <main className="week">
         {days.map((date) => (
@@ -261,7 +316,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                       </button>
                       <button
                         className="icon"
-                        onClick={() => setSkips({ ...skips, [key]: (skips[key] ?? 0) + 1 })}
+                        onClick={() => setRejected({ ...rejected, [key]: [...(rejected[key] ?? []), proposal.key] })}
                         aria-label={`Autre proposition pour ${dayName(date)} ${SLOT_LABEL[slot]}`}
                         title="Autre proposition"
                       >

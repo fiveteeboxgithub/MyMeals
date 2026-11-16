@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addDays, mondayOf, weekday } from './dates';
 import { parseIcs } from './ics';
-import { buildIndex, isTypoOf, normalize, suggest, usualSlots } from './suggest';
+import { buildIndex, isTypoOf, normalize, pickProposal, suggest, usualSlots, type Suggestion } from './suggest';
 import type { Meal, Slot } from './types';
 
 function meal(date: string, slot: Slot, name: string): Meal {
@@ -270,5 +270,42 @@ describe('surprise', async () => {
       shown.add(pick.name);
     }
     expect(pickSurprise(ideas, shown)).toBeNull();
+  });
+});
+
+describe('pickProposal', () => {
+  const ranked: Suggestion[] = Array.from({ length: 40 }, (_, i) => ({
+    key: `plat${i}`,
+    label: `plat ${i}`,
+    variants: [],
+    search: `plat ${i}`,
+    score: 40 - i,
+    count: 1,
+    reason: '',
+  }));
+  const draws = (level: number) => Array.from({ length: 400 }, (_, i) => pickProposal(ranked, level, `seed${i}`)!);
+
+  it('prend toujours le premier sans hasard', () => {
+    expect(new Set(draws(0).map((s) => s.key))).toEqual(new Set(['plat0']));
+  });
+
+  it('donne le même choix pour le même tirage', () => {
+    expect(pickProposal(ranked, 2, 'a|lundi')).toBe(pickProposal(ranked, 2, 'a|lundi'));
+  });
+
+  it('varie davantage quand le hasard augmente, en favorisant les mieux classés', () => {
+    const distinct = (level: number) => new Set(draws(level).map((s) => s.key)).size;
+    expect(distinct(1)).toBeGreaterThan(3);
+    expect(distinct(1)).toBeLessThanOrEqual(10);
+    expect(distinct(2)).toBeGreaterThan(distinct(1));
+    expect(distinct(3)).toBeGreaterThan(distinct(2));
+    const medium = draws(2);
+    const topHalf = medium.filter((s) => s.score > 25).length;
+    expect(topHalf).toBeGreaterThan(medium.length / 2);
+  });
+
+  it('gère les listes vides ou sans score', () => {
+    expect(pickProposal([], 2, 'x')).toBeUndefined();
+    expect(pickProposal([{ ...ranked[0], score: 0 }, { ...ranked[1], score: 0 }], 3, 'x')!.key).toBe('plat0');
   });
 });

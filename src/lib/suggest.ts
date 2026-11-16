@@ -313,3 +313,55 @@ export function usualSlots(meals: Meal[], today: string): Set<string> {
   }
   return usual;
 }
+
+/** Niveaux de hasard pour le choix des propositions. */
+export const RANDOMNESS_LEVELS = [
+  { label: 'Aucun', pool: 1, power: 1 },
+  { label: 'Faible', pool: 10, power: 2 },
+  { label: 'Moyen', pool: 30, power: 1 },
+  { label: 'Fort', pool: 80, power: 0.4 },
+] as const;
+export const DEFAULT_RANDOMNESS = 2;
+
+/** Nombre pseudo-aléatoire entre 0 et 1, toujours le même pour un texte donné. */
+function hashToUnit(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  h ^= h >>> 16;
+  h = Math.imul(h, 2246822507);
+  h ^= h >>> 13;
+  h = Math.imul(h, 3266489909);
+  h ^= h >>> 16;
+  return ((h >>> 0) + 0.5) / 4294967296;
+}
+
+/**
+ * Choisit une proposition dans un classement, avec plus ou moins de hasard.
+ *
+ * Au niveau 0, c'est toujours la mieux classée. Aux niveaux suivants, on tire au sort
+ * parmi les premières (10, 30 ou 80), les mieux classées gardant plus de chances ;
+ * plus le niveau est élevé, plus les chances s'égalisent. Le tirage dépend de `seed` :
+ * à seed égal le choix ne change pas, ce qui évite que l'écran bouge tout seul.
+ */
+export function pickProposal(ranked: Suggestion[], level: number, seed: string): Suggestion | undefined {
+  const { pool, power } = RANDOMNESS_LEVELS[level] ?? RANDOMNESS_LEVELS[DEFAULT_RANDOMNESS];
+  const candidates = ranked.slice(0, pool);
+  if (candidates.length <= 1 || !(candidates[0].score > 0)) return candidates[0];
+  const top = candidates[0].score;
+  let best: Suggestion | undefined;
+  let bestDraw = -Infinity;
+  for (const candidate of candidates) {
+    const weight = Math.pow(candidate.score / top, power);
+    if (weight <= 0) continue;
+    // Tirage pondéré : chaque plat reçoit une note au hasard, d'autant plus haute que son poids est grand.
+    const draw = Math.log(hashToUnit(`${seed}|${candidate.key}`)) / weight;
+    if (draw > bestDraw) {
+      bestDraw = draw;
+      best = candidate;
+    }
+  }
+  return best ?? candidates[0];
+}
