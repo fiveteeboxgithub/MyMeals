@@ -4,15 +4,32 @@ Qu'est-ce qu'on mange ce soir
 Planning des repas de la semaine (midi et soir), avec des propositions calculées
 à partir de l'historique des repas passés.
 
-## Importer l'historique depuis Google Agenda
+## Deux modes
 
-1. Sur ordinateur, ouvrir Google Agenda, puis Paramètres.
-2. À gauche, cliquer sur l'agenda des repas, puis sur « Exporter l'agenda ».
-3. Dézipper le fichier téléchargé : il contient un fichier `.ics`.
-4. Dans l'application, cliquer sur « Importer un .ics » et choisir ce fichier.
+**Avec Google Agenda (recommandé).** Si `VITE_GOOGLE_CLIENT_ID` est renseigné dans
+`.env`, l'application demande une connexion Google, lit l'agenda nommé
+`VITE_GOOGLE_CALENDAR_NAME` (« Repas ») et y écrit les repas acceptés, modifiés
+ou retirés. L'agenda reste la référence ; le navigateur n'en garde qu'une copie
+pour afficher le planning tout de suite. Les repas créés depuis l'application
+sont placés à 13 h (midi) ou 20 h (soir) et durent une heure.
 
-Les repas restent dans le stockage du navigateur : rien n'est envoyé sur un
-serveur, et les fichiers `.ics` sont ignorés par git.
+Pour obtenir l'ID client : dans la console Google Cloud, créer un projet,
+activer « Google Calendar API », configurer l'écran de consentement OAuth
+(externe, mode Test, avec les comptes du foyer comme utilisateurs de test), puis
+créer un ID client OAuth de type « Application Web » avec comme origines
+JavaScript autorisées l'adresse du site et `http://localhost:5173`. L'ID client
+est public ; le code secret du client n'est pas utilisé.
+
+**Sans Google.** Si `VITE_GOOGLE_CLIENT_ID` est vide, les repas restent dans le
+navigateur et l'historique s'importe depuis un export : Google Agenda →
+Paramètres → agenda des repas → « Exporter l'agenda », dézipper, puis
+« Importer un .ics » dans l'application. Les fichiers `.ics` sont ignorés par git.
+
+## Mise en ligne
+
+Chaque push sur `main` teste, compile et publie le site sur GitHub Pages
+(`.github/workflows/deploy.yml`). Dans les réglages du dépôt, « Pages » →
+« Source » doit être réglé sur « GitHub Actions ».
 
 ## Comment les propositions sont calculées
 

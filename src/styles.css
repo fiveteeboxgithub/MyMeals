@@ -309,3 +309,10 @@ small {
   color: var(--muted);
   padding: 12px 2px;
 }
+
+.ghost-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--card);
+  font-weight: 600;
+}

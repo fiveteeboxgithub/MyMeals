@@ -1,25 +1,158 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { addDays, dayName, longDate, mondayOf, shortDate, todayIso, weekday } from './lib/dates';
+import { useGoogleMeals } from './lib/googleStore';
 import { parseIcs } from './lib/ics';
 import { useMeals } from './lib/store';
 import { buildIndex, normalize, suggest, usualSlots, type Suggestion } from './lib/suggest';
-import { SLOTS, type Meal, type Slot } from './lib/types';
+import { SLOTS, type Meal, type MealStore, type Slot } from './lib/types';
 
 const SLOT_LABEL: Record<Slot, string> = { midi: 'Midi', soir: 'Soir' };
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? '';
+const GOOGLE_CALENDAR_NAME = import.meta.env.VITE_GOOGLE_CALENDAR_NAME?.trim() || 'Repas';
+
+/** Avec un ID client Google, l'agenda est la référence ; sinon tout reste dans le navigateur. */
+export function App() {
+  return GOOGLE_CLIENT_ID ? <GoogleApp /> : <LocalApp />;
+}
+
+function Notice({ text, onClose }: { text: string; onClose: () => void }) {
+  return (
+    <p className="notice" role="status">
+      {text}
+      <button className="link" onClick={onClose} aria-label="Fermer le message">
+        ✕
+      </button>
+    </p>
+  );
+}
+
+function GoogleApp() {
+  const store = useGoogleMeals(GOOGLE_CLIENT_ID, GOOGLE_CALENDAR_NAME);
+  const { connected, syncing, error, meals } = store;
+  return (
+    <Planner
+      store={store}
+      action={
+        connected ? (
+          <button className="ghost-btn" onClick={store.disconnect}>
+            {syncing ? 'Synchronisation…' : 'Se déconnecter'}
+          </button>
+        ) : (
+          <button className="ghost-btn primary" onClick={store.connect}>
+            Se connecter avec Google
+          </button>
+        )
+      }
+      banner={
+        <>
+          {error && <Notice text={error} onClose={store.dismissError} />}
+          {!connected && !error && (
+            <p className="notice" role="status">
+              {meals.length === 0
+                ? `Connecte-toi avec Google pour afficher l'agenda « ${GOOGLE_CALENDAR_NAME} » et recevoir des propositions.`
+                : "Tu vois la dernière copie de l'agenda. Connecte-toi avec Google pour le modifier."}
+            </p>
+          )}
+        </>
+      }
+      footer={`synchronisés avec l'agenda « ${GOOGLE_CALENDAR_NAME} »`}
+    />
+  );
+}
+
+function LocalApp() {
+  const { meals, importMeals, setSlot, clearSlot, clearAll } = useMeals();
+  const [notice, setNotice] = useState('');
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function onFile(file: File | undefined) {
+    if (!file) return;
+    try {
+      const imported = parseIcs(await file.text());
+      if (imported.length === 0) {
+        setNotice("Aucun repas trouvé dans ce fichier. Il faut le fichier .ics (dézippé) exporté depuis Google Agenda.");
+        return;
+      }
+      importMeals(imported);
+      const dates = imported.map((m) => m.date).sort();
+      setNotice(`${imported.length} repas importés, du ${longDate(dates[0])} au ${longDate(dates[dates.length - 1])}.`);
+    } catch {
+      setNotice('Impossible de lire ce fichier.');
+    }
+  }
+
+  return (
+    <Planner
+      store={{ meals, setSlot, clearSlot }}
+      action={
+        <>
+          <button className="ghost-btn" onClick={() => fileInput.current?.click()}>
+            Importer un .ics
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".ics,.ical,text/calendar"
+            hidden
+            onChange={(e) => {
+              void onFile(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+        </>
+      }
+      banner={
+        <>
+          {notice && <Notice text={notice} onClose={() => setNotice('')} />}
+          {meals.length === 0 && (
+            <section className="empty">
+              <h2>Commencer avec ton historique</h2>
+              <ol>
+                <li>Sur ordinateur, ouvre Google Agenda, puis Paramètres.</li>
+                <li>À gauche, clique sur l'agenda « Repas », puis sur « Exporter l'agenda ».</li>
+                <li>Dézippe le fichier téléchargé : il contient un fichier .ics.</li>
+                <li>Clique sur « Importer un .ics » ci-dessus et choisis ce fichier.</li>
+              </ol>
+              <p>Le fichier reste dans ce navigateur : rien n'est envoyé sur un serveur.</p>
+            </section>
+          )}
+        </>
+      }
+      footer={
+        <button
+          className="link"
+          onClick={() => {
+            if (confirm('Effacer tous les repas enregistrés dans ce navigateur ?')) clearAll();
+          }}
+        >
+          tout effacer
+        </button>
+      }
+    />
+  );
+}
 
 interface Editing {
   date: string;
   slot: Slot;
 }
 
-export function App() {
-  const { meals, importMeals, setSlot, clearSlot, clearAll } = useMeals();
+interface PlannerProps {
+  store: MealStore;
+  /** Bouton affiché à droite du titre. */
+  action: ReactNode;
+  /** Messages affichés au-dessus de la semaine. */
+  banner: ReactNode;
+  /** Complément de la ligne de bas de page. */
+  footer: ReactNode;
+}
+
+function Planner({ store, action, banner, footer }: PlannerProps) {
+  const { meals, setSlot, clearSlot } = store;
   const today = todayIso();
   const [monday, setMonday] = useState(() => mondayOf(today));
   const [editing, setEditing] = useState<Editing | null>(null);
   const [skips, setSkips] = useState<Record<string, number>>({});
-  const [notice, setNotice] = useState('');
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const dishes = useMemo(() => buildIndex(meals), [meals]);
   const usual = useMemo(() => usualSlots(meals, today), [meals, today]);
@@ -62,64 +195,16 @@ export function App() {
     return out;
   }, [days, today, bySlot, usual, dishes, skips]);
 
-  async function onFile(file: File | undefined) {
-    if (!file) return;
-    try {
-      const imported = parseIcs(await file.text());
-      if (imported.length === 0) {
-        setNotice("Aucun repas trouvé dans ce fichier. Il faut le fichier .ics (dézippé) exporté depuis Google Agenda.");
-        return;
-      }
-      importMeals(imported);
-      const dates = imported.map((m) => m.date).sort();
-      setNotice(`${imported.length} repas importés, du ${longDate(dates[0])} au ${longDate(dates[dates.length - 1])}.`);
-    } catch {
-      setNotice('Impossible de lire ce fichier.');
-    }
-  }
-
   const sunday = days[6];
 
   return (
     <div className="app">
       <header className="top">
         <h1>MyMeals</h1>
-        <button className="ghost-btn" onClick={() => fileInput.current?.click()}>
-          Importer un .ics
-        </button>
-        <input
-          ref={fileInput}
-          type="file"
-          accept=".ics,.ical,text/calendar"
-          hidden
-          onChange={(e) => {
-            void onFile(e.target.files?.[0]);
-            e.target.value = '';
-          }}
-        />
+        {action}
       </header>
 
-      {notice && (
-        <p className="notice" role="status">
-          {notice}
-          <button className="link" onClick={() => setNotice('')} aria-label="Fermer le message">
-            ✕
-          </button>
-        </p>
-      )}
-
-      {meals.length === 0 && (
-        <section className="empty">
-          <h2>Commencer avec ton historique</h2>
-          <ol>
-            <li>Sur ordinateur, ouvre Google Agenda, puis Paramètres.</li>
-            <li>À gauche, clique sur l'agenda « Repas », puis sur « Exporter l'agenda ».</li>
-            <li>Dézippe le fichier téléchargé : il contient un fichier .ics.</li>
-            <li>Clique sur « Importer un .ics » ci-dessus et choisis ce fichier.</li>
-          </ol>
-          <p>Le fichier reste dans ce navigateur : rien n'est envoyé sur un serveur.</p>
-        </section>
-      )}
+      {banner}
 
       <nav className="week-nav" aria-label="Semaine affichée">
         <button onClick={() => setMonday(addDays(monday, -7))} aria-label="Semaine précédente">
@@ -188,14 +273,7 @@ export function App() {
       {meals.length > 0 && (
         <footer className="foot">
           {meals.length} repas enregistrés · {dishes.size} plats différents ·{' '}
-          <button
-            className="link"
-            onClick={() => {
-              if (confirm('Effacer tous les repas enregistrés dans ce navigateur ?')) clearAll();
-            }}
-          >
-            tout effacer
-          </button>
+          {footer}
         </footer>
       )}
 

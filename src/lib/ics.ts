@@ -1,7 +1,4 @@
-import type { Meal, Slot } from './types';
-
-/** Avant cette heure, un repas compte pour le midi ; après, pour le soir. */
-const LUNCH_LIMIT_HOUR = 16;
+import { LUNCH_LIMIT_HOUR, type Meal, type Slot } from './types';
 
 interface Prop {
   name: string;
