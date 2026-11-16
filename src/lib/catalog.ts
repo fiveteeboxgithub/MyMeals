@@ -10,7 +10,7 @@ export const CONCEPTS = {
   riz: { label: 'le riz', stems: ['riz', 'risotto', 'paella', 'poke', 'sushi', 'maki', 'cantonai'] },
   pdt: {
     label: 'les pommes de terre',
-    stems: ['pomme de terre', 'puree', 'frite', 'pdt', 'patate', 'tartiflette', 'raclette', 'parmentier', 'rosti', 'hachi', 'aligot', 'dauphinoi'],
+    stems: ['puree', 'frite', 'pdt', 'patate', 'tartiflette', 'raclette', 'parmentier', 'rosti', 'hachi', 'aligot', 'dauphinoi'],
   },
   poisson: {
     label: 'le poisson',
@@ -18,7 +18,7 @@ export const CONCEPTS = {
   },
   mer: {
     label: 'les fruits de mer',
-    stems: ['crevette', 'calamar', 'coquille', 'st jacque', 'saint jacque', 'moule', 'gamba', 'fruit de mer', 'paella', 'encornet', 'seiche', 'crabe', 'surimi'],
+    stems: ['crevette', 'calamar', 'saintjacque', 'moule', 'gamba', 'fruitdemer', 'paella', 'encornet', 'seiche', 'crabe', 'surimi'],
   },
   volaille: {
     label: 'la volaille',
@@ -26,11 +26,11 @@ export const CONCEPTS = {
   },
   boeuf: {
     label: 'le bœuf',
-    stems: ['boeuf', 'steack', 'steak', 'hache', 'hachi', 'tartare', 'carpaccio', 'bourguignon', 'bolognaise', 'burger', 'boulette', 'entrecote', 'bavette', 'rosbif', 'veau', 'blanquette', 'keb'],
+    stems: ['boeuf', 'steak', 'hache', 'hachi', 'tartare', 'carpaccio', 'bourguignon', 'bolognaise', 'burger', 'boulette', 'entrecote', 'bavette', 'rosbif', 'veau', 'blanquette', 'keb'],
   },
   porc: {
     label: 'le porc et la charcuterie',
-    stems: ['porc', 'saucisse', 'jambon', 'lardon', 'bacon', 'choucroute', 'chipolata', 'traver', 'rougail', 'carbonara', 'boudin', 'chorizo', 'flammekueche', 'croque', 'raclette', 'petit sale', 'knack'],
+    stems: ['porc', 'saucisse', 'jambon', 'lardon', 'bacon', 'choucroute', 'chipolata', 'traver', 'rougail', 'carbonara', 'boudin', 'chorizo', 'flammekueche', 'croque', 'raclette', 'petitsale', 'knack'],
   },
   agneau: { label: "l'agneau", stems: ['agneau', 'gigot', 'mouton', 'merguez', 'tajine', 'couscou'] },
   oeuf: { label: 'les œufs', stems: ['oeuf', 'omelette', 'quiche', 'tortilla', 'frittata', 'crepe', 'galette'] },
@@ -40,15 +40,15 @@ export const CONCEPTS = {
   },
   legumes: {
     label: 'les légumes',
-    stems: ['legume', 'salade', 'endive', 'epinard', 'courgette', 'haricot vert', 'petit poi', 'champignon', 'tomate', 'carotte', 'poireau', 'chou', 'brocoli', 'aubergine', 'poivron', 'ratatouille', 'courge', 'potiron', 'butternut', 'betterave', 'concombre', 'avocat', 'fenouil', 'asperge', 'navet', 'blette', 'crudite', 'vegeta'],
+    stems: ['legume', 'salade', 'endive', 'epinard', 'courgette', 'haricotvert', 'petitpoi', 'champignon', 'tomate', 'carotte', 'poireau', 'chou', 'brocoli', 'aubergine', 'poivron', 'ratatouille', 'courge', 'potiron', 'butternut', 'betterave', 'concombre', 'avocat', 'fenouil', 'asperge', 'navet', 'blette', 'crudite', 'vegeta'],
   },
   legumineuses: {
     label: 'les légumineuses',
-    stems: ['lentille', 'haricot blanc', 'haricot rouge', 'poi chiche', 'flageolet', 'chili', 'houmou', 'falafel', 'dahl'],
+    stems: ['lentille', 'haricotblanc', 'haricotrouge', 'poichiche', 'flageolet', 'chili', 'houmou', 'falafel', 'dahl'],
   },
   asie: {
     label: 'la cuisine asiatique',
-    stems: ['nem', 'pho', 'nouille', 'poke', 'curry', 'chinoi', 'sushi', 'wok', 'soja', 'thai', 'japonai', 'ramen', 'bo bun', 'gyoza', 'teriyaki', 'coco', 'cantonai', 'maki', 'yakitori', 'tandoori', 'indien', 'naan', 'tikka'],
+    stems: ['nem', 'pho', 'nouille', 'poke', 'curry', 'chinoi', 'sushi', 'wok', 'soja', 'thai', 'japonai', 'ramen', 'bobun', 'gyoza', 'teriyaki', 'coco', 'cantonai', 'maki', 'yakitori', 'tandoori', 'indien', 'naan', 'tikka'],
   },
   tarte: {
     label: 'les tartes, pizzas et crêpes',
@@ -62,7 +62,7 @@ export const CONCEPTS = {
   salade: { label: 'les salades', stems: ['salade', 'poke', 'taboule', 'carpaccio', 'crudite', 'bowl'] },
   snack: {
     label: 'les repas sur le pouce',
-    stems: ['pizza', 'keb', 'mac do', 'mc do', 'macdo', 'mcdo', 'burger', 'croque', 'sandwich', 'hot dog', 'nugget', 'panini', 'taco', 'kfc', 'resto', 'wrap'],
+    stems: ['pizza', 'keb', 'mcdo', 'burger', 'croque', 'sandwich', 'hotdog', 'nugget', 'panini', 'taco', 'kfc', 'resto', 'wrap'],
   },
   epices: {
     label: 'les plats épicés',
@@ -165,7 +165,7 @@ const RAW: [name: string, core: string, tags: string, season?: 'h' | 'e'][] = [
   // Bœuf et veau
   ['Bœuf bourguignon', 'bourguignon', 'boeuf legumes', 'h'],
   ['Chili con carne', 'chili', 'boeuf legumineuses epices riz'],
-  ['Hachis parmentier', 'hachi', 'boeuf pdt gratin'],
+  ['Hachis parmentier', 'parmentier', 'boeuf pdt gratin'],
   ['Boulettes de bœuf à la sauce tomate', 'boulette boeuf', 'boeuf pates'],
   ['Burgers maison', 'burger', 'boeuf snack pdt'],
   ['Bœuf sauté aux oignons', 'boeuf oignon', 'boeuf asie riz'],
@@ -372,8 +372,8 @@ const RAW: [name: string, core: string, tags: string, season?: 'h' | 'e'][] = [
   ['Brochettes de crevettes marinées', 'brochette crevette', 'mer riz salade', 'e'],
   ['Beignets de calamars, salade', 'beignet calamar', 'mer salade'],
   ['Calamars farcis à la provençale', 'calamar farci', 'mer legumes riz'],
-  ['Noix de Saint-Jacques poêlées, fondue de poireaux', 'jacque poireau', 'mer legumes'],
-  ['Saint-Jacques au curry et riz basmati', 'jacque curry', 'mer epices riz'],
+  ['Noix de Saint-Jacques poêlées, fondue de poireaux', 'saint jacques poireau', 'mer legumes'],
+  ['Saint-Jacques au curry et riz basmati', 'saint jacques curry', 'mer epices riz'],
   ['Cassolette de fruits de mer', 'cassolette', 'mer gratin'],
   ['Gratin de fruits de mer', 'gratin fruit', 'mer gratin'],
   ['Fideuà (paella de vermicelles)', 'fideua', 'mer pates epices'],
@@ -425,7 +425,7 @@ const RAW: [name: string, core: string, tags: string, season?: 'h' | 'e'][] = [
   ['Coq au vin', 'coq vin', 'volaille legumes', 'h'],
   ['Poule au pot', 'poule pot', 'volaille legumes soupe riz', 'h'],
   ['Confit de canard, pommes sarladaises', 'confit canard', 'volaille pdt', 'h'],
-  ['Aiguillettes de canard au miel', 'aiguillette canard', 'volaille'],
+  ['Aiguillettes de canard au miel', 'canard miel', 'volaille'],
   ['Canard laqué', 'canard laque', 'volaille asie riz'],
   ['Pintade au chou', 'pintade', 'volaille legumes', 'h'],
   ['Boulettes de poulet à la sauce tomate', 'boulette poulet tomate', 'volaille pates'],
@@ -533,7 +533,7 @@ const RAW: [name: string, core: string, tags: string, season?: 'h' | 'e'][] = [
   ['Roulés de jambon aux asperges', 'jambon asperge', 'porc legumes', 'e'],
   ['Melon et jambon cru, salade', 'melon', 'porc salade', 'e'],
   ['Tartines chèvre-lardons, salade', 'tartine chevre', 'porc fromage salade snack'],
-  ['Pommes de terre farcies au lard et au fromage', 'pomme farci', 'porc pdt fromage', 'h'],
+  ['Pommes de terre farcies au lard et au fromage', 'pomme de terre farci', 'porc pdt fromage', 'h'],
   ['Baeckeoffe', 'baeckeoffe', 'porc boeuf agneau pdt', 'h'],
   ['Feijoada (ragoût de haricots noirs)', 'feijoada', 'porc legumineuses riz'],
   ['Jarret de porc à la bière', 'jarret', 'porc pdt', 'h'],
@@ -561,7 +561,7 @@ const RAW: [name: string, core: string, tags: string, season?: 'h' | 'e'][] = [
   ['Chorba', 'chorba', 'agneau soupe epices legumineuses', 'h'],
   ["Shepherd's pie (parmentier d'agneau)", 'shepherd', 'agneau pdt gratin', 'h'],
   // Œufs (suite)
-  ['Omelette aux pommes de terre et aux oignons', 'omelette pomme', 'oeuf pdt'],
+  ['Omelette aux pommes de terre et aux oignons', 'omelette pomme de terre', 'oeuf pdt'],
   ['Tamagoyaki (omelette roulée à la japonaise) et riz', 'tamagoyaki', 'oeuf asie riz'],
   ['Œufs à la florentine', 'florentine', 'oeuf legumes gratin fromage'],
   ['Œufs en meurette', 'meurette', 'oeuf porc', 'h'],
@@ -605,7 +605,7 @@ const RAW: [name: string, core: string, tags: string, season?: 'h' | 'e'][] = [
   ['Chou-fleur rôti entier, sauce tahini', 'tahini', 'legumes epices'],
   ['Chili sin carne', 'chili sin', 'legumineuses legumes epices riz'],
   ['Lentilles vertes mijotées aux légumes', 'lentille mijote', 'legumineuses legumes'],
-  ['Pois chiches rôtis, légumes et semoule', 'chiche roti', 'legumineuses legumes epices'],
+  ['Pois chiches rôtis, légumes et semoule', 'pois chiche roti', 'legumineuses legumes epices'],
   ['Couscous végétarien', 'couscou vegetarien', 'legumes legumineuses epices'],
   ['Tajine de légumes', 'tajine legume', 'legumes epices legumineuses'],
   ['Socca (galette de pois chiches) et salade', 'socca', 'legumineuses salade tarte'],
@@ -618,7 +618,7 @@ const RAW: [name: string, core: string, tags: string, season?: 'h' | 'e'][] = [
   ['Gratin de blettes', 'blette', 'legumes gratin fromage'],
   ['Gratin de brocolis', 'gratin brocoli', 'legumes gratin fromage'],
   ['Gratin de potiron', 'gratin potiron', 'legumes gratin fromage', 'h'],
-  ['Gratin de patates douces', 'gratin patate', 'pdt gratin fromage', 'h'],
+  ['Gratin de patates douces', 'gratin patate douce', 'pdt gratin fromage', 'h'],
   ['Poivrons farcis au quinoa et à la feta', 'quinoa feta', 'legumes fromage', 'e'],
   ['Salade de quinoa aux légumes rôtis', 'salade quinoa', 'legumes salade'],
   ['Boulgour aux légumes et pois chiches', 'boulgour', 'legumes legumineuses'],
@@ -711,7 +711,7 @@ const RAW: [name: string, core: string, tags: string, season?: 'h' | 'e'][] = [
   ['Salade de poulet, mangue et avocat', 'poulet mangue', 'salade volaille', 'e'],
   ['Salade de pâtes à la grecque', 'pate grecque', 'salade pates fromage legumes', 'e'],
   ['Salade de pâtes au pesto et à la mozzarella', 'salade pesto', 'salade pates fromage', 'e'],
-  ['Salade de pois chiches à la feta', 'salade chiche', 'salade legumineuses fromage', 'e'],
+  ['Salade de pois chiches à la feta', 'salade pois chiche', 'salade legumineuses fromage', 'e'],
   ['Salade de haricots blancs au thon', 'haricot blanc thon', 'salade legumineuses poisson', 'e'],
   ['Salade de semoule aux légumes grillés', 'salade semoule', 'salade legumes', 'e'],
   ["Salade de chou à l'asiatique au poulet", 'chou asiatique', 'salade asie volaille legumes'],

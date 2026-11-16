@@ -80,14 +80,14 @@ describe('parseIcs', () => {
 
 describe('suggest', () => {
   it('regroupe les variantes d’écriture', () => {
-    expect(normalize(' Poisson / Purée ')).toBe('poisson/puree');
+    expect(normalize(' Poisson / Purée ')).toBe('poisson puree');
     const dishes = buildIndex([
       meal('2026-01-01', 'soir', 'poisson/purée'),
       meal('2026-02-01', 'soir', 'poisson/purée'),
       meal('2026-03-01', 'soir', 'Poisson / puree'),
     ]);
     expect(dishes.dishes).toHaveLength(1);
-    expect(dishes.byKey.get('poisson/puree')!.label).toBe('poisson/purée');
+    expect(dishes.byKey.get('poisson puree')!.label).toBe('poisson/purée');
   });
 
   it('ignore l’ordre, les pluriels et les fautes de frappe', () => {
@@ -114,6 +114,45 @@ describe('suggest', () => {
     const macdo = index.byKey.get(normalize('mc do'))!;
     expect(macdo.occurrences).toHaveLength(4);
     expect(macdo.variants).toEqual(['mc do']);
+  });
+
+  it('regroupe les plats identiques écrits différemment', () => {
+    const same = (...names: string[]) => new Set(names.map(normalize)).size === 1;
+    expect(
+      same(
+        'pates/coquilles st jacques',
+        'coquilles/pates',
+        'Pâtes aux St-Jacques',
+        'pates st jacques',
+        'saint jacques et pâtes',
+        'pâtes / noix de Saint-Jacques',
+        'spaghettis aux coquilles saint jacques',
+      ),
+    ).toBe(true);
+    expect(same('curry de crevettes, riz', 'crevettes curry/riz', 'riz basmati + crevettes au curry')).toBe(true);
+    expect(same('poisson/purée', 'poisson et purée maison', 'purée de pommes de terre / poisson')).toBe(true);
+    expect(same('steack haché/frites', 'steaks hachés, frites maison')).toBe(true);
+    expect(same('mac do', 'mc do', 'McDo', "McDonald's", 'macdo')).toBe(true);
+    expect(same('blanc de poulet/haricots verts', 'poulet haricot vert')).toBe(true);
+    expect(same('hachis parmentier', 'parmentier')).toBe(true);
+    // Des plats différents restent distincts.
+    expect(same('pates/saumon', 'pates/thon')).toBe(false);
+    expect(same('poisson/riz', 'poisson/purée')).toBe(false);
+    expect(same('patates douces', 'pommes de terre')).toBe(false);
+    expect(same('coquillettes jambon', 'coquilles jambon')).toBe(false);
+    expect(same('filet mignon', 'mignon')).toBe(false);
+
+    const index = buildIndex([
+      meal('2026-01-03', 'soir', 'pates/coquilles st jacques'),
+      meal('2026-02-03', 'soir', 'pates/coquilles st jacques'),
+      meal('2026-03-03', 'soir', 'coquilles/pates'),
+      meal('2026-04-03', 'soir', 'pates aux st jaques'),
+      meal('2026-05-03', 'soir', 'croquemonsieur salade'),
+      meal('2026-06-03', 'soir', 'croque monsieur/salade'),
+      meal('2026-06-10', 'soir', 'croque monsieur/salade'),
+    ]);
+    expect(index.dishes.map((d) => d.label).sort()).toEqual(['croque monsieur/salade', 'pates/coquilles st jacques']);
+    expect(index.dishes.find((d) => d.label.startsWith('pates'))!.occurrences).toHaveLength(4);
   });
 
   it('attend plus longtemps pour un plat qui revient rarement', () => {

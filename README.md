@@ -33,10 +33,14 @@ Chaque push sur `main` teste, compile et publie le site sur GitHub Pages
 
 ## Comment les propositions sont calculées
 
-Chaque titre d'événement est un plat. Les écritures proches sont regroupées :
-majuscules, accents, pluriels, ordre des éléments (« saumon/pâtes » et « pâtes et
-saumon ») et fautes d'une lettre (« mac do » et « mc do »). L'écriture la plus
-utilisée est affichée ; les autres apparaissent sous « aussi écrit ».
+Chaque titre d'événement est un plat. Deux titres sont le même plat s'ils ont
+les mêmes mots importants, quels que soient l'ordre, les majuscules, les accents,
+les pluriels, la ponctuation et les petits mots (« aux », « de », « maison »).
+Les façons courantes de nommer un même ingrédient sont unifiées (« coquilles »,
+« st jacques » et « noix de Saint-Jacques » ; « pdt » et « pommes de terre » ;
+« mac do » et « McDonald's » ; la liste est dans `PHRASES`, `src/lib/suggest.ts`),
+et une faute d'une lettre est tolérée (« kebbab »). L'écriture la plus utilisée
+est affichée ; les autres apparaissent sous « aussi écrit ».
 
 Pour un créneau donné, un plat est mieux classé s'il a été mangé souvent,
 récemment, à la même saison, au même créneau et le même jour de la semaine.

@@ -58,16 +58,55 @@ function singular(word: string): string {
 }
 
 /**
- * Clé de regroupement d'un plat. Sont ignorés : majuscules, accents, pluriels,
- * et l'ordre des éléments (« saumon/pâtes » = « Pates / saumon » = « pâtes et saumon »).
+ * Expressions ramenées à un seul mot, pour que les différentes façons de nommer
+ * un même ingrédient donnent la même clé. L'ordre compte : les expressions les
+ * plus longues passent avant les mots qu'elles contiennent.
+ */
+const PHRASES: [RegExp, string][] = [
+  [/\b(?:noix de |coquilles? (?:de )?)?(?:st|ste|saint|sainte) *jac?ques?\b/g, 'saintjacque'],
+  [/\bcoquilles?\b/g, 'saintjacque'],
+  [/\bpatates? douces?\b/g, 'patatedouce'],
+  [/\b(?:pommes? de terre|patates?|pdt)\b/g, 'pdt'],
+  [/\bpuree (?:de )?pdt\b/g, 'puree'],
+  [/\bma?c ?do(?:nald)?s?\b/g, 'mcdo'],
+  [/\bharicots? verts?\b/g, 'haricotvert'],
+  [/\bharicots? blancs?\b/g, 'haricotblanc'],
+  [/\bharicots? rouges?\b/g, 'haricotrouge'],
+  [/\bpetits? pois\b/g, 'petitpoi'],
+  [/\bpois chiches?\b/g, 'poichiche'],
+  [/\bfruits? de mer\b/g, 'fruitdemer'],
+  [/\bpetit sale\b/g, 'petitsale'],
+  [/\bhot ?dogs?\b/g, 'hotdog'],
+  [/\bbo ?buns?\b/g, 'bobun'],
+  [/\bsteac?ks?\b/g, 'steak'],
+  [/\b(?:spaghettis?|tagliatelles?|pennes?|fusillis?|farfalles?|linguines?|macaronis?|torsades?)\b/g, 'pate'],
+  [/\bcarbo\b/g, 'carbonara'],
+  [/\b(?:bolo|bolognese)\b/g, 'bolognaise'],
+  [/\bhachis parmentier\b/g, 'parmentier'],
+  [/\b(?:blancs?|filets?|paves?|dos|eminces?|aiguillettes?) de (?=\w)/g, ''],
+  [/\briz (?:basmati|blanc|thai|complet)\b/g, 'riz'],
+  [/\bsalade verte\b/g, 'salade'],
+  [/\brestaurant\b/g, 'resto'],
+];
+
+/** Petits mots qui ne changent pas le plat. */
+const LINK_WORDS = new Set(['de', 'du', 'des', 'au', 'aux', 'la', 'le', 'les', 'en', 'et', 'ou', 'un', 'une', 'avec', 'sur', 'sauce', 'maison', 'facon']);
+
+/**
+ * Clé de regroupement d'un plat : la liste triée de ses mots importants.
+ * Sont ignorés : majuscules, accents, pluriels, ponctuation, petits mots (« aux »,
+ * « de », « maison »), ordre des mots, et les façons courantes de nommer un même
+ * ingrédient. « Pâtes aux St-Jacques », « coquilles/pates » et « pates/coquilles
+ * st jacques » donnent ainsi la même clé.
  */
 export function normalize(name: string): string {
-  return fold(name)
-    .split(/\s*(?:[/,+&]|\bet\b)\s*/)
-    .map((part) => part.split(' ').map(singular).join(' ').trim())
-    .filter(Boolean)
-    .sort()
-    .join('/');
+  let text = fold(name).replace(/[^a-z0-9]+/g, ' ').trim();
+  for (const [pattern, replacement] of PHRASES) text = text.replace(pattern, replacement);
+  const words = text
+    .split(' ')
+    .filter((word) => word.length > 1 && !LINK_WORDS.has(word))
+    .map(singular);
+  return [...new Set(words)].sort().join(' ');
 }
 
 /**
@@ -91,10 +130,25 @@ export function isTypoOf(a: string, b: string): boolean {
   return long.slice(i + 1) === short.slice(i);
 }
 
-const STOP_WORDS = new Set(['aux', 'avec', 'des', 'les', 'sans', 'sauce', 'sur', 'une']);
+/**
+ * Vrai si deux clés désignent le même plat à une faute de frappe près : tous les
+ * mots sont communs sauf un de chaque côté (ou un mot coupé en deux), et ces
+ * restes ne diffèrent que d'une lettre.
+ */
+export function isVariantKey(a: string, b: string): boolean {
+  const restA = a.split(' ');
+  const restB: string[] = [];
+  for (const word of b.split(' ')) {
+    const at = restA.indexOf(word);
+    if (at >= 0) restA.splice(at, 1);
+    else restB.push(word);
+  }
+  if (restA.length === 0 || restB.length === 0 || restA.length > 2 || restB.length > 2) return false;
+  return isTypoOf(restA.join(''), restB.join(''));
+}
 
 function wordsOf(key: string): string[] {
-  return [...new Set(key.split(/[/ ]/).filter((w) => w.length >= 3 && !STOP_WORDS.has(w)))];
+  return key.split(' ').filter((w) => w.length >= 3);
 }
 
 /** Écart médian entre deux fois, sur les trois dernières années où le plat a été mangé. */
@@ -136,13 +190,14 @@ export function buildIndex(meals: Meal[]): DishIndex {
 
   // 2. Les écritures à une faute de frappe près rejoignent l'écriture la plus fréquente.
   const merged: Group[] = [];
-  const byLength = new Map<number, { compact: string; group: Group }[]>();
   const ranked = [...groups.values()].sort((a, b) => b.occurrences.length - a.occurrences.length);
+  // Deux clés à une lettre près ont presque la même longueur : on ne compare qu'entre voisines.
+  const byLength = new Map<number, Group[]>();
   for (const group of ranked) {
-    const compact = group.key.replace(/ /g, '');
+    const length = group.key.replace(/ /g, '').length;
     let target: Group | undefined;
-    for (const length of [compact.length, compact.length - 1, compact.length + 1]) {
-      target = byLength.get(length)?.find((c) => c.group.generic === group.generic && isTypoOf(c.compact, compact))?.group;
+    for (const near of [length, length - 1, length + 1]) {
+      target = byLength.get(near)?.find((m) => m.generic === group.generic && isVariantKey(m.key, group.key));
       if (target) break;
     }
     if (target) {
@@ -153,8 +208,8 @@ export function buildIndex(meals: Meal[]): DishIndex {
       }
     } else {
       merged.push(group);
-      if (!byLength.has(compact.length)) byLength.set(compact.length, []);
-      byLength.get(compact.length)!.push({ compact, group });
+      if (!byLength.has(length)) byLength.set(length, []);
+      byLength.get(length)!.push(group);
     }
   }
 

@@ -19,21 +19,17 @@ export interface Surprise {
   score: number;
 }
 
-/** Met un nom de plat sous une forme où l'on peut chercher des débuts de mots. */
-function haystack(key: string): string {
-  return ` ${key.replace(/[/'’()-]/g, ' ').replace(/\s+/g, ' ')} `;
-}
-
-function hasWords(hay: string, words: string): boolean {
-  return words.split(' ').every((word) => hay.includes(` ${word}`));
+/** Vrai si chaque mot-clé est le début d'un des mots du plat. */
+function hasCore(dishWords: string[], coreWords: string[]): boolean {
+  return coreWords.every((core) => dishWords.some((word) => word.startsWith(core)));
 }
 
 const CONCEPT_IDS = Object.keys(CONCEPTS) as Concept[];
 
 /** Familles reconnues dans un plat de l'historique, d'après sa clé normalisée. */
 export function conceptsOf(key: string): Concept[] {
-  const hay = haystack(key);
-  return CONCEPT_IDS.filter((id) => CONCEPTS[id].stems.some((stem) => hay.includes(` ${stem}`)));
+  const words = key.split(' ');
+  return CONCEPT_IDS.filter((id) => CONCEPTS[id].stems.some((stem) => words.some((word) => word.startsWith(stem))));
 }
 
 /**
@@ -58,9 +54,10 @@ export function tasteProfile(index: DishIndex, months: number, today: string): M
 }
 
 /** Vrai si l'historique complet contient déjà ce plat du catalogue. */
-function isKnown(entry: CatalogDish, hays: string[], index: DishIndex): boolean {
+function isKnown(entry: CatalogDish, dishWords: string[][], index: DishIndex): boolean {
   if (index.byKey.has(normalize(entry.name))) return true;
-  return hays.some((hay) => hasWords(hay, entry.core));
+  const core = normalize(entry.core).split(' ');
+  return dishWords.some((words) => hasCore(words, core));
 }
 
 function inSeason(entry: CatalogDish, month: number): boolean {
@@ -76,11 +73,11 @@ function inSeason(entry: CatalogDish, month: number): boolean {
  */
 export function surpriseIdeas(index: DishIndex, date: string, months: number, today: string): Surprise[] {
   const profile = tasteProfile(index, months, today);
-  const hays = index.dishes.map((d) => haystack(d.key));
+  const dishWords = index.dishes.map((d) => d.key.split(' '));
   const month = monthOf(date);
   const ideas: Surprise[] = [];
   for (const entry of CATALOG) {
-    if (isKnown(entry, hays, index)) continue;
+    if (isKnown(entry, dishWords, index)) continue;
     const weights = entry.tags.map((tag) => profile.get(tag) ?? 0);
     const affinity = weights.reduce((sum, w) => sum + w, 0) / weights.length;
     const because = entry.tags
@@ -116,7 +113,7 @@ export function catalogProblems(): string[] {
     if (names.has(entry.name)) problems.push(`doublon : ${entry.name}`);
     names.add(entry.name);
     for (const tag of entry.tags) if (!(tag in CONCEPTS)) problems.push(`famille inconnue « ${tag} » : ${entry.name}`);
-    if (!hasWords(haystack(normalize(entry.name)), entry.core)) problems.push(`mots-clés absents du nom : ${entry.name}`);
+    if (!hasCore(normalize(entry.name).split(' '), normalize(entry.core).split(' '))) problems.push(`mots-clés absents du nom : ${entry.name}`);
     if (fold(entry.core) !== entry.core) problems.push(`mots-clés non normalisés : ${entry.name}`);
   }
   return problems;
