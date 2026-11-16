@@ -50,6 +50,15 @@ Il est moins bien classé :
 Les créneaux rarement remplis sur les 12 derniers mois (par exemple le midi en
 semaine) ne reçoivent pas de proposition.
 
+## Surprise Me
+
+Dans la fenêtre d'un créneau, le bouton « Surprise Me » propose un plat qui
+n'apparaît nulle part dans l'historique. Les idées viennent d'un catalogue
+intégré (`src/lib/catalog.ts`), où chaque plat est décrit par des familles
+(poisson, riz, gratins…). Elles sont classées selon la part de ces familles dans
+les repas de la période choisie (6 mois à 5 ans, 2 ans par défaut) et selon la
+saison, puis tirées au sort parmi les dix meilleures.
+
 ## Développement
 
 ```bash

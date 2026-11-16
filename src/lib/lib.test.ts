@@ -212,3 +212,63 @@ describe('suggest', () => {
     expect(usual.has('0-midi')).toBe(false);
   });
 });
+
+describe('surprise', async () => {
+  const { catalogProblems, conceptsOf, pickSurprise, surpriseIdeas, tasteProfile } = await import('./surprise');
+  const { CATALOG } = await import('./catalog');
+
+  it('a un catalogue cohérent', () => {
+    expect(catalogProblems()).toEqual([]);
+    expect(CATALOG.length).toBeGreaterThan(120);
+  });
+
+  it('reconnaît les familles dans les plats de l’historique', () => {
+    expect(conceptsOf(normalize('poisson/purée'))).toEqual(['pdt', 'poisson']);
+    expect(conceptsOf(normalize('crevettes curry/riz'))).toEqual(['riz', 'mer', 'asie', 'epices']);
+    expect(conceptsOf(normalize('epinards/oeufs durs'))).toEqual(['oeuf', 'legumes']);
+    expect(conceptsOf(normalize('pates/coquilles st jacques'))).toEqual(['pates', 'mer']);
+    expect(conceptsOf(normalize('boeuf carottes'))).not.toContain('oeuf');
+  });
+
+  const history: Meal[] = [];
+  // Il y a 4 ans : beaucoup de viande. Depuis un an : poisson et riz.
+  for (let i = 0; i < 60; i++) history.push(meal(addDays('2022-01-04', i * 7), 'soir', 'steak/frites'));
+  for (let i = 0; i < 40; i++) history.push(meal(addDays('2026-01-06', i * 7), 'soir', i % 2 ? 'poisson/riz' : 'saumon/riz'));
+  history.push(meal('2026-03-01', 'soir', 'risotto'));
+  history.push(meal('2026-03-08', 'midi', 'restes'));
+  const index = buildIndex(history);
+
+  it('calcule les préférences sur la période choisie', () => {
+    const recent = tasteProfile(index, 12, '2026-11-16');
+    expect(recent.get('poisson')).toBeCloseTo(40 / 41);
+    expect(recent.has('boeuf')).toBe(false);
+    const long = tasteProfile(index, 60, '2026-11-16');
+    expect(long.get('boeuf')).toBeCloseTo(60 / 101);
+  });
+
+  it('propose des plats inconnus proches des goûts récents', () => {
+    const ideas = surpriseIdeas(index, '2026-11-20', 12, '2026-11-16');
+    const names = ideas.map((i) => i.name);
+    expect(names).not.toContain('Risotto aux champignons'); // déjà connu
+    expect(names).toContain('Bœuf bourguignon');
+    expect(ideas[0].because).toEqual(['le riz', 'le poisson']);
+    expect(names.indexOf('Saumon teriyaki, riz et brocolis')).toBeLessThan(names.indexOf('Bœuf bourguignon'));
+    // Avec 5 ans de recul, la viande remonte.
+    const long = surpriseIdeas(index, '2026-11-20', 60, '2026-11-16').map((i) => i.name);
+    expect(long.indexOf('Burgers maison')).toBeLessThan(names.indexOf('Burgers maison'));
+    // Hors saison, un plat d'été descend.
+    const summer = surpriseIdeas(index, '2026-07-20', 12, '2026-11-16').map((i) => i.name);
+    expect(summer.indexOf('Ceviche de dorade')).toBeLessThan(names.indexOf('Ceviche de dorade'));
+  });
+
+  it('ne répète pas une idée déjà montrée', () => {
+    const ideas = surpriseIdeas(index, '2026-11-20', 12, '2026-11-16');
+    const shown = new Set<string>();
+    for (let i = 0; i < ideas.length; i++) {
+      const pick = pickSurprise(ideas, shown, () => 0.5)!;
+      expect(shown.has(pick.name)).toBe(false);
+      shown.add(pick.name);
+    }
+    expect(pickSurprise(ideas, shown)).toBeNull();
+  });
+});

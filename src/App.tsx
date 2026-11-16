@@ -3,7 +3,8 @@ import { addDays, dayName, longDate, mondayOf, shortDate, todayIso, weekday } fr
 import { useGoogleMeals } from './lib/googleStore';
 import { parseIcs } from './lib/ics';
 import { useMeals, useSkippedSlots } from './lib/store';
-import { buildIndex, fold, normalize, suggest, usualSlots, type Suggestion } from './lib/suggest';
+import { buildIndex, fold, normalize, suggest, usualSlots, type DishIndex, type Suggestion } from './lib/suggest';
+import { DEFAULT_PERIOD_MONTHS, PERIODS, pickSurprise, surpriseIdeas, type Surprise } from './lib/surprise';
 import { SLOTS, type Meal, type MealStore, type Slot } from './lib/types';
 
 const SLOT_LABEL: Record<Slot, string> = { midi: 'Midi', soir: 'Soir' };
@@ -300,6 +301,8 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
           slot={editing.slot}
           current={bySlot.get(`${editing.date}|${editing.slot}`)}
           suggestions={suggest(dishes, editing.date, editing.slot)}
+          dishes={dishes}
+          today={today}
           skipped={skipped.has(`${editing.date}|${editing.slot}`)}
           onSkip={(skip) => {
             setSkip(`${editing.date}|${editing.slot}`, skip);
@@ -326,6 +329,8 @@ interface SheetProps {
   slot: Slot;
   current: Meal[] | undefined;
   suggestions: Suggestion[];
+  dishes: DishIndex;
+  today: string;
   skipped: boolean;
   onSkip: (skip: boolean) => void;
   onPick: (name: string) => void;
@@ -333,7 +338,7 @@ interface SheetProps {
   onClose: () => void;
 }
 
-function SlotSheet({ date, slot, current, suggestions, skipped, onSkip, onPick, onClear, onClose }: SheetProps) {
+function SlotSheet({ date, slot, current, suggestions, dishes, today, skipped, onSkip, onPick, onClear, onClose }: SheetProps) {
   const [query, setQuery] = useState('');
   // Chaque mot saisi doit se retrouver dans une des écritures du plat, dans n'importe quel ordre.
   const needles = fold(query).split(/[\s/]+/).filter(Boolean);
@@ -388,6 +393,7 @@ function SlotSheet({ date, slot, current, suggestions, skipped, onSkip, onPick, 
             aria-label="Chercher ou saisir un plat"
           />
         </form>
+        <SurpriseMe date={date} dishes={dishes} today={today} onPick={onPick} />
         <ul className="choices">
           {query.trim() && !exact && (
             <li>
@@ -413,5 +419,108 @@ function SlotSheet({ date, slot, current, suggestions, skipped, onSkip, onPick, 
         </ul>
       </div>
     </div>
+  );
+}
+
+const PERIOD_KEY = 'mymeals.surprise.months';
+
+function loadPeriod(): number {
+  try {
+    const stored = Number(localStorage.getItem(PERIOD_KEY));
+    return PERIODS.some((p) => p.months === stored) ? stored : DEFAULT_PERIOD_MONTHS;
+  } catch {
+    return DEFAULT_PERIOD_MONTHS;
+  }
+}
+
+interface SurpriseProps {
+  date: string;
+  dishes: DishIndex;
+  today: string;
+  onPick: (name: string) => void;
+}
+
+/** Propose un plat absent de l'historique, choisi d'après les goûts de la période réglée. */
+function SurpriseMe({ date, dishes, today, onPick }: SurpriseProps) {
+  const [months, setMonths] = useState(loadPeriod);
+  const [idea, setIdea] = useState<Surprise | null>(null);
+  const [opened, setOpened] = useState(false);
+  const shown = useRef(new Set<string>());
+
+  function draw(period: number) {
+    const ideas = surpriseIdeas(dishes, date, period, today);
+    let pick = pickSurprise(ideas, shown.current);
+    if (!pick && ideas.length > 0) {
+      // Toutes les idées ont été vues : on repart du début.
+      shown.current.clear();
+      pick = pickSurprise(ideas, shown.current);
+    }
+    if (pick) shown.current.add(pick.name);
+    setIdea(pick);
+    setOpened(true);
+  }
+
+  if (!opened) {
+    return (
+      <button className="surprise-btn" onClick={() => draw(months)}>
+        ✨ Surprise Me
+      </button>
+    );
+  }
+
+  return (
+    <section className="surprise" aria-live="polite">
+      {idea ? (
+        <>
+          <p className="surprise-name">✨ {idea.name}</p>
+          <p className="surprise-why">
+            {idea.because.length > 0
+              ? `Jamais noté dans tes repas. Proche de tes goûts récents : ${idea.because.join(' et ')}.`
+              : 'Jamais noté dans tes repas. Pas assez de repas sur cette période pour cerner tes goûts.'}
+          </p>
+          <div className="surprise-actions">
+            <button className="ghost-btn primary" onClick={() => onPick(idea.name)}>
+              Choisir
+            </button>
+            <button className="ghost-btn" onClick={() => draw(months)}>
+              Une autre
+            </button>
+            <a
+              className="link"
+              href={`https://www.google.com/search?q=${encodeURIComponent(`recette ${idea.name}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Voir des recettes
+            </a>
+          </div>
+        </>
+      ) : (
+        <p className="surprise-why">Tu connais déjà tous les plats de mon catalogue.</p>
+      )}
+      <label className="surprise-period">
+        D'après mes repas des
+        <select
+          value={months}
+          onChange={(e) => {
+            const period = Number(e.target.value);
+            setMonths(period);
+            try {
+              localStorage.setItem(PERIOD_KEY, String(period));
+            } catch {
+              // le réglage vaudra pour cette session
+            }
+            shown.current.clear();
+            draw(period);
+          }}
+        >
+          {PERIODS.map((p) => (
+            <option key={p.months} value={p.months}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </section>
   );
 }

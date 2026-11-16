@@ -1,0 +1,262 @@
+/**
+ * Familles de plats. Chaque famille est reconnue dans l'historique par des débuts
+ * de mots (sans accents, au singulier), et sert à décrire les idées du catalogue.
+ */
+export const CONCEPTS = {
+  pates: {
+    label: 'les pâtes',
+    stems: ['pate', 'spaghetti', 'tagliatelle', 'lasagne', 'raviol', 'gnocchi', 'nouille', 'carbonara', 'bolognaise', 'macaroni', 'penne', 'coquillette', 'croz', 'cannelloni', 'vermicelle', 'linguine'],
+  },
+  riz: { label: 'le riz', stems: ['riz', 'risotto', 'paella', 'poke', 'sushi', 'maki', 'cantonai'] },
+  pdt: {
+    label: 'les pommes de terre',
+    stems: ['pomme de terre', 'puree', 'frite', 'pdt', 'patate', 'tartiflette', 'raclette', 'parmentier', 'rosti', 'hachi', 'aligot', 'dauphinoi'],
+  },
+  poisson: {
+    label: 'le poisson',
+    stems: ['poisson', 'saumon', 'thon', 'cabillaud', 'colin', 'truite', 'sardine', 'maquereau', 'lieu', 'dorade', 'merlu', 'sole', 'brandade', 'morue', 'anchoi', 'sushi', 'poke'],
+  },
+  mer: {
+    label: 'les fruits de mer',
+    stems: ['crevette', 'calamar', 'coquille', 'st jacque', 'saint jacque', 'moule', 'gamba', 'fruit de mer', 'paella', 'encornet', 'seiche', 'crabe', 'surimi'],
+  },
+  volaille: {
+    label: 'la volaille',
+    stems: ['poulet', 'dinde', 'escalope', 'cordon', 'canard', 'magret', 'pintade', 'nugget', 'volaille'],
+  },
+  boeuf: {
+    label: 'le bœuf',
+    stems: ['boeuf', 'steack', 'steak', 'hache', 'hachi', 'tartare', 'carpaccio', 'bourguignon', 'bolognaise', 'burger', 'boulette', 'entrecote', 'bavette', 'rosbif', 'veau', 'blanquette', 'keb'],
+  },
+  porc: {
+    label: 'le porc et la charcuterie',
+    stems: ['porc', 'saucisse', 'jambon', 'lardon', 'bacon', 'choucroute', 'chipolata', 'traver', 'rougail', 'carbonara', 'boudin', 'chorizo', 'flammekueche', 'croque', 'raclette', 'petit sale', 'knack'],
+  },
+  agneau: { label: "l'agneau", stems: ['agneau', 'gigot', 'mouton', 'merguez', 'tajine', 'couscou'] },
+  oeuf: { label: 'les œufs', stems: ['oeuf', 'omelette', 'quiche', 'tortilla', 'frittata', 'crepe', 'galette'] },
+  fromage: {
+    label: 'le fromage',
+    stems: ['fromage', 'tartiflette', 'raclette', 'fondue', 'croziflette', 'morbier', 'reblochon', 'gruyere', 'chevre', 'mozza', 'bleu', 'comte', 'camembert', 'feta', 'parmesan', 'boursin', 'croque', 'pizza', 'burrata', 'roquefort', 'emmental', 'cheddar'],
+  },
+  legumes: {
+    label: 'les légumes',
+    stems: ['legume', 'salade', 'endive', 'epinard', 'courgette', 'haricot vert', 'petit poi', 'champignon', 'tomate', 'carotte', 'poireau', 'chou', 'brocoli', 'aubergine', 'poivron', 'ratatouille', 'courge', 'potiron', 'butternut', 'betterave', 'concombre', 'avocat', 'fenouil', 'asperge', 'navet', 'blette', 'crudite', 'vegeta'],
+  },
+  legumineuses: {
+    label: 'les légumineuses',
+    stems: ['lentille', 'haricot blanc', 'haricot rouge', 'poi chiche', 'flageolet', 'chili', 'houmou', 'falafel', 'dahl'],
+  },
+  asie: {
+    label: 'la cuisine asiatique',
+    stems: ['nem', 'pho', 'nouille', 'poke', 'curry', 'chinoi', 'sushi', 'wok', 'soja', 'thai', 'japonai', 'ramen', 'bo bun', 'gyoza', 'teriyaki', 'coco', 'cantonai', 'maki', 'yakitori', 'tandoori', 'indien', 'naan', 'tikka'],
+  },
+  tarte: {
+    label: 'les tartes, pizzas et crêpes',
+    stems: ['tarte', 'quiche', 'pizza', 'flammekueche', 'crepe', 'galette', 'tourte', 'feuillete', 'cake', 'fajita', 'burrito', 'taco', 'calzone', 'wrap'],
+  },
+  soupe: { label: 'les soupes', stems: ['soupe', 'veloute', 'potage', 'bouillon', 'pho', 'ramen', 'minestrone', 'gaspacho'] },
+  gratin: {
+    label: 'les gratins',
+    stems: ['gratin', 'parmentier', 'lasagne', 'hachi', 'tartiflette', 'croziflette', 'moussaka', 'tian'],
+  },
+  salade: { label: 'les salades', stems: ['salade', 'poke', 'taboule', 'carpaccio', 'crudite', 'bowl'] },
+  snack: {
+    label: 'les repas sur le pouce',
+    stems: ['pizza', 'keb', 'mac do', 'mc do', 'macdo', 'mcdo', 'burger', 'croque', 'sandwich', 'hot dog', 'nugget', 'panini', 'taco', 'kfc', 'resto', 'wrap'],
+  },
+  epices: {
+    label: 'les plats épicés',
+    stems: ['curry', 'chili', 'tajine', 'couscou', 'paella', 'rougail', 'tandoori', 'colombo', 'epice', 'piment', 'harissa', 'tikka', 'massala', 'mexicain', 'fajita', 'chorizo', 'merguez'],
+  },
+} as const;
+
+export type Concept = keyof typeof CONCEPTS;
+
+export interface CatalogDish {
+  name: string;
+  /** Mots qui, tous présents dans un plat de l'historique, montrent que le plat est déjà connu. */
+  core: string;
+  tags: Concept[];
+  /** 'h' : plutôt d'octobre à mars ; 'e' : plutôt d'avril à septembre ; '' : toute l'année. */
+  season: '' | 'h' | 'e';
+}
+
+const RAW: [name: string, core: string, tags: string, season?: 'h' | 'e'][] = [
+  // Pâtes
+  ['Pâtes au pesto et tomates cerises', 'pesto', 'pates legumes'],
+  ['Lasagnes aux épinards et ricotta', 'lasagne epinard', 'pates legumes fromage gratin'],
+  ['Pâtes à la puttanesca', 'puttanesca', 'pates legumes'],
+  ['Gnocchis à la sorrentina', 'sorrentina', 'pates fromage gratin'],
+  ['One pot pasta poulet-champignons', 'one pot', 'pates volaille legumes'],
+  ['Pâtes aux crevettes, citron et courgettes', 'crevette citron', 'pates mer legumes'],
+  ['Tagliatelles au saumon fumé et aneth', 'saumon fume', 'pates poisson'],
+  ['Cannellonis ricotta-épinards', 'cannelloni', 'pates fromage legumes gratin'],
+  ["Pâtes à l'arrabbiata", 'arrabbiata', 'pates epices'],
+  ['Raviolis à la crème et aux champignons', 'ravioli', 'pates legumes fromage'],
+  ['Spaghettis aux palourdes', 'palourde', 'pates mer'],
+  ['Gratin de coquillettes au jambon', 'coquillette', 'pates porc gratin fromage'],
+  ['Nouilles sautées aux crevettes', 'nouille saute', 'pates asie mer'],
+  ['Pad thaï au poulet', 'pad thai', 'pates asie volaille'],
+  ['Linguine aux fruits de mer', 'fruit de mer', 'pates mer'],
+  ['Gratin de ravioles', 'raviole', 'pates fromage gratin'],
+  ['Gnocchis au gorgonzola', 'gorgonzola', 'pates fromage'],
+  // Riz
+  ['Risotto aux champignons', 'risotto', 'riz legumes fromage'],
+  ['Risotto aux crevettes et petits pois', 'risotto crevette', 'riz mer legumes'],
+  ['Riz cantonais', 'cantonai', 'riz asie oeuf porc'],
+  ['Riz sauté au poulet et aux légumes', 'riz saute', 'riz asie volaille legumes'],
+  ['Jambalaya', 'jambalaya', 'riz epices volaille mer'],
+  ['Poulet basquaise et riz', 'basquaise', 'volaille riz legumes'],
+  ['Biryani de poulet', 'biryani', 'riz epices volaille asie'],
+  ['Chirashi saumon-avocat', 'chirashi', 'riz poisson asie salade'],
+  ['Bibimbap', 'bibimbap', 'riz asie boeuf legumes oeuf'],
+  ['Nasi goreng', 'nasi', 'riz asie epices oeuf'],
+  // Poisson
+  ['Saumon teriyaki, riz et brocolis', 'teriyaki', 'poisson riz asie legumes'],
+  ['Cabillaud en croûte de chorizo', 'cabillaud chorizo', 'poisson epices'],
+  ['Papillote de poisson aux légumes', 'papillote', 'poisson legumes'],
+  ['Fish and chips', 'fish', 'poisson pdt snack'],
+  ['Brandade de morue', 'brandade', 'poisson pdt gratin'],
+  ['Curry de poisson au lait de coco', 'curry poisson', 'poisson epices asie riz'],
+  ['Tacos de poisson', 'taco poisson', 'poisson tarte epices'],
+  ['Saumon en croûte', 'saumon croute', 'poisson tarte'],
+  ['Thon mi-cuit au sésame et nouilles', 'thon sesame', 'poisson asie pates'],
+  ['Poisson meunière, pommes vapeur', 'meuniere', 'poisson pdt'],
+  ['Quenelles de brochet sauce Nantua', 'quenelle', 'poisson gratin'],
+  ['Tartare de saumon, frites', 'tartare saumon', 'poisson pdt salade'],
+  ['Ceviche de dorade', 'ceviche', 'poisson salade', 'e'],
+  ['Lieu noir à la moutarde, poireaux', 'lieu', 'poisson legumes'],
+  ['Gratin de poisson aux poireaux', 'poisson poireau', 'poisson gratin legumes'],
+  ['Accras de morue et salade', 'accra', 'poisson salade epices'],
+  ['Quiche au saumon et brocolis', 'quiche saumon', 'tarte poisson oeuf legumes'],
+  ['Sushis maison', 'sushi', 'asie poisson riz'],
+  // Fruits de mer
+  ['Moules marinières, frites', 'moule', 'mer pdt'],
+  ['Wok de crevettes aux légumes', 'wok', 'mer asie legumes'],
+  ['Encornets farcis, riz', 'encornet', 'mer riz'],
+  ['Gambas flambées, tagliatelles', 'gamba', 'mer pates'],
+  ['Crevettes sauce aigre-douce, riz', 'aigre', 'mer asie riz'],
+  ['Tempura de crevettes et légumes', 'tempura', 'mer asie legumes'],
+  ['Soupe thaïe aux crevettes', 'soupe thai', 'soupe mer asie epices'],
+  ['Rouleaux de printemps', 'rouleau', 'asie mer salade', 'e'],
+  // Volaille
+  ['Poulet au curry et lait de coco', 'poulet curry', 'volaille epices riz asie'],
+  ['Poulet rôti, pommes de terre', 'poulet roti', 'volaille pdt'],
+  ['Poulet à la moutarde', 'poulet moutarde', 'volaille'],
+  ['Poulet tikka massala, riz', 'tikka', 'volaille epices asie riz'],
+  ['Fajitas au poulet', 'fajita', 'volaille tarte epices legumes'],
+  ['Tajine de poulet aux citrons confits', 'tajine', 'volaille epices legumes'],
+  ['Poulet yassa', 'yassa', 'volaille riz epices'],
+  ['Nuggets maison, purée', 'nugget', 'volaille pdt snack'],
+  ['Salade César au poulet', 'cesar', 'volaille salade'],
+  ['Wok de poulet aux noix de cajou', 'cajou', 'volaille asie legumes riz'],
+  ['Magret de canard, pommes sautées', 'magret', 'volaille pdt'],
+  ['Émincé de dinde à la crème et aux champignons', 'dinde', 'volaille legumes riz'],
+  ['Poulet katsu et riz', 'katsu', 'volaille asie riz'],
+  ['Yakitoris et riz', 'yakitori', 'volaille asie riz'],
+  ['Parmentier de canard', 'parmentier canard', 'volaille pdt gratin'],
+  ['Couscous poulet-merguez', 'couscou', 'volaille agneau epices legumes'],
+  ['Curry vert thaï au poulet', 'curry vert', 'asie volaille epices riz'],
+  ['Poulet général Tao', 'tao', 'asie volaille riz'],
+  ['Tourte au poulet et aux champignons', 'tourte', 'tarte volaille legumes', 'h'],
+  ['Wraps poulet-crudités', 'wrap', 'tarte volaille salade snack'],
+  ['Pastilla au poulet', 'pastilla', 'tarte volaille epices'],
+  ['Salade landaise', 'landaise', 'salade volaille'],
+  // Bœuf et veau
+  ['Bœuf bourguignon', 'bourguignon', 'boeuf legumes', 'h'],
+  ['Chili con carne', 'chili', 'boeuf legumineuses epices riz'],
+  ['Hachis parmentier', 'hachi', 'boeuf pdt gratin'],
+  ['Boulettes de bœuf à la sauce tomate', 'boulette boeuf', 'boeuf pates'],
+  ['Burgers maison', 'burger', 'boeuf snack pdt'],
+  ['Bœuf sauté aux oignons', 'boeuf oignon', 'boeuf asie riz'],
+  ['Lasagnes à la bolognaise', 'lasagne', 'boeuf pates gratin'],
+  ['Bo bun', 'bo bun', 'boeuf asie pates salade', 'e'],
+  ['Pot-au-feu', 'pot au feu', 'boeuf legumes soupe', 'h'],
+  ['Blanquette de veau', 'blanquette', 'boeuf riz', 'h'],
+  ['Tacos mexicains au bœuf', 'taco', 'boeuf tarte epices'],
+  ['Moussaka', 'moussaka', 'boeuf agneau legumes gratin'],
+  ['Bœuf loc lac', 'loc lac', 'boeuf asie riz'],
+  ['Carbonade flamande, frites', 'carbonade', 'boeuf pdt', 'h'],
+  ['Tomates farcies, riz', 'farci', 'boeuf porc riz legumes', 'e'],
+  ['Keftas, semoule et légumes', 'kefta', 'boeuf agneau epices legumes'],
+  ['Burritos', 'burrito', 'tarte boeuf legumineuses epices riz'],
+  ['Salade thaïe au bœuf', 'thai boeuf', 'salade asie boeuf', 'e'],
+  // Porc et charcuterie
+  ['Rougail saucisse', 'rougail', 'porc epices riz'],
+  ['Filet mignon à la moutarde', 'filet mignon', 'porc pdt'],
+  ['Endives au jambon gratinées', 'endive jambon', 'porc legumes gratin fromage', 'h'],
+  ['Porc au caramel, riz', 'caramel', 'porc asie riz'],
+  ['Travers de porc au miel', 'traver', 'porc pdt'],
+  ['Petit salé aux lentilles', 'petit sale', 'porc legumineuses', 'h'],
+  ["Sauté de porc à l'ananas", 'anana', 'porc asie riz'],
+  ['Galettes de sarrasin complètes', 'galette', 'porc oeuf fromage tarte'],
+  ['Quiche poireaux-lardons', 'quiche poireau', 'porc oeuf tarte legumes'],
+  ['Potée auvergnate', 'potee', 'porc legumes', 'h'],
+  ['Croque-madame', 'croque madame', 'porc oeuf fromage snack'],
+  ['Saucisse de Morteau, pommes de terre et cancoillotte', 'morteau', 'porc pdt fromage', 'h'],
+  ['Jambon braisé, gratin dauphinois', 'dauphinoi', 'porc pdt gratin'],
+  ['Cake salé jambon-olives', 'cake', 'tarte porc'],
+  ['Calzone', 'calzone', 'tarte fromage porc'],
+  ['Bánh mì', 'banh', 'asie porc snack'],
+  ['Raviolis vapeur', 'ravioli vapeur', 'asie porc'],
+  ['Ramen', 'ramen', 'soupe asie pates porc oeuf'],
+  ['Soupe miso et gyozas', 'gyoza', 'soupe asie porc'],
+  // Agneau
+  ["Tajine d'agneau aux pruneaux", 'tajine agneau', 'agneau epices'],
+  ["Navarin d'agneau", 'navarin agneau', 'agneau legumes'],
+  ["Gigot d'agneau, flageolets", 'gigot', 'agneau legumineuses'],
+  // Œufs
+  ['Tortilla espagnole', 'tortilla', 'oeuf pdt'],
+  ['Shakshuka', 'shakshuka', 'oeuf legumes epices'],
+  ['Œufs cocotte et mouillettes', 'cocotte', 'oeuf fromage'],
+  ['Frittata aux légumes', 'frittata', 'oeuf legumes'],
+  ['Œufs brouillés, saumon fumé', 'brouille', 'oeuf poisson'],
+  ['Soufflé au fromage', 'souffle', 'oeuf fromage gratin'],
+  // Fromage
+  ['Raclette', 'raclette', 'fromage pdt porc', 'h'],
+  ['Fondue savoyarde', 'fondue', 'fromage', 'h'],
+  ["Mont d'Or au four, pommes de terre", 'mont or', 'fromage pdt porc', 'h'],
+  ['Aligot-saucisse', 'aligot', 'fromage pdt porc', 'h'],
+  ['Welsh', 'welsh', 'fromage porc snack', 'h'],
+  ['Tarte aux poireaux et au chèvre', 'tarte poireau', 'fromage tarte legumes'],
+  ['Feuilleté chèvre-épinards', 'feuillete', 'fromage tarte legumes'],
+  ['Camembert rôti, charcuterie et salade', 'camembert', 'fromage porc salade'],
+  ['Salade de chèvre chaud', 'chevre chaud', 'salade fromage'],
+  ['Salade grecque', 'grecque', 'salade fromage legumes', 'e'],
+  // Légumes et légumineuses
+  ['Ratatouille et œufs', 'ratatouille', 'legumes oeuf', 'e'],
+  ['Curry de légumes et pois chiches', 'curry legume', 'legumes legumineuses epices riz'],
+  ['Dahl de lentilles corail', 'dahl', 'legumineuses epices riz'],
+  ['Gratin de courgettes', 'gratin courgette', 'legumes gratin fromage', 'e'],
+  ['Tian de légumes', 'tian', 'legumes gratin', 'e'],
+  ['Buddha bowl', 'buddha', 'legumes salade riz legumineuses'],
+  ['Falafels, houmous et crudités', 'falafel', 'legumineuses salade epices'],
+  ['Poêlée de légumes et halloumi', 'halloumi', 'legumes fromage'],
+  ['Aubergines à la parmigiana', 'parmigiana', 'legumes fromage gratin', 'e'],
+  ['Wok de légumes et tofu', 'tofu', 'legumes asie'],
+  ['Courge butternut farcie', 'butternut', 'legumes fromage gratin', 'h'],
+  ['Gratin de chou-fleur', 'chou fleur', 'legumes gratin fromage', 'h'],
+  ['Okonomiyaki', 'okonomiyaki', 'asie tarte legumes'],
+  // Soupes
+  ["Soupe à l'oignon gratinée", 'soupe oignon', 'soupe fromage', 'h'],
+  ['Velouté de potimarron', 'potimarron', 'soupe legumes', 'h'],
+  ['Minestrone', 'minestrone', 'soupe legumes pates'],
+  ['Gaspacho et tartines', 'gaspacho', 'soupe legumes', 'e'],
+  ['Soupe de poisson, rouille et croûtons', 'soupe poisson', 'soupe poisson', 'h'],
+  ['Velouté de courgettes au fromage frais', 'veloute courgette', 'soupe legumes fromage'],
+  ['Harira', 'harira', 'soupe legumineuses epices', 'h'],
+  // Tartes et salades
+  ['Tarte tomate-moutarde', 'tarte tomate', 'tarte legumes', 'e'],
+  ['Pissaladière', 'pissaladiere', 'tarte legumes poisson'],
+  ['Salade niçoise', 'nicoise', 'salade poisson oeuf', 'e'],
+  ['Taboulé libanais et brochettes', 'taboule', 'salade legumes', 'e'],
+  ['Salade de lentilles et saumon fumé', 'salade lentille', 'salade legumineuses poisson'],
+  ['Salade de pâtes au thon', 'salade pate', 'salade pates poisson', 'e'],
+];
+
+export const CATALOG: CatalogDish[] = RAW.map(([name, core, tags, season]) => ({
+  name,
+  core,
+  tags: tags.split(' ') as Concept[],
+  season: season ?? '',
+}));

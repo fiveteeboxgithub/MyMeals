@@ -329,3 +329,63 @@ small {
   flex-basis: 36px;
   height: 36px;
 }
+
+.surprise-btn {
+  align-self: flex-start;
+  margin: 4px 0 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+.surprise {
+  background: var(--accent-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 4px 0 8px;
+}
+
+.surprise p {
+  margin: 0;
+}
+
+.surprise-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.surprise-why,
+.surprise-period {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.surprise-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.surprise-period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.surprise-period select {
+  font: inherit;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.choices button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
