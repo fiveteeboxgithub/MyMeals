@@ -19,4 +19,6 @@ export interface MealStore {
   meals: Meal[];
   setSlot: (date: string, slot: Slot, name: string) => void;
   clearSlot: (date: string, slot: Slot) => void;
+  /** Donne le même nom à tous les repas indiqués. Renvoie le nombre de repas renommés ou en échec. */
+  renameMeals: (ids: string[], name: string) => Promise<{ renamed: number; failed: number }>;
 }

@@ -64,7 +64,18 @@ export function useMeals() {
 
   const clearAll = useCallback(() => update(() => []), [update]);
 
-  return { meals, importMeals, setSlot, clearSlot, clearAll };
+  const renameMeals = useCallback(
+    async (ids: string[], rawName: string) => {
+      const name = rawName.trim();
+      const wanted = new Set(ids);
+      const renamed = name ? meals.filter((m) => wanted.has(m.id) && m.name !== name).length : 0;
+      if (name) update((current) => current.map((m) => (wanted.has(m.id) ? { ...m, name } : m)));
+      return { renamed, failed: 0 };
+    },
+    [meals, update],
+  );
+
+  return { meals, importMeals, setSlot, clearSlot, clearAll, renameMeals };
 }
 
 const SKIPPED_KEY = 'mymeals.skipped.v1';

@@ -348,3 +348,54 @@ describe('pickProposal', () => {
     expect(pickProposal([{ ...ranked[0], score: 0 }, { ...ranked[1], score: 0 }], 3, 'x')!.key).toBe('plat0');
   });
 });
+
+describe('doublons', async () => {
+  const { findOccurrences, groupByLabel, parseKeywords, proposeLabel } = await import('./duplicates');
+
+  const history: Meal[] = [
+    meal('2026-01-03', 'soir', 'pates/coquilles st jacques'),
+    meal('2026-02-03', 'soir', 'pates/coquilles st jacques'),
+    meal('2026-03-03', 'soir', 'Coquilles / pâtes'),
+    meal('2026-04-03', 'midi', 'pates st jacques'),
+    meal('2026-05-03', 'soir', 'pates carbonara'),
+    meal('2026-06-03', 'soir', 'poisson/purée'),
+    meal('2026-07-03', 'soir', 'pommes de terre sautées'),
+    meal('2026-08-03', 'soir', 'pdt rissolées'),
+  ];
+
+  it('découpe les mots-clés sans accents ni mots trop courts', () => {
+    expect(parseKeywords(' Pâtes, st/Jacques  a ')).toEqual(['pates', 'st', 'jacques']);
+    expect(parseKeywords('   ')).toEqual([]);
+  });
+
+  it('regroupe les repas par libellé exact, du plus fréquent au plus rare', () => {
+    const groups = groupByLabel(history);
+    expect(groups[0]).toMatchObject({ label: 'pates/coquilles st jacques', count: 2, lastDate: '2026-02-03' });
+    expect(groups[0].ids).toHaveLength(2);
+    expect(groups).toHaveLength(7);
+  });
+
+  it('trouve les libellés qui contiennent au moins un des mots-clés', () => {
+    const labels = (query: string) => findOccurrences(history, query).map((o) => o.label);
+    expect(labels('jacques')).toEqual(['pates/coquilles st jacques', 'pates st jacques']);
+    expect(labels('pâtes').sort()).toEqual(['Coquilles / pâtes', 'pates carbonara', 'pates st jacques', 'pates/coquilles st jacques']);
+    // Plusieurs mots : un seul suffit.
+    expect(labels('carbonara purée').sort()).toEqual(['pates carbonara', 'poisson/purée']);
+    expect(labels('')).toEqual([]);
+    expect(labels('zzz')).toEqual([]);
+  });
+
+  it('retrouve aussi les autres noms d’un même ingrédient', () => {
+    const labels = (query: string) => findOccurrences(history, query).map((o) => o.label);
+    expect(labels('coquille')).toContain('pates st jacques');
+    expect(labels('pdt').sort()).toEqual(['pdt rissolées', 'pommes de terre sautées']);
+  });
+
+  it('propose le libellé le plus utilisé, puis le plus court', () => {
+    const found = findOccurrences(history, 'jacques');
+    expect(proposeLabel(found)).toBe('pates/coquilles st jacques');
+    const tie = groupByLabel([meal('2026-01-01', 'soir', 'pates saumon grillé'), meal('2026-01-02', 'soir', 'pates saumon')]);
+    expect(proposeLabel(tie)).toBe('pates saumon');
+    expect(proposeLabel([])).toBe('');
+  });
+});

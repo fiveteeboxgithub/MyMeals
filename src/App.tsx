@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { DuplicatesPage } from './Duplicates';
 import { addDays, dayName, longDate, mondayOf, shortDate, todayIso, weekday } from './lib/dates';
 import { useGoogleMeals } from './lib/googleStore';
 import { parseIcs } from './lib/ics';
@@ -73,7 +74,7 @@ function GoogleApp() {
 }
 
 function LocalApp() {
-  const { meals, importMeals, setSlot, clearSlot, clearAll } = useMeals();
+  const { meals, importMeals, setSlot, clearSlot, clearAll, renameMeals } = useMeals();
   const [notice, setNotice] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -95,7 +96,7 @@ function LocalApp() {
 
   return (
     <Planner
-      store={{ meals, setSlot, clearSlot }}
+      store={{ meals, setSlot, clearSlot, renameMeals }}
       action={
         <>
           <button className="ghost-btn" onClick={() => fileInput.current?.click()}>
@@ -181,8 +182,23 @@ interface PlannerProps {
   footer: ReactNode;
 }
 
+type View = 'planning' | 'doublons';
+
+/** La page affichée est mémorisée dans l'adresse (#doublons), pour que « retour » fonctionne. */
+function useView(): [View, (view: View) => void] {
+  const read = (): View => (window.location.hash === '#doublons' ? 'doublons' : 'planning');
+  const [view, setView] = useState<View>(read);
+  useEffect(() => {
+    const onChange = () => setView(read());
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
+  return [view, (next) => { window.location.hash = next === 'doublons' ? 'doublons' : ''; }];
+}
+
 function Planner({ store, action, banner, footer }: PlannerProps) {
   const { meals, setSlot, clearSlot } = store;
+  const [view, setView] = useView();
   const today = todayIso();
   const [monday, setMonday] = useState(() => mondayOf(today));
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -283,6 +299,19 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
 
       {banner}
 
+      <nav className="tabs" aria-label="Pages">
+        <button aria-current={view === 'planning' ? 'page' : undefined} onClick={() => setView('planning')}>
+          Planning
+        </button>
+        <button aria-current={view === 'doublons' ? 'page' : undefined} onClick={() => setView('doublons')}>
+          Doublons
+        </button>
+      </nav>
+
+      {view === 'doublons' ? (
+        <DuplicatesPage store={store} />
+      ) : (
+        <>
       <nav className="week-nav" aria-label="Semaine affichée">
         <button onClick={() => setMonday(addDays(monday, -7))} aria-label="Semaine précédente">
           ‹
@@ -421,6 +450,8 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
           </section>
         ))}
       </main>
+        </>
+      )}
 
       {meals.length > 0 && (
         <footer className="foot">

@@ -196,10 +196,58 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     [commit, fail, writable],
   );
 
+  /** Renomme des événements de l'agenda, quelques-uns à la fois ; ceux qui échouent reprennent leur nom. */
+  const renameMeals = useCallback(
+    async (ids: string[], rawName: string) => {
+      const name = rawName.trim();
+      const access = writable();
+      if (!access || !name) return { renamed: 0, failed: access ? 0 : ids.length };
+      const wanted = new Set(ids);
+      // Les repas pas encore créés dans l'agenda (identifiant provisoire) sont laissés de côté.
+      const targets = cacheRef.current.meals.filter((m) => wanted.has(m.id) && !m.id.startsWith('tmp-') && m.name !== name);
+      commit((c) => ({ ...c, meals: c.meals.map((m) => (targets.some((t) => t.id === m.id) ? { ...m, name } : m)) }));
+      const revert = (meal: Meal) =>
+        commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === meal.id ? meal : m)) }));
+
+      const queue = [...targets];
+      let renamed = 0;
+      let failed = 0;
+      let stop = false;
+      let lastError: unknown;
+      const worker = async () => {
+        while (!stop) {
+          const meal = queue.shift();
+          if (!meal) return;
+          try {
+            await renameEvent(access.token, access.calendar, meal.id, name);
+            renamed++;
+          } catch (e) {
+            failed++;
+            revert(meal);
+            lastError = e;
+            if (e instanceof AuthError) stop = true;
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, targets.length) }, worker));
+      for (const meal of queue) {
+        failed++;
+        revert(meal);
+      }
+      if (failed > 0) {
+        if (lastError instanceof AuthError) fail(lastError);
+        else fail(new Error(`${failed} repas ${failed > 1 ? "n'ont" : "n'a"} pas pu être renommé${failed > 1 ? 's' : ''} dans l'agenda (${lastError instanceof Error ? lastError.message : 'erreur inconnue'}).`));
+      }
+      return { renamed, failed };
+    },
+    [commit, fail, writable],
+  );
+
   return {
     meals: cache.meals,
     setSlot,
     clearSlot,
+    renameMeals,
     connected: token !== null,
     syncing,
     error,
