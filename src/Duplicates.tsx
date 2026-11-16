@@ -56,7 +56,7 @@ export function DuplicatesPage({ store }: { store: MealStore }) {
   return (
     <section className="duplicates" aria-label="Chercher les doublons">
       <p className="dup-intro">
-        Cherche des mots-clés (par exemple « pâtes st jacques ») : tous les libellés qui contiennent au moins un de ces
+        Cherche des mots ou des débuts de mots (par exemple « pat jacqu ») : seuls les libellés qui contiennent tous ces
         mots s'affichent. Coche ceux qui désignent le même plat, puis fusionne-les sous un seul nom.
       </p>
       <input
@@ -68,7 +68,7 @@ export function DuplicatesPage({ store }: { store: MealStore }) {
           setResult('');
           setMerging(false);
         }}
-        placeholder="Mots-clés, séparés par des espaces"
+        placeholder="Mots ou débuts de mots, séparés par des espaces"
         aria-label="Mots-clés"
       />
 

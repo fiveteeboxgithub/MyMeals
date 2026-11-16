@@ -375,12 +375,27 @@ describe('doublons', async () => {
     expect(groups).toHaveLength(7);
   });
 
-  it('trouve les libellés qui contiennent au moins un des mots-clés', () => {
-    const labels = (query: string) => findOccurrences(history, query).map((o) => o.label);
-    expect(labels('jacques')).toEqual(['pates/coquilles st jacques', 'pates st jacques']);
-    expect(labels('pâtes').sort()).toEqual(['Coquilles / pâtes', 'pates carbonara', 'pates st jacques', 'pates/coquilles st jacques']);
-    // Plusieurs mots : un seul suffit.
-    expect(labels('carbonara purée').sort()).toEqual(['pates carbonara', 'poisson/purée']);
+  it('trouve les libellés qui contiennent tous les mots-clés, même coupés', () => {
+    const labels = (query: string) => findOccurrences(history, query).map((o) => o.label).sort();
+    const found = findOccurrences(
+      [
+        meal('2026-01-01', 'soir', 'st jacques aux pâtes'),
+        meal('2026-01-02', 'soir', 'pâte a la saint jacques'),
+        meal('2026-01-03', 'soir', 'pâtes au pesto'),
+        meal('2026-01-04', 'soir', 'pat carbo'),
+        meal('2026-01-05', 'soir', 'pates carbonara'),
+        meal('2026-01-06', 'soir', 'jacques le fataliste'),
+      ],
+      'pat jacqu',
+    ).map((o) => o.label);
+    expect(found.sort()).toEqual(['pâte a la saint jacques', 'st jacques aux pâtes']);
+    // Tous les mots sont obligatoires, dans n'importe quel ordre.
+    expect(labels('jacqu pat')).toEqual(['pates st jacques', 'pates/coquilles st jacques']);
+    expect(labels('carbonara purée')).toEqual([]);
+    expect(labels('jacques')).toEqual(['pates st jacques', 'pates/coquilles st jacques']);
+    // Un mot-clé est un début de mot, pas un bout de mot.
+    expect(findOccurrences([meal('2026-01-01', 'soir', 'boeuf carottes')], 'oeuf')).toEqual([]);
+    expect(findOccurrences([meal('2026-01-01', 'soir', 'oeufs durs')], 'oeuf')).toHaveLength(1);
     expect(labels('')).toEqual([]);
     expect(labels('zzz')).toEqual([]);
   });
@@ -389,6 +404,7 @@ describe('doublons', async () => {
     const labels = (query: string) => findOccurrences(history, query).map((o) => o.label);
     expect(labels('coquille')).toContain('pates st jacques');
     expect(labels('pdt').sort()).toEqual(['pdt rissolées', 'pommes de terre sautées']);
+    expect(labels('saint jacques pat').sort()).toEqual(['Coquilles / pâtes', 'pates st jacques', 'pates/coquilles st jacques']);
   });
 
   it('propose le libellé le plus utilisé, puis le plus court', () => {

@@ -72,9 +72,11 @@ saison, puis tirées au sort parmi les dix meilleures.
 ## Page « Doublons »
 
 L'onglet « Doublons » cherche dans tout le calendrier les repas dont le libellé
-contient au moins un des mots-clés saisis (sans tenir compte des accents ni des
-majuscules, et en reconnaissant les autres noms d'un même ingrédient : « coquille »
-trouve « st jacques »). Chaque libellé distinct est affiché avec le nombre de repas
+contient **tous** les mots saisis, chacun pouvant n'être que le début d'un mot :
+« pat jacqu » trouve « st jacques aux pâtes » et « pâte à la saint jacques », mais
+ni « pâtes au pesto » ni « pat carbo ». L'ordre des mots, les accents et les
+majuscules ne comptent pas, et les autres noms d'un même ingrédient sont reconnus
+(« st jacques » trouve aussi « coquilles » ; « pdt » trouve « pommes de terre »). Chaque libellé distinct est affiché avec le nombre de repas
 qui le portent et une case à cocher. « Fusionner » propose un nom commun (le libellé
 coché le plus utilisé, modifiable) puis, après confirmation, renomme tous les repas
 cochés. Avec Google Agenda, ce sont les événements de l'agenda qui sont renommés ;

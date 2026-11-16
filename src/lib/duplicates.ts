@@ -33,18 +33,31 @@ export function groupByLabel(meals: Meal[]): Occurrence[] {
   return [...groups.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
+/** Mots d'un texte, sans accents ni ponctuation : « Pâtes aux St-Jacques » donne pates, aux, st, jacques. */
+function wordsOf(text: string): string[] {
+  return fold(text).split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+/** Vrai si chaque mot-clé est le début d'au moins un des mots. */
+function coversAll(keywords: string[], words: string[]): boolean {
+  return keywords.every((keyword) => words.some((word) => word.startsWith(keyword)));
+}
+
 /**
- * Libellés dont le texte contient au moins un des mots-clés (sans tenir compte des
- * accents ni des majuscules). Un mot-clé qui désigne un ingrédient connu trouve aussi
- * ses autres noms : « coquille » trouve « st jacques », « pdt » trouve « pommes de terre ».
+ * Libellés qui contiennent tous les mots-clés, chacun pouvant n'être que le début
+ * d'un mot : « pat jacqu » trouve « st jacques aux pâtes » et « pâtes à la saint
+ * jacques », mais ni « pâtes au pesto » (pas de « jacqu ») ni « pat carbo ».
+ * Les accents et les majuscules sont ignorés. Une deuxième lecture reconnaît les
+ * autres noms d'un même ingrédient : « st jacques » trouve aussi « coquilles »
+ * et « saint-jacques », « pdt » trouve « pommes de terre ».
  */
 export function findOccurrences(meals: Meal[], query: string): Occurrence[] {
-  const keywords = parseKeywords(query).map((word) => ({ word, key: normalize(word) }));
-  if (keywords.length === 0) return [];
+  const literal = parseKeywords(query);
+  if (literal.length === 0) return [];
+  const unified = normalize(query).split(' ').filter(Boolean);
   return groupByLabel(meals).filter((occurrence) => {
-    const text = fold(occurrence.label);
-    const words = normalize(occurrence.label).split(' ');
-    return keywords.some(({ word, key }) => text.includes(word) || (key !== '' && words.includes(key)));
+    if (coversAll(literal, wordsOf(occurrence.label))) return true;
+    return unified.length > 0 && coversAll(unified, normalize(occurrence.label).split(' '));
   });
 }
 
