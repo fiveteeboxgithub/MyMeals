@@ -1,7 +1,29 @@
 import { useMemo, useState } from 'react';
 import { longDate } from './lib/dates';
-import { findOccurrences, parseKeywords, proposeLabel } from './lib/duplicates';
+import { compileRegex, findOccurrences, hasQuery, proposeLabel } from './lib/duplicates';
 import type { MealStore } from './lib/types';
+
+const REGEX_KEY = 'mymeals.duplicates.regex';
+
+function loadRegexMode(): boolean {
+  try {
+    return localStorage.getItem(REGEX_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Exemples affichés dans l'infobulle : [expression, ce qu'elle trouve]. */
+const REGEX_EXAMPLES: [string, string][] = [
+  ['^pates', 'commence par « pates » (ou « pâtes »)'],
+  ['riz|quinoa', 'contient « riz » ou « quinoa »'],
+  ['pat.*jacqu', '« pat… » puis « jacqu… », dans cet ordre'],
+  ['(saumon|thon).*riz', 'saumon ou thon, puis riz'],
+  ['^(?!.*sauce).*pates', 'contient « pates » mais pas « sauce »'],
+  ['restes?$', 'finit par « reste » ou « restes »'],
+  ['\\briz\\b', 'le mot « riz » entier (pas « rizotto »)'],
+  ['[0-9]', 'contient un chiffre'],
+];
 
 /** Au-delà, la liste devient illisible : on demande de préciser la recherche. */
 const MAX_ROWS = 300;
@@ -9,18 +31,21 @@ const MAX_ROWS = 300;
 /** Page de recherche des libellés proches dans le calendrier, pour les fusionner en un seul. */
 export function DuplicatesPage({ store }: { store: MealStore }) {
   const [query, setQuery] = useState('');
+  const [regex, setRegex] = useState(loadRegexMode);
+  const [tipOpen, setTipOpen] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [merging, setMerging] = useState(false);
   const [label, setLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState('');
 
-  const results = useMemo(() => findOccurrences(store.meals, query), [store.meals, query]);
+  const regexError = regex ? compileRegex(query).error : undefined;
+  const results = useMemo(() => findOccurrences(store.meals, query, { regex }), [store.meals, query, regex]);
   const shown = results.slice(0, MAX_ROWS);
   // Seuls comptent les libellés cochés qui figurent encore dans la liste.
   const checked = results.filter((r) => selected.has(r.label));
   const mealCount = checked.reduce((sum, r) => sum + r.count, 0);
-  const searching = parseKeywords(query).length > 0;
+  const searching = hasQuery(query, { regex }) && !regexError;
 
   function toggle(value: string) {
     const next = new Set(selected);
@@ -57,7 +82,8 @@ export function DuplicatesPage({ store }: { store: MealStore }) {
     <section className="duplicates" aria-label="Chercher les doublons">
       <p className="dup-intro">
         Cherche des mots ou des débuts de mots (par exemple « pat jacqu ») : seuls les libellés qui contiennent tous ces
-        mots s'affichent. Coche ceux qui désignent le même plat, puis fusionne-les sous un seul nom.
+        mots s'affichent. Avec l'option « Expression régulière », le texte saisi est un motif. Coche les libellés qui
+        désignent le même plat, puis fusionne-les sous un seul nom.
       </p>
       <input
         type="search"
@@ -68,9 +94,61 @@ export function DuplicatesPage({ store }: { store: MealStore }) {
           setResult('');
           setMerging(false);
         }}
-        placeholder="Mots ou débuts de mots, séparés par des espaces"
-        aria-label="Mots-clés"
+        placeholder={regex ? 'Expression régulière, par exemple pat.*jacqu' : 'Mots ou débuts de mots, séparés par des espaces'}
+        aria-label={regex ? 'Expression régulière' : 'Mots-clés'}
+        aria-invalid={regexError ? true : undefined}
+        spellCheck={false}
+        autoCapitalize="off"
+        autoCorrect="off"
       />
+      <div className="dup-options">
+        <label className="switch">
+          <input
+            type="checkbox"
+            checked={regex}
+            onChange={(e) => {
+              setRegex(e.target.checked);
+              setResult('');
+              setMerging(false);
+              try {
+                localStorage.setItem(REGEX_KEY, e.target.checked ? '1' : '0');
+              } catch {
+                // le réglage vaudra pour cette session
+              }
+            }}
+          />
+          <span className="switch-track" aria-hidden="true" />
+          Expression régulière
+        </label>
+        <span className="tip">
+          <button
+            type="button"
+            className="tip-btn"
+            aria-label="Exemples d'expressions régulières"
+            aria-describedby="regex-tip"
+            aria-expanded={tipOpen}
+            onClick={() => setTipOpen(!tipOpen)}
+            onBlur={() => setTipOpen(false)}
+          >
+            ?
+          </button>
+          <span id="regex-tip" role="tooltip" className={`tip-panel${tipOpen ? ' open' : ''}`}>
+            <strong>Exemples</strong> (sans tenir compte des majuscules ni des accents)
+            <ul>
+              {REGEX_EXAMPLES.map(([pattern, meaning]) => (
+                <li key={pattern}>
+                  <code>{pattern}</code> {meaning}
+                </li>
+              ))}
+            </ul>
+          </span>
+        </span>
+      </div>
+      {regexError && (
+        <p className="dup-error" role="alert">
+          Expression régulière invalide : {regexError}
+        </p>
+      )}
 
       {result && (
         <p className="notice" role="status">

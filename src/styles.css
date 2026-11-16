@@ -610,3 +610,77 @@ small {
 .dup-merge p {
   margin: 12px 0 0;
 }
+
+.dup-options {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.dup-search[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.dup-error {
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.tip-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  text-align: center;
+  font-weight: 700;
+}
+
+.tip-panel {
+  display: none;
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-width: 380px;
+  padding: 10px 12px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 18%);
+  font-size: 0.8rem;
+}
+
+.tip:hover .tip-panel,
+.tip:focus-within .tip-panel,
+.tip-panel.open {
+  display: block;
+}
+
+.tip-panel ul {
+  margin: 6px 0 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.tip-panel li {
+  margin: 4px 0;
+}
+
+.tip-panel code {
+  display: inline-block;
+  padding: 0 5px;
+  background: var(--accent-soft);
+  border-radius: 5px;
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}

@@ -350,7 +350,7 @@ describe('pickProposal', () => {
 });
 
 describe('doublons', async () => {
-  const { findOccurrences, groupByLabel, parseKeywords, proposeLabel } = await import('./duplicates');
+  const { compileRegex, findOccurrences, groupByLabel, hasQuery, parseKeywords, proposeLabel } = await import('./duplicates');
 
   const history: Meal[] = [
     meal('2026-01-03', 'soir', 'pates/coquilles st jacques'),
@@ -405,6 +405,49 @@ describe('doublons', async () => {
     expect(labels('coquille')).toContain('pates st jacques');
     expect(labels('pdt').sort()).toEqual(['pdt rissolées', 'pommes de terre sautées']);
     expect(labels('saint jacques pat').sort()).toEqual(['Coquilles / pâtes', 'pates st jacques', 'pates/coquilles st jacques']);
+  });
+
+  it('accepte une expression régulière, sans accents ni casse', () => {
+    const regexHistory: Meal[] = [
+      meal('2026-01-01', 'soir', 'Pâtes au pesto'),
+      meal('2026-01-02', 'soir', 'pates carbonara'),
+      meal('2026-01-03', 'soir', 'riz sauce tomate'),
+      meal('2026-01-04', 'soir', 'saumon/riz'),
+      meal('2026-01-05', 'soir', 'thon/pâtes'),
+      meal('2026-01-06', 'soir', 'restes'),
+      meal('2026-01-07', 'soir', 'pâté lorrain'),
+      meal('2026-01-08', 'soir', 'menu 2 pizzas'),
+    ];
+    const rx = (pattern: string) => findOccurrences(regexHistory, pattern, { regex: true }).map((o) => o.label).sort();
+    expect(rx('^pates')).toEqual(['Pâtes au pesto', 'pates carbonara']);
+    expect(rx('^pâtes')).toEqual(['Pâtes au pesto', 'pates carbonara']);
+    expect(rx('RIZ|pesto')).toEqual(['Pâtes au pesto', 'riz sauce tomate', 'saumon/riz']);
+    expect(rx('(saumon|thon).*(riz|pates)')).toEqual(['saumon/riz', 'thon/pâtes']);
+    expect(rx('^(?!.*sauce).*riz')).toEqual(['saumon/riz']);
+    expect(rx('restes?$')).toEqual(['restes']);
+    // Les accents sont ignorés : « pâté » est vu comme « pate ».
+    expect(rx('\\bpate\\b')).toEqual(['pâté lorrain']);
+    expect(rx('\\bpates\\b')).toEqual(['Pâtes au pesto', 'pates carbonara', 'thon/pâtes']);
+    expect(rx('\\briz\\b')).toEqual(['riz sauce tomate', 'saumon/riz']);
+    expect(rx('\\d')).toEqual(['menu 2 pizzas']);
+    // Un motif répété sur plusieurs libellés donne toujours le même résultat (pas d'état entre deux tests).
+    expect(rx('pates')).toHaveLength(3);
+    expect(rx('pates')).toHaveLength(3);
+    // Le mode mots ne change pas, et un motif vide ne trouve rien.
+    expect(findOccurrences(regexHistory, 'pates au', {}).map((o) => o.label)).toEqual(['Pâtes au pesto']);
+    expect(rx('')).toEqual([]);
+    expect(rx('(riz')).toEqual([]);
+  });
+
+  it('signale une expression régulière invalide', () => {
+    expect(compileRegex('(riz').error).toBeTruthy();
+    expect(compileRegex('(riz').error).not.toMatch(/\/iu/);
+    expect(compileRegex('[a-').error).toBeTruthy();
+    expect(compileRegex('').error).toBeUndefined();
+    expect(compileRegex('pat.*jacqu').regex).toBeInstanceOf(RegExp);
+    expect(hasQuery('  ', { regex: true })).toBe(false);
+    expect(hasQuery('.*', { regex: true })).toBe(true);
+    expect(hasQuery('de', {})).toBe(true);
   });
 
   it('propose le libellé le plus utilisé, puis le plus court', () => {
