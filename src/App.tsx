@@ -3,7 +3,7 @@ import { addDays, dayName, longDate, mondayOf, shortDate, todayIso, weekday } fr
 import { useGoogleMeals } from './lib/googleStore';
 import { parseIcs } from './lib/ics';
 import { useMeals } from './lib/store';
-import { buildIndex, normalize, suggest, usualSlots, type Suggestion } from './lib/suggest';
+import { buildIndex, fold, normalize, suggest, usualSlots, type Suggestion } from './lib/suggest';
 import { SLOTS, type Meal, type MealStore, type Slot } from './lib/types';
 
 const SLOT_LABEL: Record<Slot, string> = { midi: 'Midi', soir: 'Soir' };
@@ -172,12 +172,16 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
   const proposals = useMemo(() => {
     const out = new Map<string, Suggestion>();
     const used = new Set<string>();
+    const weekWords = new Map<string, number>();
+    const count = (key: string) => {
+      const dish = dishes.byKey.get(key);
+      if (!dish || dish.generic) return;
+      used.add(dish.key);
+      for (const word of dish.words) weekWords.set(word, (weekWords.get(word) ?? 0) + 1);
+    };
     for (const date of days) {
       for (const slot of SLOTS) {
-        for (const meal of bySlot.get(`${date}|${slot}`) ?? []) {
-          const dish = dishes.get(normalize(meal.name));
-          if (dish && !dish.generic) used.add(dish.key);
-        }
+        for (const meal of bySlot.get(`${date}|${slot}`) ?? []) count(normalize(meal.name));
       }
     }
     for (const date of days) {
@@ -185,11 +189,11 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
       for (const slot of SLOTS) {
         const key = `${date}|${slot}`;
         if (bySlot.has(key) || !usual.has(`${weekday(date)}-${slot}`)) continue;
-        const ranked = suggest(dishes, date, slot, used).slice(0, 12);
+        const ranked = suggest(dishes, date, slot, { exclude: used, weekWords }).slice(0, 12);
         if (ranked.length === 0) continue;
         const pick = ranked[(skips[key] ?? 0) % ranked.length];
         out.set(key, pick);
-        if (!dishes.get(pick.key)?.generic) used.add(pick.key);
+        count(pick.key);
       }
     }
     return out;
@@ -272,7 +276,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
 
       {meals.length > 0 && (
         <footer className="foot">
-          {meals.length} repas enregistrés · {dishes.size} plats différents ·{' '}
+          {meals.length} repas enregistrés · {dishes.dishes.length} plats différents ·{' '}
           {footer}
         </footer>
       )}
@@ -310,9 +314,11 @@ interface SheetProps {
 
 function SlotSheet({ date, slot, current, suggestions, onPick, onClear, onClose }: SheetProps) {
   const [query, setQuery] = useState('');
-  const needle = normalize(query);
-  const shown = (needle ? suggestions.filter((s) => s.key.includes(needle)) : suggestions).slice(0, 30);
-  const exact = suggestions.some((s) => s.key === needle);
+  // Chaque mot saisi doit se retrouver dans une des écritures du plat, dans n'importe quel ordre.
+  const needles = fold(query).split(/[\s/]+/).filter(Boolean);
+  const shown = suggestions.filter((s) => needles.every((n) => s.search.includes(n))).slice(0, 30);
+  const queryKey = normalize(query);
+  const exact = suggestions.some((s) => s.key === queryKey);
 
   return (
     <div className="backdrop" onClick={onClose}>
@@ -364,7 +370,10 @@ function SlotSheet({ date, slot, current, suggestions, onPick, onClear, onClose 
           {shown.map((s) => (
             <li key={s.key}>
               <button onClick={() => onPick(s.label)}>
-                <span>{s.label}</span>
+                <span>
+                  {s.label}
+                  {s.variants.length > 0 && <small>aussi écrit : {s.variants.slice(0, 3).join(', ')}</small>}
+                </span>
                 <small>{s.reason}</small>
               </button>
             </li>

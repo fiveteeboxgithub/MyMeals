@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addDays, mondayOf, weekday } from './dates';
 import { parseIcs } from './ics';
-import { buildIndex, normalize, suggest, usualSlots } from './suggest';
+import { buildIndex, isTypoOf, normalize, suggest, usualSlots } from './suggest';
 import type { Meal, Slot } from './types';
 
 function meal(date: string, slot: Slot, name: string): Meal {
@@ -86,8 +86,74 @@ describe('suggest', () => {
       meal('2026-02-01', 'soir', 'poisson/purée'),
       meal('2026-03-01', 'soir', 'Poisson / puree'),
     ]);
-    expect(dishes.size).toBe(1);
-    expect(dishes.get('poisson/puree')!.label).toBe('poisson/purée');
+    expect(dishes.dishes).toHaveLength(1);
+    expect(dishes.byKey.get('poisson/puree')!.label).toBe('poisson/purée');
+  });
+
+  it('ignore l’ordre, les pluriels et les fautes de frappe', () => {
+    expect(normalize('Pâtes et saumon')).toBe(normalize('saumon/pates'));
+    expect(normalize('poissons panés / purée')).toBe(normalize('poisson pané/purée'));
+    expect(isTypoOf('macdo', 'mcdo')).toBe(true);
+    expect(isTypoOf('kebbab', 'kebab')).toBe(true);
+    expect(isTypoOf('steack', 'staeck')).toBe(true);
+    expect(isTypoOf('oeuf/epinard', 'boeuf/epinard')).toBe(false);
+    expect(isTypoOf('pate/thon', 'pate/thym')).toBe(false);
+    expect(isTypoOf('riz', 'ris')).toBe(false);
+
+    const index = buildIndex([
+      meal('2026-01-03', 'midi', 'mac do'),
+      meal('2026-02-07', 'midi', 'mac do'),
+      meal('2026-03-07', 'midi', 'mc do'),
+      meal('2026-04-04', 'midi', 'Mac Do'),
+      meal('2026-01-10', 'soir', 'saumon/pates'),
+      meal('2026-02-10', 'soir', 'pates/saumon'),
+      meal('2026-03-10', 'soir', 'pizza'),
+      meal('2026-04-10', 'soir', 'pizzas'),
+    ]);
+    expect(index.dishes.map((d) => d.label).sort()).toEqual(['mac do', 'pizza', 'saumon/pates']);
+    const macdo = index.byKey.get(normalize('mc do'))!;
+    expect(macdo.occurrences).toHaveLength(4);
+    expect(macdo.variants).toEqual(['mc do']);
+  });
+
+  it('attend plus longtemps pour un plat qui revient rarement', () => {
+    const history: Meal[] = [];
+    // « raclette » tous les 2 mois, « poisson » toutes les semaines, même jour.
+    for (let i = 0; i < 12; i++) history.push(meal(addDays('2024-10-01', i * 60), 'soir', 'raclette'));
+    for (let i = 0; i < 100; i++) history.push(meal(addDays('2024-12-10', i * 7), 'soir', 'poisson'));
+    history.push(meal('2026-11-03', 'soir', 'raclette'));
+    history.push(meal('2026-11-03', 'midi', 'poisson'));
+    const index = buildIndex(history);
+    expect(index.byKey.get('raclette')!.interval).toBe(60);
+    const ranked = suggest(index, '2026-11-24', 'soir', { today: '2026-11-16' });
+    const raclette = ranked.find((s) => s.label === 'raclette')!;
+    const withoutRecent = suggest(buildIndex(history.slice(0, -2)), '2026-11-24', 'soir', { today: '2026-11-16' });
+    // Trois semaines après, la raclette est encore nettement pénalisée…
+    expect(raclette.score).toBeLessThan(0.3 * withoutRecent.find((s) => s.label === 'raclette')!.score);
+    // …alors que le poisson hebdomadaire ne l'est plus.
+    expect(ranked[0].label).toBe('poisson');
+  });
+
+  it('laisse s’effacer les plats abandonnés', () => {
+    const history: Meal[] = [];
+    for (let i = 0; i < 40; i++) history.push(meal(addDays('2019-01-08', i * 14), 'soir', 'hachis'));
+    for (let i = 0; i < 6; i++) history.push(meal(addDays('2026-05-05', i * 28), 'soir', 'curry'));
+    const ranked = suggest(buildIndex(history), '2026-11-24', 'soir', { today: '2026-11-16' });
+    expect(ranked.map((s) => s.label)).toEqual(['curry', 'hachis']);
+  });
+
+  it('évite de répéter le même ingrédient dans la semaine', () => {
+    const history: Meal[] = [];
+    for (let i = 0; i < 10; i++) {
+      history.push(meal(addDays('2026-06-02', i * 14), 'soir', 'pates carbonara'));
+      history.push(meal(addDays('2026-06-03', i * 14), 'soir', 'pates/saumon'));
+    }
+    for (let i = 0; i < 9; i++) history.push(meal(addDays('2026-06-10', i * 14), 'soir', 'omelette'));
+    const index = buildIndex(history);
+    const options = { today: '2026-11-16', exclude: new Set([normalize('pates carbonara')]) };
+    expect(suggest(index, '2026-11-25', 'soir', options)[0].label).toBe('pates/saumon');
+    const weekWords = new Map([['pate', 1]]);
+    expect(suggest(index, '2026-11-25', 'soir', { ...options, weekWords })[0].label).toBe('omelette');
   });
 
   it('préfère les plats de saison et écarte ceux mangés récemment', () => {
@@ -117,7 +183,7 @@ describe('suggest', () => {
     ]);
     expect(suggest(dishes, '2026-11-21', 'midi')[0].label).toBe('poke bowl');
     expect(suggest(dishes, '2026-11-21', 'soir')[0].label).toBe('soupe');
-    expect(suggest(dishes, '2026-11-21', 'soir', new Set(['soupe']))[0].label).toBe('poke bowl');
+    expect(suggest(dishes, '2026-11-21', 'soir', { exclude: new Set(['soupe']) })[0].label).toBe('poke bowl');
   });
 
   it('ne propose les restes que le jour où ils reviennent', () => {
@@ -127,8 +193,8 @@ describe('suggest', () => {
       history.push(meal(addDays('2026-09-01', week * 7), 'soir', 'pizzas')); // mardis
     }
     const dishes = buildIndex(history);
-    expect(suggest(dishes, '2026-11-22', 'soir', new Set(), '2026-11-16')[0].label).toBe('restes');
-    const wednesday = suggest(dishes, '2026-11-18', 'soir', new Set(), '2026-11-16');
+    expect(suggest(dishes, '2026-11-22', 'soir', { today: '2026-11-16' })[0].label).toBe('restes');
+    const wednesday = suggest(dishes, '2026-11-18', 'soir', { today: '2026-11-16' });
     expect(wednesday.map((s) => s.label)).toEqual(['pizzas']);
     expect(wednesday[0].reason).toBe('8 fois · il y a 4 semaines');
   });

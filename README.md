@@ -33,12 +33,22 @@ Chaque push sur `main` teste, compile et publie le site sur GitHub Pages
 
 ## Comment les propositions sont calculées
 
-Chaque titre d'événement est un plat (« Poisson / Purée » et « poisson/purée »
-sont regroupés). Pour un créneau donné, un plat est mieux classé s'il a été
-mangé souvent, récemment, à la même saison, au même créneau et le même jour de
-la semaine ; il est écarté s'il est déjà prévu ou mangé à moins de trois
-semaines. Les créneaux rarement remplis sur les 12 derniers mois (par exemple
-le midi en semaine) ne reçoivent pas de proposition.
+Chaque titre d'événement est un plat. Les écritures proches sont regroupées :
+majuscules, accents, pluriels, ordre des éléments (« saumon/pâtes » et « pâtes et
+saumon ») et fautes d'une lettre (« mac do » et « mc do »). L'écriture la plus
+utilisée est affichée ; les autres apparaissent sous « aussi écrit ».
+
+Pour un créneau donné, un plat est mieux classé s'il a été mangé souvent,
+récemment, à la même saison, au même créneau et le même jour de la semaine.
+Il est moins bien classé :
+
+- s'il revient plus tôt que son rythme habituel (un plat hebdomadaire peut
+  revenir au bout de deux semaines, un plat rare attend jusqu'à trois mois) ;
+- s'il n'a plus été mangé depuis plus d'un an ;
+- si la semaine contient déjà un plat avec le même ingrédient.
+
+Les créneaux rarement remplis sur les 12 derniers mois (par exemple le midi en
+semaine) ne reçoivent pas de proposition.
 
 ## Développement
 
