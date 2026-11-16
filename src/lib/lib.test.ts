@@ -219,7 +219,7 @@ describe('surprise', async () => {
 
   it('a un catalogue cohérent', () => {
     expect(catalogProblems()).toEqual([]);
-    expect(CATALOG.length).toBeGreaterThan(120);
+    expect(CATALOG.length).toBeGreaterThan(500);
   });
 
   it('reconnaît les familles dans les plats de l’historique', () => {

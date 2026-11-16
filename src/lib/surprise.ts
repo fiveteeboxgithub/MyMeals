@@ -21,7 +21,7 @@ export interface Surprise {
 
 /** Met un nom de plat sous une forme où l'on peut chercher des débuts de mots. */
 function haystack(key: string): string {
-  return ` ${key.replace(/[/'’-]/g, ' ').replace(/\s+/g, ' ')} `;
+  return ` ${key.replace(/[/'’()-]/g, ' ').replace(/\s+/g, ' ')} `;
 }
 
 function hasWords(hay: string, words: string): boolean {
