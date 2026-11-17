@@ -458,3 +458,49 @@ describe('doublons', async () => {
     expect(proposeLabel([])).toBe('');
   });
 });
+
+describe('thème', async () => {
+  const { THEMES, contrast, themeFromColor, resolveTheme } = await import('./theme');
+
+  it('garde le texte lisible sur chaque thème prédéfini', () => {
+    for (const theme of THEMES) {
+      if (!theme.vars) continue;
+      const { bg, card, text, muted, accent, onAccent, danger } = theme.vars;
+      const problems: string[] = [];
+      for (const [name, a, b] of [
+        ['texte/fond', text, bg],
+        ['texte/carte', text, card],
+        ['discret/fond', muted, bg],
+        ['discret/carte', muted, card],
+        ['bouton (texte sur accent)', onAccent, accent],
+        ['accent/fond', accent, bg],
+        ['danger/carte', danger, card],
+      ] as const) {
+        if (contrast(a, b) < 4.5) problems.push(`${name} ${contrast(a, b).toFixed(2)}`);
+      }
+      expect(problems, theme.id).toEqual([]);
+    }
+  });
+
+  it('choisit un texte lisible pour n’importe quelle couleur libre', () => {
+    for (const color of ['#ffffff', '#000000', '#808080', '#777777', '#999999', '#2f6f4f', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#7b3fa0', '#ffd1dc', '#e9efe9', '#123456']) {
+      const vars = themeFromColor(color);
+      expect(vars.bg).toBe(color);
+      expect(contrast(vars.text, vars.bg), `texte sur ${color}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(vars.text, vars.card), `texte sur carte ${color}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(vars.muted, vars.bg), `discret sur ${color}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(vars.onAccent, vars.accent), `bouton sur ${color}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(vars.accent, vars.bg), `accent sur ${color}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(vars.accent, vars.card), `accent sur carte ${color}`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(themeFromColor('#101820').dark).toBe(true);
+    expect(themeFromColor('#fff5cc').dark).toBe(false);
+  });
+
+  it('résout les choix enregistrés', () => {
+    expect(resolveTheme({ id: 'auto' })).toBeNull();
+    expect(resolveTheme({ id: 'inconnu' })).toBeNull();
+    expect(resolveTheme({ id: 'menthe' })!.bg).toBe('#e3f1ea');
+    expect(resolveTheme({ id: 'custom', custom: '#102030' })!.dark).toBe(true);
+  });
+});

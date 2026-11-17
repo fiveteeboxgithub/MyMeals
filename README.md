@@ -86,6 +86,27 @@ coché le plus utilisé, modifiable) puis, après confirmation, renomme tous les
 cochés. Avec Google Agenda, ce sont les événements de l'agenda qui sont renommés ;
 ceux qui échouent gardent leur nom.
 
+## Affichage
+
+- **Repas affichés** : un sélecteur « Midi / Soir / Les deux » (« Soir » par défaut)
+  choisit les créneaux montrés dans le planning. Seuls les créneaux affichés reçoivent
+  des propositions ; les repas déjà prévus comptent toujours pour la variété de la semaine.
+- **Couleur de fond** : le bouton 🎨 de l'en-tête propose dix thèmes (Auto, Crème, Blanc,
+  Menthe, Ciel, Rose, Sable, Ardoise, Nuit, Minuit) et une couleur libre. Le texte, les
+  cartes et les boutons s'adaptent pour rester lisibles (contraste d'au moins 4,5:1, vérifié
+  par les tests). « Auto » suit le mode clair ou sombre de l'appareil.
+
+Les deux réglages sont mémorisés sur l'appareil.
+
+## Connexion Google
+
+Une connexion Google dans un navigateur dure une heure. À l'expiration, le premier toucher
+sur l'écran la renouvelle (la fenêtre Google s'ouvre et se referme seule quand le compte est
+connu) ; une action d'écriture (✓, renommage) renouvelle aussi la connexion avant de s'exécuter.
+Un refus 403 « trop de requêtes » est réessayé avec une attente progressive au lieu de
+déconnecter ; seul un refus 401 ou des autorisations insuffisantes déconnecte. « Se déconnecter »
+arrête la reconnexion automatique.
+
 ## Développement
 
 ```bash

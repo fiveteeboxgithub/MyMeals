@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DuplicatesPage } from './Duplicates';
+import { ThemePicker } from './ThemePicker';
 import { addDays, dayName, longDate, mondayOf, shortDate, todayIso, weekday } from './lib/dates';
 import { useGoogleMeals } from './lib/googleStore';
 import { parseIcs } from './lib/ics';
@@ -41,7 +42,7 @@ function Notice({ text, onClose }: { text: string; onClose: () => void }) {
 
 function GoogleApp() {
   const store = useGoogleMeals(GOOGLE_CLIENT_ID, GOOGLE_CALENDAR_NAME);
-  const { connected, syncing, error, meals } = store;
+  const { connected, canRenew, syncing, error, meals } = store;
   return (
     <Planner
       store={store}
@@ -52,7 +53,7 @@ function GoogleApp() {
           </button>
         ) : (
           <button className="ghost-btn primary" onClick={store.connect}>
-            Se connecter avec Google
+            {canRenew ? 'Reconnecter' : 'Se connecter avec Google'}
           </button>
         )
       }
@@ -61,9 +62,11 @@ function GoogleApp() {
           {error && <Notice text={error} onClose={store.dismissError} />}
           {!connected && !error && (
             <p className="notice" role="status">
-              {meals.length === 0
-                ? `Connecte-toi avec Google pour afficher l'agenda « ${GOOGLE_CALENDAR_NAME} » et recevoir des propositions.`
-                : "Tu vois la dernière copie de l'agenda. Connecte-toi avec Google pour le modifier."}
+              {canRenew
+                ? "La connexion Google a expiré (elle dure une heure). Touche l'écran pour la renouveler, ou utilise « Reconnecter »."
+                : meals.length === 0
+                  ? `Connecte-toi avec Google pour afficher l'agenda « ${GOOGLE_CALENDAR_NAME} » et recevoir des propositions.`
+                  : "Tu vois la dernière copie de l'agenda. Connecte-toi avec Google pour le modifier."}
             </p>
           )}
         </>
@@ -145,6 +148,25 @@ function LocalApp() {
   );
 }
 
+type SlotMode = Slot | 'both';
+
+const SLOT_MODES: { value: SlotMode; label: string }[] = [
+  { value: 'midi', label: 'Midi' },
+  { value: 'soir', label: 'Soir' },
+  { value: 'both', label: 'Les deux' },
+];
+const SLOT_MODE_KEY = 'mymeals.slotMode';
+const DEFAULT_SLOT_MODE: SlotMode = 'soir';
+
+function loadSlotMode(): SlotMode {
+  try {
+    const stored = localStorage.getItem(SLOT_MODE_KEY);
+    return SLOT_MODES.some((m) => m.value === stored) ? (stored as SlotMode) : DEFAULT_SLOT_MODE;
+  } catch {
+    return DEFAULT_SLOT_MODE;
+  }
+}
+
 const PENDING_KEY = 'mymeals.pendingOnly';
 
 function loadPendingOnly(): boolean {
@@ -208,6 +230,8 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
   // Change à chaque ouverture de l'application, pour ne pas revoir le même tirage.
   const [seed] = useState(() => String(Math.random()));
   const [pendingOnly, setPendingOnly] = useState(loadPendingOnly);
+  const [slotMode, setSlotMode] = useState(loadSlotMode);
+  const activeSlots = useMemo(() => (slotMode === 'both' ? SLOTS : SLOTS.filter((slot) => slot === slotMode)), [slotMode]);
   // Idées « Surprise Me » affichées à la place de la proposition, par créneau.
   const [surprises, setSurprises] = useState<Record<string, Surprise>>({});
   const surprisesShown = useRef(new Set<string>());
@@ -245,7 +269,8 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
     }
     for (const date of days) {
       if (date < today) continue;
-      for (const slot of SLOTS) {
+      // Seuls les créneaux affichés reçoivent une proposition (les repas déjà prévus comptent partout).
+      for (const slot of activeSlots) {
         const key = `${date}|${slot}`;
         if (bySlot.has(key) || skipped.has(key) || !usual.has(`${weekday(date)}-${slot}`)) continue;
         const ranked = suggest(dishes, date, slot, { exclude: used, weekWords });
@@ -259,7 +284,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
       }
     }
     return out;
-  }, [days, today, bySlot, usual, dishes, rejected, skipped, randomness, seed]);
+  }, [days, today, bySlot, usual, dishes, rejected, skipped, randomness, seed, activeSlots]);
 
   const sunday = days[6];
 
@@ -270,7 +295,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
     return usual.size === 0 || usual.has(`${weekday(date)}-${slot}`);
   };
   const visibleDays = days
-    .map((date) => ({ date, slots: SLOTS.filter((slot) => !pendingOnly || needsDecision(date, slot)) }))
+    .map((date) => ({ date, slots: activeSlots.filter((slot) => !pendingOnly || needsDecision(date, slot)) }))
     .filter((day) => day.slots.length > 0);
 
   function surpriseSlot(key: string, date: string) {
@@ -294,7 +319,10 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
     <div className="app">
       <header className="top">
         <h1>MyMeals</h1>
-        {action}
+        <div className="top-actions">
+          <ThemePicker />
+          {action}
+        </div>
       </header>
 
       {banner}
@@ -323,6 +351,25 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
           ›
         </button>
       </nav>
+
+      <div className="segmented" role="group" aria-label="Repas affichés">
+        {SLOT_MODES.map((mode) => (
+          <button
+            key={mode.value}
+            aria-pressed={slotMode === mode.value}
+            onClick={() => {
+              setSlotMode(mode.value);
+              try {
+                localStorage.setItem(SLOT_MODE_KEY, mode.value);
+              } catch {
+                // le réglage vaudra pour cette session
+              }
+            }}
+          >
+            {mode.label}
+          </button>
+        ))}
+      </div>
 
       <div className="settings">
         <label className="switch">

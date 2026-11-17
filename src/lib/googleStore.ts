@@ -6,12 +6,14 @@ import {
   eventToMeal,
   findCalendar,
   forgetToken,
+  getAccount,
   insertEvent,
   listChanges,
   loadGoogleSignIn,
   renameEvent,
   signIn,
   storedToken,
+  tokenRemainingMs,
   type GoogleCalendar,
   type GoogleEvent,
 } from './google';
@@ -21,6 +23,8 @@ const CACHE_KEY = 'mymeals.google.v1';
 
 interface Cache {
   calendar?: GoogleCalendar;
+  /** Adresse du compte Google, pour renouveler la connexion sans demander de choisir un compte. */
+  account?: string;
   syncToken?: string;
   meals: Meal[];
 }
@@ -46,6 +50,8 @@ function applyEvents(meals: Meal[], events: GoogleEvent[]): Meal[] {
 
 export interface GoogleMealStore extends MealStore {
   connected: boolean;
+  /** Une connexion a déjà eu lieu : la reconnexion peut se faire d'un simple toucher. */
+  canRenew: boolean;
   syncing: boolean;
   error: string;
   connect: () => void;
@@ -64,6 +70,8 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   const [error, setError] = useState('');
   const cacheRef = useRef(cache);
   const busy = useRef(false);
+  const renewing = useRef<Promise<string | null> | null>(null);
+  const lastRenewFailure = useRef(0);
 
   const commit = useCallback((fn: (current: Cache) => Cache) => {
     const next = fn(cacheRef.current);
@@ -93,6 +101,11 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
           if (!calendar) throw new Error(`L'agenda « ${calendarName} » est introuvable dans ce compte Google.`);
           const found = calendar;
           commit((c) => ({ ...c, calendar: found }));
+        }
+        if (!cacheRef.current.account) {
+          // Sert seulement à renouveler la connexion plus discrètement : un échec ne gêne pas.
+          const account = await getAccount(accessToken).catch(() => undefined);
+          if (account) commit((c) => ({ ...c, account }));
         }
         let changes;
         let full = !cacheRef.current.syncToken;
@@ -132,76 +145,143 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
 
   const connect = useCallback(() => {
     setError('');
-    signIn(clientId).then(setToken, fail);
+    signIn(clientId, { hint: cacheRef.current.account }).then(setToken, fail);
   }, [clientId, fail]);
 
   const disconnect = useCallback(() => {
     forgetToken();
     setToken(null);
-  }, []);
+    // Déconnexion voulue : on ne se reconnecte plus tout seul au prochain toucher.
+    commit((c) => ({ ...c, calendar: undefined, account: undefined, syncToken: undefined }));
+  }, [commit]);
 
-  /** Vérifie qu'on peut écrire dans l'agenda, sinon explique pourquoi. */
-  const writable = useCallback((): { token: string; calendar: GoogleCalendar } | null => {
-    const fresh = storedToken();
+  /**
+   * Demande un nouveau jeton à Google, sans rien afficher si le compte est connu. À appeler
+   * pendant un toucher ou un clic (sinon le navigateur bloque la fenêtre). Plusieurs appels
+   * simultanés partagent la même demande.
+   */
+  const renew = useCallback((): Promise<string | null> => {
+    if (!renewing.current) {
+      renewing.current = signIn(clientId, { hint: cacheRef.current.account })
+        .then(
+          (fresh) => {
+            setToken(fresh);
+            return fresh;
+          },
+          () => {
+            lastRenewFailure.current = Date.now();
+            return null;
+          },
+        )
+        .finally(() => {
+          renewing.current = null;
+        });
+    }
+    return renewing.current;
+  }, [clientId]);
+
+  const canRenew = cache.calendar !== undefined;
+
+  // Le jeton Google ne dure qu'une heure. Au premier toucher après son expiration (ou dans ses
+  // cinq dernières minutes), on le renouvelle : pas besoin de se reconnecter à la main.
+  useEffect(() => {
+    if (!canRenew) return;
+    const onGesture = () => {
+      if (renewing.current || Date.now() - lastRenewFailure.current < 60_000) return;
+      if (tokenRemainingMs() > 5 * 60_000) return;
+      void renew();
+    };
+    document.addEventListener('pointerup', onGesture, true);
+    document.addEventListener('keydown', onGesture, true);
+    return () => {
+      document.removeEventListener('pointerup', onGesture, true);
+      document.removeEventListener('keydown', onGesture, true);
+    };
+  }, [canRenew, renew]);
+
+  /** Donne accès à l'agenda pour écrire, en renouvelant la connexion si elle a expiré. */
+  const access = useCallback(async (): Promise<{ token: string; calendar: GoogleCalendar } | null> => {
     const calendar = cacheRef.current.calendar;
-    if (!fresh || !calendar) {
-      if (!fresh) setToken(null);
+    if (!calendar) {
       setError("Connecte-toi à Google pour modifier l'agenda.");
       return null;
     }
+    const fresh = storedToken() ?? (await renew());
+    if (!fresh) {
+      setToken(null);
+      setError('La connexion Google a expiré : reconnecte-toi, puis recommence.');
+      return null;
+    }
     return { token: fresh, calendar };
-  }, []);
+  }, [renew]);
+
+  /** Exécute une écriture tout de suite si la connexion est valable, sinon après l'avoir renouvelée. */
+  const withAccess = useCallback(
+    (action: (a: { token: string; calendar: GoogleCalendar }) => void) => {
+      const calendar = cacheRef.current.calendar;
+      const fresh = storedToken();
+      if (calendar && fresh) {
+        action({ token: fresh, calendar });
+        return;
+      }
+      void access().then((a) => {
+        if (a) action(a);
+      });
+    },
+    [access],
+  );
 
   const setSlot = useCallback(
     (date: string, slot: Slot, rawName: string) => {
       const name = rawName.trim();
-      const access = writable();
-      if (!access || !name) return;
-      const existing = cacheRef.current.meals.find((m) => m.date === date && m.slot === slot);
-      if (existing) {
-        // Le créneau a déjà un événement : on change seulement son titre.
-        commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === existing.id ? { ...m, name } : m)) }));
-        renameEvent(access.token, access.calendar, existing.id, name).catch((e) => {
-          commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === existing.id ? existing : m)) }));
-          fail(e);
-        });
-      } else {
-        const tempId = `tmp-${date}-${slot}-${Date.now()}`;
-        commit((c) => ({ ...c, meals: [...c.meals, { id: tempId, date, slot, name, source: 'google' }] }));
-        insertEvent(access.token, access.calendar, date, slot, name).then(
-          (event) => commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === tempId ? { ...m, id: event.id } : m)) })),
-          (e) => {
-            commit((c) => ({ ...c, meals: c.meals.filter((m) => m.id !== tempId) }));
+      if (!name) return;
+      withAccess((a) => {
+        const existing = cacheRef.current.meals.find((m) => m.date === date && m.slot === slot);
+        if (existing) {
+          // Le créneau a déjà un événement : on change seulement son titre.
+          commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === existing.id ? { ...m, name } : m)) }));
+          renameEvent(a.token, a.calendar, existing.id, name).catch((e) => {
+            commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === existing.id ? existing : m)) }));
             fail(e);
-          },
-        );
-      }
+          });
+        } else {
+          const tempId = `tmp-${date}-${slot}-${Date.now()}`;
+          commit((c) => ({ ...c, meals: [...c.meals, { id: tempId, date, slot, name, source: 'google' }] }));
+          insertEvent(a.token, a.calendar, date, slot, name).then(
+            (event) => commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === tempId ? { ...m, id: event.id } : m)) })),
+            (e) => {
+              commit((c) => ({ ...c, meals: c.meals.filter((m) => m.id !== tempId) }));
+              fail(e);
+            },
+          );
+        }
+      });
     },
-    [commit, fail, writable],
+    [commit, fail, withAccess],
   );
 
   const clearSlot = useCallback(
     (date: string, slot: Slot) => {
-      const access = writable();
-      if (!access) return;
-      const removed = cacheRef.current.meals.filter((m) => m.date === date && m.slot === slot);
-      commit((c) => ({ ...c, meals: c.meals.filter((m) => !removed.includes(m)) }));
-      for (const meal of removed) {
-        deleteEvent(access.token, access.calendar, meal.id).catch((e) => {
-          commit((c) => ({ ...c, meals: [...c.meals, meal] }));
-          fail(e);
-        });
-      }
+      withAccess((a) => {
+        const removed = cacheRef.current.meals.filter((m) => m.date === date && m.slot === slot);
+        commit((c) => ({ ...c, meals: c.meals.filter((m) => !removed.includes(m)) }));
+        for (const meal of removed) {
+          deleteEvent(a.token, a.calendar, meal.id).catch((e) => {
+            commit((c) => ({ ...c, meals: [...c.meals, meal] }));
+            fail(e);
+          });
+        }
+      });
     },
-    [commit, fail, writable],
+    [commit, fail, withAccess],
   );
 
   /** Renomme des événements de l'agenda, quelques-uns à la fois ; ceux qui échouent reprennent leur nom. */
   const renameMeals = useCallback(
     async (ids: string[], rawName: string) => {
       const name = rawName.trim();
-      const access = writable();
-      if (!access || !name) return { renamed: 0, failed: access ? 0 : ids.length };
+      const granted = await access();
+      if (!granted || !name) return { renamed: 0, failed: granted ? 0 : ids.length };
       const wanted = new Set(ids);
       // Les repas pas encore créés dans l'agenda (identifiant provisoire) sont laissés de côté.
       const targets = cacheRef.current.meals.filter((m) => wanted.has(m.id) && !m.id.startsWith('tmp-') && m.name !== name);
@@ -219,7 +299,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
           const meal = queue.shift();
           if (!meal) return;
           try {
-            await renameEvent(access.token, access.calendar, meal.id, name);
+            await renameEvent(granted.token, granted.calendar, meal.id, name);
             renamed++;
           } catch (e) {
             failed++;
@@ -229,18 +309,18 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
           }
         }
       };
-      await Promise.all(Array.from({ length: Math.min(4, targets.length) }, worker));
+      await Promise.all(Array.from({ length: Math.min(2, targets.length) }, worker));
       for (const meal of queue) {
         failed++;
         revert(meal);
       }
       if (failed > 0) {
         if (lastError instanceof AuthError) fail(lastError);
-        else fail(new Error(`${failed} repas ${failed > 1 ? "n'ont" : "n'a"} pas pu être renommé${failed > 1 ? 's' : ''} dans l'agenda (${lastError instanceof Error ? lastError.message : 'erreur inconnue'}).`));
+        else fail(new Error(`${failed} repas ${failed > 1 ? "n'ont" : "n'a"} pas pu être renommé${failed > 1 ? 's' : ''} dans l'agenda. ${lastError instanceof Error ? lastError.message : ''}`.trim()));
       }
       return { renamed, failed };
     },
-    [commit, fail, writable],
+    [access, commit, fail],
   );
 
   return {
@@ -249,6 +329,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     clearSlot,
     renameMeals,
     connected: token !== null,
+    canRenew,
     syncing,
     error,
     connect,

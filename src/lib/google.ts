@@ -23,7 +23,7 @@ interface TokenResponse {
 }
 
 interface TokenClient {
-  requestAccessToken: () => void;
+  requestAccessToken: (overrideConfig?: { prompt?: string; hint?: string }) => void;
 }
 
 declare global {
@@ -34,6 +34,7 @@ declare global {
           initTokenClient: (config: {
             client_id: string;
             scope: string;
+            hint?: string;
             callback: (response: TokenResponse) => void;
             error_callback?: (error: { type: string }) => void;
           }) => TokenClient;
@@ -86,6 +87,18 @@ export function storedToken(): string | null {
   }
 }
 
+/** Durée de validité restante du jeton enregistré, en millisecondes (0 s'il n'y en a pas ou s'il a expiré). */
+export function tokenRemainingMs(): number {
+  try {
+    const raw = localStorage.getItem(TOKEN_KEY);
+    if (!raw) return 0;
+    const { expires } = JSON.parse(raw) as { expires: number };
+    return Math.max(0, expires - Date.now());
+  } catch {
+    return 0;
+  }
+}
+
 export function forgetToken(): void {
   try {
     localStorage.removeItem(TOKEN_KEY);
@@ -94,14 +107,20 @@ export function forgetToken(): void {
   }
 }
 
-/** Ouvre la fenêtre de connexion Google et renvoie un jeton d'accès (valable environ 1 h). */
-export async function signIn(clientId: string): Promise<string> {
+/**
+ * Ouvre la fenêtre de connexion Google et renvoie un jeton d'accès (valable environ 1 h).
+ * Avec `hint` (l'adresse du compte déjà utilisé), Google peut renouveler le jeton sans rien
+ * demander : la fenêtre s'ouvre et se referme seule. Il faut appeler cette fonction pendant
+ * un geste de l'utilisateur (clic, toucher), sinon le navigateur bloque la fenêtre.
+ */
+export async function signIn(clientId: string, options: { hint?: string } = {}): Promise<string> {
   await loadGoogleSignIn();
   const oauth2 = window.google!.accounts.oauth2;
   return new Promise<string>((resolve, reject) => {
     const client = oauth2.initTokenClient({
       client_id: clientId,
       scope: SCOPES.join(' '),
+      hint: options.hint,
       callback: (response) => {
         if (response.error || !response.access_token) {
           reject(new AuthError('Connexion Google refusée.'));
@@ -119,22 +138,62 @@ export async function signIn(clientId: string): Promise<string> {
       },
       error_callback: () => reject(new AuthError('Connexion Google annulée.')),
     });
-    client.requestAccessToken();
+    client.requestAccessToken(options.hint ? { prompt: '', hint: options.hint } : undefined);
   });
 }
 
-async function call<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
+/** Motifs de refus 403 qui veulent dire « trop de requêtes », pas « pas connecté ». */
+const RATE_LIMIT_REASONS = new Set(['rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded']);
+/** Motifs de refus 403 qui veulent dire que les autorisations accordées ne suffisent pas. */
+const PERMISSION_REASONS = new Set(['insufficientPermissions', 'ACCESS_TOKEN_SCOPE_INSUFFICIENT']);
+const MAX_RETRIES = 4;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function errorReason(response: Response): Promise<string> {
+  try {
+    const body = (await response.clone().json()) as { error?: { errors?: { reason?: string }[]; status?: string; details?: { reason?: string }[] } };
+    return body.error?.errors?.[0]?.reason ?? body.error?.details?.[0]?.reason ?? body.error?.status ?? '';
+  } catch {
+    return '';
+  }
+}
+
+async function call<T>(token: string, path: string, init: RequestInit = {}, attempt = 0): Promise<T> {
   const response = await fetch(`${API}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers },
   });
-  if (response.status === 401 || response.status === 403) {
+  // Seul 401 veut dire « jeton expiré » : un 403 est souvent une simple limite de débit.
+  if (response.status === 401) {
     forgetToken();
     throw new AuthError('La connexion Google a expiré.');
   }
   if (response.status === 410) throw new SyncExpiredError();
-  if (!response.ok) throw new Error(`Google Agenda a répondu ${response.status}.`);
+  if (!response.ok) {
+    const reason = await errorReason(response);
+    const limited = response.status === 429 || (response.status === 403 && RATE_LIMIT_REASONS.has(reason));
+    const serverError = response.status === 500 || response.status === 502 || response.status === 503 || response.status === 504;
+    if ((limited || serverError) && attempt < MAX_RETRIES) {
+      const retryAfter = Number(response.headers.get('Retry-After'));
+      await sleep((retryAfter > 0 ? retryAfter * 1000 : 1000 * 2 ** attempt) + Math.random() * 400);
+      return call<T>(token, path, init, attempt + 1);
+    }
+    if (response.status === 403 && PERMISSION_REASONS.has(reason)) {
+      forgetToken();
+      throw new AuthError("Autorisations insuffisantes : reconnecte-toi en cochant toutes les cases demandées.");
+    }
+    if (limited) throw new Error('Google limite temporairement les requêtes : réessaie dans une minute.');
+    if (response.status === 403) throw new Error(`Google Agenda a refusé la demande${reason ? ` (${reason})` : ''}.`);
+    throw new Error(`Google Agenda a répondu ${response.status}.`);
+  }
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+}
+
+/** Adresse du compte connecté (l'identifiant de son agenda principal), pour renouveler la connexion sans la redemander. */
+export async function getAccount(token: string): Promise<string | undefined> {
+  const calendar = await call<{ id?: string }>(token, '/calendars/primary?fields=id');
+  return calendar.id;
 }
 
 export async function findCalendar(token: string, name: string): Promise<GoogleCalendar | null> {
