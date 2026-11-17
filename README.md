@@ -146,6 +146,18 @@ tous les repas du groupe, « Pas des doublons » écarte le groupe (mémorisé s
 lien pour réafficher les écartés). « Tout confirmer » fusionne tous les groupes après une
 confirmation. Les groupes les plus lourds viennent en premier, vingt à la fois.
 
+**Approchants.** Un second onglet propose les plats dont les mots sont **inclus** dans ceux d'un plat plus
+détaillé : « pâtes saumon » et « pâtes saumon fumé ». Le plat de base a au moins deux mots et le plat détaillé
+un ou deux de plus (trois mots en plus, c'est trop loin) ; chaque plat détaillé est rangé sous le plat de base
+le plus proche, et les « restes » sont écartés. Comme c'est moins sûr que de simples variantes d'écriture, rien
+n'est coché d'avance : on coche les plats qui sont bien le même, le nom retenu se propose, puis « Fusionner ».
+Les plats qui ne diffèrent que par un mot d'habillage (« fumé », « frais », « grillé »…) sont marqués
+« probable » et passent en premier. « Pas des doublons » écarte la carte (mémorisé sur l'appareil).
+
+**Le pied de page** affiche trois chiffres : les repas, les **libellés** (écritures exactes différentes, ce que les
+fusions font baisser) et les **plats** (après le regroupement automatique des majuscules, pluriels, accents et
+ordre des mots : fusionner de simples variantes ne change donc pas ce dernier chiffre).
+
 **Recherche manuelle.** L'onglet « Doublons » cherche dans tout le calendrier les repas dont le libellé
 contient **tous** les mots saisis, chacun pouvant n'être que le début d'un mot :
 « pat jacqu » trouve « st jacques aux pâtes » et « pâte à la saint jacques », mais

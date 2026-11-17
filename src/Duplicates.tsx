@@ -3,6 +3,7 @@ import { longDate } from './lib/dates';
 import { compileRegex, findOccurrences, hasQuery, proposeLabel } from './lib/duplicates';
 import type { DishIndex } from './lib/suggest';
 import type { MealStore } from './lib/types';
+import { ApproximateDuplicates } from './ApproximateDuplicates';
 import { SuspectedDuplicates } from './SuspectedDuplicates';
 
 const REGEX_KEY = 'mymeals.duplicates.regex';
@@ -30,7 +31,7 @@ const REGEX_EXAMPLES: [string, string][] = [
 /** Au-delà, la liste devient illisible : on demande de préciser la recherche. */
 const MAX_ROWS = 300;
 
-type Mode = 'suspects' | 'search';
+type Mode = 'suspects' | 'approx' | 'search';
 
 /** Page des doublons : propositions toutes prêtes à confirmer, ou recherche à la main. */
 export function DuplicatesPage({ store, dishes }: { store: MealStore; dishes: DishIndex }) {
@@ -39,13 +40,18 @@ export function DuplicatesPage({ store, dishes }: { store: MealStore; dishes: Di
     <>
       <div className="segmented" role="group" aria-label="Façon de trouver les doublons">
         <button aria-pressed={mode === 'suspects'} onClick={() => setMode('suspects')}>
-          Doublons suspectés
+          Suspectés
+        </button>
+        <button aria-pressed={mode === 'approx'} onClick={() => setMode('approx')}>
+          Approchants
         </button>
         <button aria-pressed={mode === 'search'} onClick={() => setMode('search')}>
-          Recherche manuelle
+          Recherche
         </button>
       </div>
-      {mode === 'suspects' ? <SuspectedDuplicates store={store} dishes={dishes} /> : <ManualSearch store={store} />}
+      {mode === 'suspects' && <SuspectedDuplicates store={store} dishes={dishes} />}
+      {mode === 'approx' && <ApproximateDuplicates store={store} dishes={dishes} />}
+      {mode === 'search' && <ManualSearch store={store} />}
     </>
   );
 }

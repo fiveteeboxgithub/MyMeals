@@ -1,4 +1,4 @@
-import { fold, normalize, singular, type DishIndex } from './suggest';
+import { fold, normalize, singular, type Dish, type DishIndex } from './suggest';
 import type { Meal } from './types';
 
 /** Un libellé exact de repas, avec tous les repas du calendrier qui le portent. */
@@ -207,4 +207,115 @@ export function suspectedGroups(meals: Meal[], index: DishIndex, ignored: Readon
     });
   }
   return groups.sort((a, b) => b.mealCount - a.mealCount || a.proposal.localeCompare(b.proposal));
+}
+
+/** Mots d'« habillage » : un plat qui n'en diffère que par eux est très probablement le même (formes normalisées). */
+const QUALIFIERS = new Set(
+  [
+    'maison', 'frais', 'fraiche', 'fume', 'grille', 'roti', 'rotie', 'gratine', 'vapeur', 'nature', 'simple',
+    'chaud', 'froid', 'rapide', 'express', 'leger', 'bio', 'cuit', 'poele', 'saute', 'mijote', 'petit', 'grand',
+  ].map(singular),
+);
+
+/** Le mot tel qu'il est écrit dans le libellé (avec ses accents et son pluriel), à partir de sa forme normalisée. */
+function showWord(label: string, word: string): string {
+  const tokens = label.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  return tokens.find((token) => singular(fold(token)) === word) ?? word;
+}
+
+/** Un plat plus détaillé qu'un autre : mêmes mots, plus un ou deux. */
+export interface ApproxCandidate {
+  /** Libellé le plus utilisé de ce plat. */
+  label: string;
+  occurrences: Occurrence[];
+  mealCount: number;
+  /** Mots en plus par rapport au plat de base (sans accents, au singulier). */
+  extra: string[];
+  /** Les mêmes mots, écrits comme dans le libellé. */
+  shown: string[];
+  /** Les mots en plus ne sont que de l'habillage (« fumé », « maison »…) : très probablement le même plat. */
+  likely: boolean;
+}
+
+export interface ApproxGroup {
+  signature: string;
+  /** Libellé le plus utilisé du plat de base. */
+  label: string;
+  base: Occurrence[];
+  baseCount: number;
+  candidates: ApproxCandidate[];
+  /** Total des repas du plat de base et de ses candidats. */
+  mealCount: number;
+  likely: boolean;
+}
+
+/**
+ * Plats dont les mots sont inclus dans ceux d'un autre plat plus détaillé : « pâtes saumon » et
+ * « pâtes saumon fumé ». Chaque plat détaillé est rangé sous le plat de base le plus proche (celui
+ * qui a le plus de mots). Le plat de base a au moins deux mots, et le plat détaillé en a un ou deux de
+ * plus. Ce sont des soupçons moins sûrs que les variantes d'écriture : on les propose sans les cocher.
+ */
+export function approximateGroups(meals: Meal[], index: DishIndex, ignored: ReadonlySet<string> = new Set()): ApproxGroup[] {
+  const occByDish = new Map<Dish, Occurrence[]>();
+  for (const occurrence of groupByLabel(meals)) {
+    const dish = index.byKey.get(normalize(occurrence.label));
+    if (!dish || dish.generic) continue;
+    const list = occByDish.get(dish);
+    if (list) list.push(occurrence);
+    else occByDish.set(dish, [occurrence]);
+  }
+  const countOf = (dish: Dish) => (occByDish.get(dish) ?? []).reduce((sum, o) => sum + o.count, 0);
+
+  const grouped = new Map<Dish, { dish: Dish; extra: string[] }[]>();
+  for (const dish of occByDish.keys()) {
+    const words = dish.key.split(' ');
+    if (words.length < 3 || words.length > 10) continue;
+    let best: { base: Dish; extra: string[]; size: number } | undefined;
+    const attempt = (removed: number[]) => {
+      const rest = words.filter((_, i) => !removed.includes(i));
+      if (rest.length < 2) return;
+      const base = index.byKey.get(rest.join(' '));
+      if (!base || base === dish || !occByDish.has(base)) return;
+      if (!best || rest.length > best.size || (rest.length === best.size && countOf(base) > countOf(best.base))) {
+        best = { base, extra: removed.map((i) => words[i]), size: rest.length };
+      }
+    };
+    for (let i = 0; i < words.length; i++) attempt([i]);
+    for (let i = 0; i < words.length; i++) for (let j = i + 1; j < words.length; j++) attempt([i, j]);
+    if (!best) continue;
+    const list = grouped.get(best.base);
+    if (list) list.push({ dish, extra: best.extra });
+    else grouped.set(best.base, [{ dish, extra: best.extra }]);
+  }
+
+  const groups: ApproxGroup[] = [];
+  for (const [baseDish, found] of grouped) {
+    const base = occByDish.get(baseDish)!;
+    const candidates: ApproxCandidate[] = found
+      .map(({ dish, extra }) => {
+        const occurrences = occByDish.get(dish)!;
+        const label = proposeLabel(occurrences);
+        return {
+          label,
+          occurrences,
+          mealCount: countOf(dish),
+          extra,
+          shown: extra.map((word) => showWord(label, word)),
+          likely: extra.every((word) => QUALIFIERS.has(word)),
+        };
+      })
+      .sort((a, b) => Number(b.likely) - Number(a.likely) || b.mealCount - a.mealCount || a.label.localeCompare(b.label));
+    const signature = `~${base.map((o) => o.label).sort().join('\u001f')}\u001e${candidates.map((c) => c.label).sort().join('\u001f')}`;
+    if (ignored.has(signature)) continue;
+    groups.push({
+      signature,
+      label: proposeLabel(base),
+      base,
+      baseCount: countOf(baseDish),
+      candidates,
+      mealCount: countOf(baseDish) + candidates.reduce((sum, c) => sum + c.mealCount, 0),
+      likely: candidates.some((c) => c.likely),
+    });
+  }
+  return groups.sort((a, b) => Number(b.likely) - Number(a.likely) || b.mealCount - a.mealCount || a.label.localeCompare(b.label));
 }

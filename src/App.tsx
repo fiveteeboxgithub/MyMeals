@@ -364,6 +364,8 @@ function Planner({ store, action, banner, footer, settingsSync }: PlannerProps) 
     }
   }, [remoteSettings, saveRemoteSettings, stamp]);
 
+  // Écritures exactes différentes (ce que les fusions de doublons font baisser), puis plats après regroupement automatique.
+  const labelCount = useMemo(() => new Set(meals.map((m) => m.name.replace(/\s+/g, ' ').trim())).size, [meals]);
   const blacklist = useMemo(() => parseBlacklist(blacklistText), [blacklistText]);
   const blacklistKeys = useMemo(() => blacklistedKeys(dishes, blacklist), [dishes, blacklist]);
   const blacklistFilter = useMemo<BlacklistFilter>(
@@ -778,7 +780,8 @@ function Planner({ store, action, banner, footer, settingsSync }: PlannerProps) 
 
       {meals.length > 0 && (
         <footer className="foot">
-          {meals.length} repas enregistrés · {dishes.dishes.length} plats différents ·{' '}
+          {meals.length} repas · {labelCount} {labelCount > 1 ? 'libellés' : 'libellé'} · {dishes.dishes.length}{' '}
+          {dishes.dishes.length > 1 ? 'plats' : 'plat'} ·{' '}
           {footer}
         </footer>
       )}

@@ -428,6 +428,7 @@ describe('pickProposal', () => {
 describe('doublons', async () => {
   const {
     applyInitialStyle,
+    approximateGroups,
     compileRegex,
     findOccurrences,
     groupByLabel,
@@ -574,6 +575,55 @@ describe('doublons', async () => {
     // Un groupe écarté ne revient pas.
     const ignored = new Set([fish.signature]);
     expect(suspectedGroups(meals, buildIndex(meals), ignored).map((g) => g.proposal)).not.toContain('poisson/purée');
+  });
+
+  it('propose des plats approchants : mêmes mots, plus un ou deux', () => {
+    const meals: Meal[] = [];
+    let n = 0;
+    const add = (name: string, times = 1) => {
+      for (let i = 0; i < times; i++) meals.push(meal(addDays('2026-01-01', n++), 'soir', name));
+    };
+    add('pates saumon', 5);
+    add('pates saumon fumé', 2); // habillage seulement
+    add('Pâtes au saumon fumé frais', 1); // plus détaillé que « pates saumon fumé »
+    add('pates saumon fumé maison', 1); // « maison » est un petit mot ignoré : c'est déjà le même plat
+    add('pates saumon crème', 2); // autre mot : moins sûr
+    add('poisson riz', 4);
+    add('poisson riz haricots verts', 3);
+    add('quiche', 6);
+    add('quiche lorraine', 2); // base d'un seul mot : ignorée
+    add('restes', 3);
+    add('restes pates saumon', 1); // les restes sont écartés
+    add('curry poulet', 3);
+    add('curry poulet lait coco épinards', 2); // trois mots en plus : trop loin
+    const groups = approximateGroups(meals, buildIndex(meals));
+    const byLabel = new Map(groups.map((g) => [g.label, g]));
+    expect([...byLabel.keys()].sort()).toEqual(['pates saumon', 'pates saumon fumé', 'poisson riz']);
+    // Le plat « Pâtes au saumon fumé frais » est rangé sous le plat le plus proche, « pates saumon fumé ».
+    const fumeGroup = byLabel.get('pates saumon fumé')!;
+    expect(fumeGroup.candidates.map((c) => c.label)).toEqual(['Pâtes au saumon fumé frais']);
+    expect(fumeGroup.candidates[0].extra).toEqual(['frai']);
+    expect(fumeGroup.candidates[0].shown).toEqual(['frais']);
+    expect(fumeGroup.candidates[0].likely).toBe(true);
+    const salmon = byLabel.get('pates saumon')!;
+    expect(salmon.baseCount).toBe(5);
+    expect(salmon.candidates.map((c) => c.label)).toEqual(['pates saumon fumé', 'pates saumon crème']);
+    expect(salmon.candidates.map((c) => c.likely)).toEqual([true, false]);
+    expect(salmon.candidates[0].extra).toEqual(['fume']);
+    expect(salmon.candidates[0].shown).toEqual(['fumé']);
+    expect(salmon.mealCount).toBe(5 + (2 + 1) + 2); // « fumé » compte aussi « fumé maison »
+    const fish = byLabel.get('poisson riz')!;
+    expect(fish.candidates[0].extra).toEqual(['haricotvert']);
+    expect(fish.candidates[0].shown).toEqual(['haricotvert']); // mot unifié : pas d'écriture d'origine
+    expect(fish.likely).toBe(false);
+    // Les groupes qui ont un candidat « probable » passent avant les autres.
+    expect(groups.map((g) => g.likely)).toEqual([true, true, false]);
+    // Écarter un groupe le fait disparaître.
+    const without = approximateGroups(meals, buildIndex(meals), new Set([fish.signature]));
+    expect(without.map((g) => g.label)).not.toContain('poisson riz');
+    // Une fois fusionnés, les plats ne sont plus approchants.
+    const merged = meals.map((m) => (m.name.startsWith('poisson riz') ? { ...m, name: 'poisson riz' } : m));
+    expect(approximateGroups(merged, buildIndex(merged)).map((g) => g.label)).not.toContain('poisson riz');
   });
 
   it('propose le style d’écriture majoritaire pour la première lettre', () => {
