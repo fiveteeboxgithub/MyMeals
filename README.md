@@ -238,7 +238,7 @@ colonnes.
 - **Une proposition** garde deux boutons, **↻** (une autre) et **✓** (accepter). Le menu **⋯** regroupe le
   reste, avec un libellé : « Surprise Me » (un plat jamais noté, catalogue ou « Mes idées »), « Un plat
   oublié » (mangé au moins quatre fois, plus depuis un an), « Un plat de la liste noire », « Pas de repas ce
-  jour-là », « Ne plus jamais proposer ce plat ».
+  midi » ou « ce soir » (seulement ce créneau), « Ne plus jamais proposer ce plat ».
 - **Restes** : l'application apprend quels plats laissent des restes (au moins deux repas « restes <plat> »
   dans les trois jours qui suivent ce plat). Quand un tel plat est prévu, le créneau suivant (parmi les
   trois suivants) propose ses restes ; ce n'est qu'une proposition, ↻ en donne une autre.
