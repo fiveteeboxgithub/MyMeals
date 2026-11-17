@@ -9,7 +9,8 @@ import { KEYS, readPref, writePref } from './lib/prefs';
 import { MAX_FAVORITES_CHARS, parseSkipped, withSkip, type SharedSettings } from './lib/settings';
 import { buildIndex, normalize } from './lib/suggest';
 import { parseIdeas } from './lib/surprise';
-import type { MealStore, SettingsSync } from './lib/types';
+import type { ImagesSync, MealStore, SettingsSync } from './lib/types';
+import { CustomImagesContext, useCustomImages } from './lib/customImages';
 import { useAppSettings } from './lib/useAppSettings';
 import { Notice } from './Notice';
 import { PlanningView, type SlotMode, type WeekLayout } from './PlanningView';
@@ -60,6 +61,8 @@ export interface CalendarsAccess {
 interface PlannerProps {
   store: MealStore;
   settingsSync?: SettingsSync;
+  /** Images choisies pour des plats, partagées via l'agenda (mode Google). */
+  imagesSync?: ImagesSync;
   calendars?: CalendarsAccess;
   /** Premier chargement de l'agenda, encore vide. */
   loading?: boolean;
@@ -78,6 +81,7 @@ export function Planner(props: PlannerProps) {
   const [resetToken, setResetToken] = useState(0);
   const bump = useCallback(() => setResetToken((t) => t + 1), []);
   const { shared, update } = useAppSettings(props.settingsSync, bump);
+  const customImages = useCustomImages(props.imagesSync);
   const change = useCallback(
     (patch: Partial<SharedSettings>) => {
       update(patch);
@@ -204,6 +208,7 @@ export function Planner(props: PlannerProps) {
   const eventsApi = useMemo(() => (eventsOf ? { events: eventsOf } : undefined), [eventsOf]);
 
   return (
+    <CustomImagesContext.Provider value={customImages}>
     <div className={`app${view === 'planning' && weekLayout === 'columns' ? ' wide' : ''}`}>
       <header className="top">
         <h1>MyMeals</h1>
@@ -316,5 +321,6 @@ export function Planner(props: PlannerProps) {
         </footer>
       )}
     </div>
+    </CustomImagesContext.Provider>
   );
 }

@@ -15,6 +15,10 @@ import {
   listTimedEvents,
   loadGoogleSignIn,
   readSettingsEvent,
+  readSpecialEvent,
+  writeSpecialEvent,
+  IMAGES_EVENT,
+  IMAGES_EVENT_ID,
   renameEvent,
   signIn,
   storedToken,
@@ -26,6 +30,7 @@ import {
   type GoogleEvent,
 } from './google';
 import { parseSettingsRecord, type SettingsRecord } from './settings';
+import { parseImagesRecord, type ImagesRecord } from './customImages';
 import type { Meal, MealStore, Slot } from './types';
 import { withNote } from './store';
 
@@ -70,6 +75,9 @@ export interface GoogleMealStore extends MealStore {
   /** Réglages lus dans l'événement spécial de l'agenda : undefined avant lecture, null s'il n'existe pas. */
   settings: SettingsRecord | null | undefined;
   saveSettings: (record: SettingsRecord) => void;
+  /** Images choisies pour des plats, lues dans le second événement spécial. */
+  images: ImagesRecord | null | undefined;
+  saveImages: (record: ImagesRecord) => void;
   /** Adresse du compte connecté, si elle est connue. */
   account: string | undefined;
   /** L'agenda a déjà été lu au moins une fois (sur cet appareil). */
@@ -105,6 +113,8 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   const lastRenewSuccess = useRef(0);
   const [settings, setSettings] = useState<SettingsRecord | null | undefined>(undefined);
   const settingsLoaded = useRef(false);
+  const [images, setImages] = useState<ImagesRecord | null | undefined>(undefined);
+  const imagesLoaded = useRef(false);
   const pendingSettings = useRef<SettingsRecord | null>(null);
   const settingsTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Repas retirés pendant leur création : ils seront supprimés dès que Google leur aura donné un identifiant.
@@ -171,6 +181,16 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
             // lecture impossible : les réglages de cet appareil restent seuls en vigueur
           }
         }
+        if (!imagesLoaded.current || events.some((event) => event.id === IMAGES_EVENT_ID)) {
+          try {
+            const found = await readSpecialEvent(accessToken, calendar, IMAGES_EVENT);
+            setImages(found ? parseImagesRecord(found.payload) : null);
+            imagesLoaded.current = true;
+          } catch (e) {
+            if (e instanceof AuthError) throw e;
+            // lecture impossible : les images choisies sur cet appareil restent seules
+          }
+        }
       } catch (e) {
         fail(e);
       } finally {
@@ -208,6 +228,8 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     commit((c) => ({ ...c, calendar: undefined, account: undefined, syncToken: undefined }));
     setSettings(undefined);
     settingsLoaded.current = false;
+    setImages(undefined);
+    imagesLoaded.current = false;
   }, [commit]);
 
   /**
@@ -409,6 +431,33 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     [flushSettings],
   );
 
+  /** Enregistre les images choisies dans leur événement spécial (rare : tout de suite). */
+  const pendingImages = useRef<ImagesRecord | null>(null);
+  const flushImages = useCallback(() => {
+    const record = pendingImages.current;
+    const fresh = storedToken();
+    const calendar = cacheRef.current.calendar;
+    if (!record || !fresh || !calendar) return;
+    pendingImages.current = null;
+    writeSpecialEvent(fresh, calendar, record, IMAGES_EVENT).then(
+      () => setImages(record),
+      (e) => {
+        pendingImages.current ??= record;
+        fail(e);
+      },
+    );
+  }, [fail]);
+  const saveImages = useCallback(
+    (record: ImagesRecord) => {
+      pendingImages.current = record;
+      flushImages();
+    },
+    [flushImages],
+  );
+  useEffect(() => {
+    if (token) flushImages();
+  }, [token, flushImages]);
+
   // Une connexion toute neuve (ou renouvelée) envoie ce qui attendait.
   useEffect(() => {
     if (token) flushSettings();
@@ -495,6 +544,8 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     setNote,
     settings,
     saveSettings,
+    images,
+    saveImages,
     connected: token !== null,
     canRenew,
     syncing,

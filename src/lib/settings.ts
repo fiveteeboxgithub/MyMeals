@@ -114,7 +114,7 @@ export type SyncDecision = 'adopt-remote' | 'push-local' | 'none';
  * `remote` : undefined tant qu'on ne les a pas lus, null s'ils n'existent pas encore.
  * `localUpdatedAt` : 0 si rien n'a jamais été réglé ici.
  */
-export function decideSync(localUpdatedAt: number, remote: SettingsRecord | null | undefined): SyncDecision {
+export function decideSync(localUpdatedAt: number, remote: { updatedAt: number } | null | undefined): SyncDecision {
   if (remote === undefined) return 'none';
   if (remote === null) return localUpdatedAt > 0 ? 'push-local' : 'none';
   if (remote.updatedAt > localUpdatedAt) return 'adopt-remote';

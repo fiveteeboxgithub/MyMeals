@@ -7,14 +7,21 @@ import { fold, leftoverOf, singular } from './suggest';
  * cherché qu'une fois, puis gardé sur l'appareil.
  */
 export interface DishImage {
-  /** Miniature (upload.wikimedia.org). */
+  /** Miniature (upload.wikimedia.org, api.openverse.org) ou image choisie. */
   url: string;
-  /** Titre de l'article Wikipédia d'où vient l'image. */
+  /** Titre de l'article ou de la photo. */
   title: string;
+  /** D'où vient l'image (absent : Wikipédia, pour les images gardées par une version précédente). */
+  source?: 'wikipedia' | 'openverse' | 'perso';
+  /** Page d'origine (source et licence). */
+  link?: string;
+  /** Auteur et licence, pour Openverse. */
+  credit?: string;
 }
 
 const API = 'https://fr.wikipedia.org/w/api.php';
-const CACHE_KEY = 'mymeals.images.v1';
+// v2 : avec Openverse en secours, les plats restés sans image sont cherchés à nouveau.
+const CACHE_KEY = 'mymeals.images.v2';
 const HIDDEN_KEY = 'mymeals.images.hidden';
 /** Un plat sans image est recherché à nouveau au bout d'un mois. */
 const RETRY_MISSING_MS = 30 * 24 * 3600_000;
@@ -54,7 +61,7 @@ export function pickImage(pages: WikiPage[] | undefined, query: string, exact: b
   for (const page of sorted) {
     if (page.missing || !page.thumbnail?.source || page.pageprops?.disambiguation !== undefined) continue;
     if (!exact && !imageWords(page.title).some((w) => wanted.has(w))) continue;
-    return { url: page.thumbnail.source, title: page.title };
+    return { url: page.thumbnail.source, title: page.title, source: 'wikipedia' };
   }
   return null;
 }
@@ -78,12 +85,56 @@ async function wiki(params: Record<string, string>): Promise<WikiPage[] | undefi
   return data.query?.pages;
 }
 
-/** Cherche l'image d'un plat : l'article du même nom d'abord, sinon les premiers résultats de recherche. */
+interface OpenverseResult {
+  title?: string;
+  thumbnail?: string;
+  creator?: string;
+  license?: string;
+  license_version?: string;
+  foreign_landing_url?: string;
+  tags?: { name: string }[];
+}
+
+/** Choisit une photo Openverse : la première dont le titre ou les mots-clés partagent un mot avec le plat. */
+export function pickOpenverse(results: OpenverseResult[] | undefined, query: string): DishImage | null {
+  if (!results) return null;
+  const wanted = new Set(imageWords(query));
+  for (const r of results) {
+    if (!r.thumbnail?.startsWith('https://')) continue;
+    const words = imageWords([r.title ?? '', ...(r.tags ?? []).map((t) => t.name)].join(' '));
+    if (!words.some((w) => wanted.has(w))) continue;
+    const license = r.license ? `${r.license.toUpperCase()}${r.license_version ? ` ${r.license_version}` : ''}` : '';
+    return {
+      url: r.thumbnail,
+      title: r.title?.trim() || query,
+      source: 'openverse',
+      link: r.foreign_landing_url,
+      credit: [r.creator, license && (license.startsWith('CC0') || license === 'PDM' ? license : `CC ${license}`)].filter(Boolean).join(' · '),
+    };
+  }
+  return null;
+}
+
+/** Recherche sur Openverse (photos sous licence libre, sans compte). Une limite atteinte lève une erreur : rien n'est gardé. */
+async function openverse(query: string): Promise<DishImage | null> {
+  const params = new URLSearchParams({ q: query, page_size: '8', mature: 'false' });
+  const response = await fetch(`https://api.openverse.org/v1/images/?${params}`, { referrerPolicy: 'no-referrer', credentials: 'omit' });
+  if (!response.ok) throw new Error(`Openverse : ${response.status}`);
+  const data = (await response.json()) as { results?: OpenverseResult[] };
+  return pickOpenverse(data.results, query);
+}
+
+/**
+ * Cherche l'image d'un plat : l'article Wikipédia du même nom, sinon les premiers résultats de
+ * recherche de Wikipédia, sinon une photo libre d'Openverse.
+ */
 export async function findDishImage(query: string): Promise<DishImage | null> {
   if (imageWords(query).length === 0) return null;
   const direct = pickImage(await wiki({ titles: query }), query, true);
   if (direct) return direct;
-  return pickImage(await wiki({ generator: 'search', gsrsearch: query, gsrlimit: '5', gsrnamespace: '0' }), query, false);
+  const searched = pickImage(await wiki({ generator: 'search', gsrsearch: query, gsrlimit: '5', gsrnamespace: '0' }), query, false);
+  if (searched) return searched;
+  return openverse(query);
 }
 
 type CacheEntry = { image: DishImage | null; at: number };
@@ -182,8 +233,11 @@ export function resetHiddenImages(): void {
   for (const listener of listeners) listener();
 }
 
-/** Image d'un plat (null s'il n'y en a pas, ou si les images sont désactivées). */
-export function useDishImage(name: string | undefined, enabled: boolean): DishImage | null {
+/**
+ * Image d'un plat (null s'il n'y en a pas, ou si les images sont désactivées). Une image choisie
+ * (`custom`) passe avant toute recherche, même si l'image trouvée avait été écartée.
+ */
+export function useDishImage(name: string | undefined, enabled: boolean, custom?: string): DishImage | null {
   const [image, setImage] = useState<DishImage | null>(null);
   const [version, setVersion] = useState(0);
   useEffect(() => {
@@ -196,6 +250,10 @@ export function useDishImage(name: string | undefined, enabled: boolean): DishIm
   useEffect(() => {
     setImage(null);
     if (!enabled || !name) return;
+    if (custom) {
+      setImage({ url: custom, title: name, source: 'perso', link: custom });
+      return;
+    }
     const key = imageKey(name);
     if (!key || hiddenSet().has(key)) return;
     let alive = true;
@@ -205,11 +263,11 @@ export function useDishImage(name: string | undefined, enabled: boolean): DishIm
     return () => {
       alive = false;
     };
-  }, [name, enabled, version]);
+  }, [name, enabled, version, custom]);
   return image;
 }
 
-/** Lien vers l'article Wikipédia d'une image (crédit et licence). */
+/** Page d'origine d'une image (crédit et licence). */
 export function articleUrl(image: DishImage): string {
-  return `https://fr.wikipedia.org/wiki/${encodeURIComponent(image.title.replace(/ /g, '_'))}`;
+  return image.link ?? `https://fr.wikipedia.org/wiki/${encodeURIComponent(image.title.replace(/ /g, '_'))}`;
 }

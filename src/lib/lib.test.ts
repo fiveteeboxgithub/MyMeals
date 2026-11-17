@@ -1138,3 +1138,29 @@ describe('créneaux « Pas de repas » partagés', () => {
     expect(parseSettingsRecord({ updatedAt: 1, settings: { skippedSlots: 'x,2026-11-20|midi' } })!.settings.skippedSlots).toBe('2026-11-20|midi');
   });
 });
+
+describe('Openverse et images choisies', () => {
+  it('prend la première photo Openverse liée au plat, avec auteur et licence', async () => {
+    const { pickOpenverse } = await import('./dishImages');
+    const results = [
+      { title: 'Sunset', thumbnail: 'https://api.openverse.org/a/thumb/', tags: [{ name: 'beach' }] },
+      { title: 'Tartiflette maison', thumbnail: 'https://api.openverse.org/b/thumb/', creator: 'Marie', license: 'by-sa', license_version: '2.0', foreign_landing_url: 'https://flickr.com/x' },
+    ];
+    expect(pickOpenverse(results, 'tartiflette')).toEqual({
+      url: 'https://api.openverse.org/b/thumb/',
+      title: 'Tartiflette maison',
+      source: 'openverse',
+      link: 'https://flickr.com/x',
+      credit: 'Marie · CC BY-SA 2.0',
+    });
+    expect(pickOpenverse([{ title: 'x', thumbnail: 'http://insecure/', tags: [{ name: 'tartiflette' }] }], 'tartiflette')).toBeNull();
+  });
+
+  it('n’accepte que des adresses https pour les images choisies', async () => {
+    const { validImageUrl, parseImagesRecord } = await import('./customImages');
+    expect(validImageUrl(' https://ex.fr/p.jpg ')).toBe('https://ex.fr/p.jpg');
+    expect(validImageUrl('http://ex.fr/p.jpg')).toBeNull();
+    expect(validImageUrl('javascript:alert(1)')).toBeNull();
+    expect(parseImagesRecord({ updatedAt: 3, images: { lasagne: 'https://ex.fr/l.jpg', bad: 'ftp://x' } })).toEqual({ updatedAt: 3, images: { lasagne: 'https://ex.fr/l.jpg' } });
+  });
+});

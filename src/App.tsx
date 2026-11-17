@@ -30,6 +30,7 @@ function GoogleApp() {
     <Planner
       store={store}
       settingsSync={{ remote: store.settings, save: store.saveSettings }}
+      imagesSync={{ remote: store.images, save: store.saveImages }}
       calendars={calendars}
       loading={connected && !store.synced && !error}
       headerAction={connected ? syncing ? <span className="sync-status">Synchronisation…</span> : null : connectButton}

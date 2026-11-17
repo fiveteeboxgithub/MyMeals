@@ -1767,8 +1767,17 @@ small {
 .dish-picture {
   margin: 8px 0 0;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: flex-end;
+}
+
+.image-edit {
+  flex: 1 1 100%;
+}
+
+.sheet .image-edit input {
+  margin: 0 0 4px;
 }
 .dish-picture img {
   width: 120px;
@@ -1790,6 +1799,7 @@ small {
   color: var(--muted);
 }
 .dish-picture .link {
+  margin: 0;
   padding: 0;
   font-size: 0.8rem;
 }

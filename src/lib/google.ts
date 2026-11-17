@@ -334,7 +334,7 @@ export function deleteEvent(token: string, calendar: GoogleCalendar, eventId: st
 
 /** Un événement devient un repas ; renvoie null s'il est annulé, sans titre ou sans date. */
 export function eventToMeal(event: GoogleEvent): Meal | null {
-  if (event.id === SETTINGS_EVENT_ID) return null;
+  if (event.id === SETTINGS_EVENT_ID || event.id === IMAGES_EVENT_ID) return null;
   const name = event.summary?.trim();
   if (event.status === 'cancelled' || !name || !event.start) return null;
   // Google renvoie l'heure dans le fuseau de l'agenda : on lit la date et l'heure telles quelles.
@@ -354,20 +354,47 @@ export function eventToMeal(event: GoogleEvent): Meal | null {
  * en 2100, masqué des repas. Son identifiant est fixe (lettres a-v et chiffres, comme l'exige Google).
  */
 export const SETTINGS_EVENT_ID = 'mmealsreglages00';
-const SETTINGS_TITLE = '⚙ MyMeals : réglages (ne pas supprimer)';
-const SETTINGS_MARKER = 'MYMEALS-REGLAGES';
+/** Second événement spécial : les images choisies pour des plats (des adresses, trop longues pour les réglages). */
+export const IMAGES_EVENT_ID = 'mmealsimages00';
 
-/** Texte de l'événement : une phrase d'explication puis les réglages en JSON sur une seule ligne. */
-export function encodeSettings(payload: unknown): string {
-  return `Réglages de l'application MyMeals, enregistrés ici pour être retrouvés sur tous vos appareils. Ne pas supprimer ni modifier à la main.\n${SETTINGS_MARKER} ${JSON.stringify(payload)}`;
+interface SpecialEvent {
+  id: string;
+  title: string;
+  marker: string;
+  intro: string;
+  tooLong: string;
+  date: string;
 }
 
-/** Relit les réglages dans le texte d'un événement (qu'il ait été reformaté en HTML ou non). */
-export function decodeSettings(description: string | undefined): unknown {
+export const SETTINGS_EVENT: SpecialEvent = {
+  id: SETTINGS_EVENT_ID,
+  title: '⚙ MyMeals : réglages (ne pas supprimer)',
+  marker: 'MYMEALS-REGLAGES',
+  intro: "Réglages de l'application MyMeals, enregistrés ici pour être retrouvés sur tous vos appareils. Ne pas supprimer ni modifier à la main.",
+  tooLong: "Réglages trop longs pour l'agenda : raccourcis la liste noire, les favoris ou « Mes idées ». Ils restent enregistrés sur cet appareil.",
+  date: '2100-01-01',
+};
+
+export const IMAGES_EVENT: SpecialEvent = {
+  id: IMAGES_EVENT_ID,
+  title: '🖼 MyMeals : images des plats (ne pas supprimer)',
+  marker: 'MYMEALS-IMAGES',
+  intro: "Images choisies pour des plats dans l'application MyMeals. Ne pas supprimer ni modifier à la main.",
+  tooLong: "Trop d'images choisies pour tenir dans l'agenda : retire-en quelques-unes. Elles restent enregistrées sur cet appareil.",
+  date: '2100-01-02',
+};
+
+/** Texte d'un événement spécial : une phrase d'explication puis les données en JSON sur une seule ligne. */
+function encodeSpecial(kind: SpecialEvent, payload: unknown): string {
+  return `${kind.intro}\n${kind.marker} ${JSON.stringify(payload)}`;
+}
+
+/** Relit les données dans le texte d'un événement (qu'il ait été reformaté en HTML ou non). */
+function decodeSpecial(kind: SpecialEvent, description: string | undefined): unknown {
   if (!description) return null;
-  const at = description.indexOf(SETTINGS_MARKER);
+  const at = description.indexOf(kind.marker);
   if (at < 0) return null;
-  const text = description.slice(at + SETTINGS_MARKER.length).replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  const text = description.slice(at + kind.marker.length).replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start < 0 || end < start) return null;
@@ -378,48 +405,55 @@ export function decodeSettings(description: string | undefined): unknown {
   }
 }
 
-/** Lit l'événement des réglages : null s'il n'existe pas (ou a été supprimé). */
-export async function readSettingsEvent(token: string, calendar: GoogleCalendar): Promise<{ payload: unknown } | null> {
+export const encodeSettings = (payload: unknown) => encodeSpecial(SETTINGS_EVENT, payload);
+export const decodeSettings = (description: string | undefined) => decodeSpecial(SETTINGS_EVENT, description);
+
+/** Lit un événement spécial : null s'il n'existe pas (ou a été supprimé). */
+export async function readSpecialEvent(token: string, calendar: GoogleCalendar, kind: SpecialEvent): Promise<{ payload: unknown } | null> {
   try {
     const event = await call<{ status?: string; description?: string }>(
       token,
-      `/calendars/${encodeURIComponent(calendar.id)}/events/${SETTINGS_EVENT_ID}?fields=status,description`,
+      `/calendars/${encodeURIComponent(calendar.id)}/events/${kind.id}?fields=status,description`,
     );
     if (event.status === 'cancelled') return null;
-    return { payload: decodeSettings(event.description) };
+    return { payload: decodeSpecial(kind, event.description) };
   } catch (e) {
     if (e instanceof NotFoundError) return null;
     throw e;
   }
 }
 
-/** Écrit l'événement des réglages : le met à jour, le recrée s'il a été supprimé, ou le crée la première fois. */
+export const readSettingsEvent = (token: string, calendar: GoogleCalendar) => readSpecialEvent(token, calendar, SETTINGS_EVENT);
+
 /** Taille prudente du texte d'un événement (Google n'en garde qu'environ 8 000 caractères). */
 export const MAX_EVENT_TEXT = 7800;
 
-export async function writeSettingsEvent(token: string, calendar: GoogleCalendar, payload: unknown): Promise<void> {
-  if (encodeSettings(payload).length > MAX_EVENT_TEXT) {
-    throw new Error("Réglages trop longs pour l'agenda : raccourcis la liste noire, les favoris ou « Mes idées ». Ils restent enregistrés sur cet appareil.");
-  }
+/** Écrit un événement spécial : le met à jour, le recrée s'il a été supprimé, ou le crée la première fois. */
+export async function writeSpecialEvent(token: string, calendar: GoogleCalendar, payload: unknown, kind: SpecialEvent): Promise<void> {
+  const description = encodeSpecial(kind, payload);
+  if (description.length > MAX_EVENT_TEXT) throw new Error(kind.tooLong);
   const base = `/calendars/${encodeURIComponent(calendar.id)}/events`;
   const body = {
-    summary: SETTINGS_TITLE,
-    description: encodeSettings(payload),
-    start: { date: '2100-01-01' },
-    end: { date: '2100-01-02' },
+    summary: kind.title,
+    description,
+    start: { date: kind.date },
+    end: { date: addDays(kind.date, 1) },
     transparency: 'transparent',
     visibility: 'private',
     reminders: { useDefault: false },
-    extendedProperties: { private: { mymeals: 'settings' } },
+    extendedProperties: { private: { mymeals: kind.marker.toLowerCase() } },
     status: 'confirmed',
   };
   try {
-    await call<unknown>(token, `${base}/${SETTINGS_EVENT_ID}?fields=id`, { method: 'PATCH', body: JSON.stringify(body) });
+    await call<unknown>(token, `${base}/${kind.id}?fields=id`, { method: 'PATCH', body: JSON.stringify(body) });
   } catch (e) {
     if (!(e instanceof NotFoundError)) throw e;
-    await call<unknown>(token, `${base}?fields=id`, { method: 'POST', body: JSON.stringify({ id: SETTINGS_EVENT_ID, ...body }) });
+    await call<unknown>(token, `${base}?fields=id`, { method: 'POST', body: JSON.stringify({ id: kind.id, ...body }) });
   }
 }
+
+export const writeSettingsEvent = (token: string, calendar: GoogleCalendar, payload: unknown) =>
+  writeSpecialEvent(token, calendar, payload, SETTINGS_EVENT);
 
 /** Un agenda de la liste de l'utilisateur. */
 export interface CalendarInfo {

@@ -1,4 +1,5 @@
 import type { SettingsRecord } from './settings';
+export type { ImagesSync } from './customImages';
 
 export type Slot = 'midi' | 'soir';
 

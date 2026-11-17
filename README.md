@@ -144,7 +144,17 @@ descriptions existantes.
 Wikimedia Commons), sans aucune IA ni clé d'API : l'application cherche l'article du même nom que le plat, sinon
 les premiers résultats de recherche dont le titre partage un mot avec le plat, en écartant les pages d'homonymie.
 Pour un plat composé, seule la première partie est cherchée (« agneau/pates » → « agneau ») ; « restes de X »
-cherche « X ». Pas de résultat fiable : pas d'image.
+cherche « X ». Si Wikipédia ne trouve rien, l'application cherche une photo sous licence libre sur
+**Openverse** (moteur public de la fondation WordPress, qui rassemble notamment des photos Flickr), dont le titre
+ou les mots-clés partagent un mot avec le plat ; l'auteur et la licence sont indiqués. Pas de résultat fiable :
+pas d'image.
+
+**Choisir une image** : dans la fenêtre d'un créneau, « 🖼️ Choisir une image » accepte l'adresse d'une image
+(https uniquement ; sur une photo, « Copier l'adresse de l'image »). Elle passe avant toute recherche, pour le plat
+et toutes ses variantes de même début (« quiche lorraine/salade » et « quiche lorraine »). Ces images sont
+partagées entre les appareils par un second événement spécial de l'agenda, « 🖼 MyMeals : images des plats (ne pas
+supprimer) », le 2 janvier 2100 (une quarantaine d'images y tiennent) ; sans Google, elles restent dans le
+navigateur.
 
 - Chaque plat n'est cherché qu'une fois puis gardé sur l'appareil (un plat sans image est recherché à nouveau au
   bout d'un mois), deux recherches à la fois au plus. Seul le nom du plat est envoyé à Wikipédia.
