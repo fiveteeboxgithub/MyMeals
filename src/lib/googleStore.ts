@@ -9,7 +9,9 @@ import {
   getAccount,
   SETTINGS_EVENT_ID,
   insertEvent,
+  listCalendars,
   listChanges,
+  listTimedEvents,
   loadGoogleSignIn,
   readSettingsEvent,
   renameEvent,
@@ -17,7 +19,9 @@ import {
   storedToken,
   tokenRemainingMs,
   writeSettingsEvent,
+  type CalendarInfo,
   type GoogleCalendar,
+  type TimedEvent,
   type GoogleEvent,
 } from './google';
 import { parseSettingsRecord, type SettingsRecord } from './settings';
@@ -57,6 +61,16 @@ export interface GoogleMealStore extends MealStore {
   /** Réglages lus dans l'événement spécial de l'agenda : undefined avant lecture, null s'il n'existe pas. */
   settings: SettingsRecord | null | undefined;
   saveSettings: (record: SettingsRecord) => void;
+  /** Adresse du compte connecté, si elle est connue. */
+  account: string | undefined;
+  /** L'agenda a déjà été lu au moins une fois (sur cet appareil). */
+  synced: boolean;
+  /** Identifiant de l'agenda des repas (pour l'exclure des « autres agendas »). */
+  mealsCalendarId: string | undefined;
+  /** Agendas de l'utilisateur (sans renouveler la connexion : null si elle n'est pas valable). */
+  listCalendars: () => Promise<CalendarInfo[] | null>;
+  /** Événements à heure fixe d'un agenda sur une période (null si la connexion n'est pas valable). */
+  listTimedEvents: (calendarId: string, from: Date, to: Date) => Promise<TimedEvent[] | null>;
   /** Une connexion a déjà eu lieu : la reconnexion peut se faire d'un simple toucher. */
   canRenew: boolean;
   syncing: boolean;
@@ -84,6 +98,8 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   const settingsLoaded = useRef(false);
   const pendingSettings = useRef<SettingsRecord | null>(null);
   const settingsTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Repas retirés pendant leur création : ils seront supprimés dès que Google leur aura donné un identifiant.
+  const pendingDeletes = useRef(new Set<string>());
 
   const commit = useCallback((fn: (current: Cache) => Cache) => {
     const next = fn(cacheRef.current);
@@ -280,7 +296,13 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
           const tempId = `tmp-${date}-${slot}-${Date.now()}`;
           commit((c) => ({ ...c, meals: [...c.meals, { id: tempId, date, slot, name, source: 'google' }] }));
           insertEvent(a.token, a.calendar, date, slot, name).then(
-            (event) => commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === tempId ? { ...m, id: event.id } : m)) })),
+            (event) => {
+              if (pendingDeletes.current.delete(tempId)) {
+                deleteEvent(a.token, a.calendar, event.id).catch(fail);
+                return;
+              }
+              commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === tempId ? { ...m, id: event.id } : m)) }));
+            },
             (e) => {
               commit((c) => ({ ...c, meals: c.meals.filter((m) => m.id !== tempId) }));
               fail(e);
@@ -298,6 +320,10 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
         const removed = cacheRef.current.meals.filter((m) => m.date === date && m.slot === slot);
         commit((c) => ({ ...c, meals: c.meals.filter((m) => !removed.includes(m)) }));
         for (const meal of removed) {
+          if (meal.id.startsWith('tmp-')) {
+            pendingDeletes.current.add(meal.id);
+            continue;
+          }
           deleteEvent(a.token, a.calendar, meal.id).catch((e) => {
             commit((c) => ({ ...c, meals: [...c.meals, meal] }));
             fail(e);
@@ -311,8 +337,12 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   /** Retire un seul repas de l'agenda. */
   const removeMeal = useCallback(
     (id: string) => {
-      // Un repas encore en cours de création n'a pas d'identifiant Google : on ne peut pas le supprimer tout de suite.
-      if (id.startsWith('tmp-')) return;
+      // Un repas encore en cours de création sera supprimé dès que Google lui aura donné un identifiant.
+      if (id.startsWith('tmp-')) {
+        pendingDeletes.current.add(id);
+        commit((c) => ({ ...c, meals: c.meals.filter((m) => m.id !== id) }));
+        return;
+      }
       withAccess((a) => {
         const meal = cacheRef.current.meals.find((m) => m.id === id);
         if (!meal) return;
@@ -404,8 +434,33 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     [access, commit, fail],
   );
 
+  const listCalendarsNow = useCallback(async () => {
+    const fresh = storedToken();
+    if (!fresh) return null;
+    try {
+      return await listCalendars(fresh);
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const listTimedEventsNow = useCallback(async (calendarId: string, from: Date, to: Date) => {
+    const fresh = storedToken();
+    if (!fresh) return null;
+    try {
+      return await listTimedEvents(fresh, calendarId, from, to);
+    } catch {
+      return null;
+    }
+  }, []);
+
   return {
     meals: cache.meals,
+    account: cache.account,
+    synced: cache.syncToken !== undefined,
+    mealsCalendarId: cache.calendar?.id,
+    listCalendars: listCalendarsNow,
+    listTimedEvents: listTimedEventsNow,
     setSlot,
     clearSlot,
     removeMeal,

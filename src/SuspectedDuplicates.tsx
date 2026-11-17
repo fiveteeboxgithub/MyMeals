@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { longDate } from './lib/dates';
-import { applyInitialStyle, prefersLowercase, proposeLabel, suspectedGroups, type Occurrence, type SuspectedGroup } from './lib/duplicates';
+import { applyInitialStyle, mealsToRename, prefersLowercase, proposeLabel, suspectedGroups, type Occurrence, type SuspectedGroup } from './lib/duplicates';
 import type { DishIndex } from './lib/suggest';
 import type { MealStore } from './lib/types';
 
@@ -52,13 +52,13 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
     return picked.length === 0 ? group.proposal : applyInitialStyle(proposeLabel(picked, lowercase), lowercase);
   };
   const nameOf = (group: SuspectedGroup) => (names[group.signature] ?? proposalOf(group)).trim();
-  const mealsOf = (occurrences: Occurrence[]) => occurrences.reduce((sum, o) => sum + o.count, 0);
   /** Y a-t-il quelque chose à renommer ? (un seul libellé coché, déjà au bon nom : non) */
   const changes = (group: SuspectedGroup) => pickedOf(group).some((o) => o.label !== nameOf(group));
 
   const total = groups.reduce((sum, g) => sum + g.mealCount, 0);
   const active = groups.filter((g) => pickedOf(g).length > 0 && nameOf(g) && changes(g));
-  const activeMeals = active.reduce((sum, g) => sum + mealsOf(pickedOf(g)), 0);
+  // Seuls les repas qui ne portent pas déjà le nom retenu changent vraiment.
+  const activeMeals = active.reduce((sum, g) => sum + mealsToRename(pickedOf(g), nameOf(g)), 0);
 
   function toggle(group: SuspectedGroup, label: string) {
     const next = new Set(unchecked[group.signature] ?? []);
@@ -173,7 +173,7 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
           {confirmAll ? (
             <div className="dup-merge">
               <p>
-                Fusionner <strong>{plural(active.length, 'groupe', 'groupes')}</strong> ({activeMeals} repas cochés) sous le nom
+                Fusionner <strong>{plural(active.length, 'groupe', 'groupes')}</strong> ({activeMeals} repas à renommer) sous le nom
                 retenu pour chacun ? Seuls les libellés cochés sont renommés. Cela modifie les événements du calendrier.
               </p>
               <div className="dup-actions">
@@ -251,7 +251,7 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
                           ? 'Coche au moins un libellé'
                           : !changes(group)
                             ? 'Rien à changer'
-                            : `Confirmer (${mealsOf(picked)} repas)`}
+                            : `Renommer ${mealsToRename(picked, nameOf(group))} repas`}
                     </button>
                     <button className="ghost-btn" disabled={busy !== null} onClick={() => ignore(group)}>
                       Pas des doublons

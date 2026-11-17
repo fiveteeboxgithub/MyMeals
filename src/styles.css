@@ -176,7 +176,7 @@ h1 {
   flex: 1;
   min-width: 0;
   padding: 10px 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .meal {
@@ -469,23 +469,9 @@ small {
 
 /* Sur téléphone, les boutons d'une proposition passent sous le nom du plat. */
 @media (max-width: 559px) {
-  .proposal {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    padding-bottom: 8px;
-  }
-
-  .proposal-name {
-    flex: 1 1 100%;
-    padding-bottom: 2px;
-  }
-
-  /* Jusqu'à cinq boutons sur une ligne, même sur un petit écran : ils se partagent la place. */
   .proposal .icon {
-    flex: 1 1 36px;
-    max-width: 56px;
-    height: 34px;
-    border-radius: 999px;
+    flex: 0 0 40px;
+    height: 36px;
   }
 }
 
@@ -1001,4 +987,361 @@ small {
   gap: 14px;
   margin: 0 0 4px;
   font-size: 0.8rem;
+}
+
+/* ---------- Organisation des pages ---------- */
+
+.tabs {
+  overflow-x: auto;
+}
+
+.tabs button {
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+.sync-status {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.week-nav .week-label {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+}
+
+.week-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: -4px 0 12px;
+}
+
+.chip {
+  padding: 7px 14px;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 0.88rem;
+}
+
+.slot-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.slot-body > .meal,
+.slot-body > .add {
+  width: 100%;
+}
+
+.proposal {
+  position: relative;
+  flex-wrap: nowrap;
+}
+
+.proposal-name {
+  flex: 1 1 auto;
+}
+
+.menu-wrap {
+  position: relative;
+  display: flex;
+}
+
+.menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: -48px;
+  width: min(290px, calc(100vw - 32px));
+  padding: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
+}
+
+.menu button {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px;
+  min-height: 44px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.menu button:hover,
+.menu button:focus-visible {
+  background: var(--accent-soft);
+}
+
+.menu button > span:first-child {
+  flex: 0 0 22px;
+  text-align: center;
+}
+
+.others {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.others li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.others-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.others:not(.compact) {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 0.85rem;
+}
+
+.others:not(.compact) .others-text {
+  white-space: normal;
+}
+
+.dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 0;
+  color: var(--muted);
+}
+
+.spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+}
+
+.sheet-proposal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
+
+.sheet-proposal > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+}
+
+.sheet-proposal .ghost-btn {
+  flex: 0 0 auto;
+}
+
+.choices .variants {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.choices button > span {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ---------- Réglages ---------- */
+
+.settings-page section {
+  margin: 0 0 14px;
+  padding: 12px 14px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.settings-page h2 {
+  font-size: 1rem;
+  margin: 0 0 10px;
+}
+
+.settings-page .setting {
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0;
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.settings-page .switch {
+  margin: 6px 0;
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.settings-page .segmented {
+  margin-bottom: 8px;
+}
+
+.settings-label {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.settings-page .blacklist {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.times input[type='time'] {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.calendar-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+
+.calendar-list .approx-candidate {
+  align-items: center;
+  min-height: 40px;
+}
+
+.calendar-list .dot {
+  flex-basis: 12px;
+  width: 12px;
+  height: 12px;
+}
+
+.account p {
+  margin: 0 0 10px;
+  overflow-wrap: anywhere;
+}
+
+.palette-grid ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 10px 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.palette-grid li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* ---------- Ordinateur : la semaine en sept colonnes ---------- */
+
+@media (min-width: 1000px) {
+  .app.wide {
+    max-width: 1320px;
+  }
+
+  .app.wide .week {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 10px;
+    align-items: start;
+  }
+
+  .app.wide .day {
+    margin-bottom: 0;
+    padding: 10px;
+  }
+
+  .app.wide .all-done {
+    grid-column: 1 / -1;
+  }
+
+  .app.wide .slot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding-top: 6px;
+  }
+
+  .app.wide .proposal {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .app.wide .proposal-name {
+    flex: 1 1 100%;
+  }
+
+  .app.wide .proposal .icon {
+    flex: 1 1 0;
+    height: 34px;
+    border-radius: 999px;
+  }
+
+  .app.wide .menu-wrap {
+    flex: 1 1 0;
+  }
+
+  .app.wide .menu-wrap .icon {
+    width: 100%;
+  }
+
+  .app.wide .menu {
+    right: auto;
+    left: 0;
+  }
 }

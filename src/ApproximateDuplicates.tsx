@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { approximateGroups, prefersLowercase, applyInitialStyle, proposeLabel, type ApproxGroup } from './lib/duplicates';
+import { approximateGroups, prefersLowercase, applyInitialStyle, mealsToRename, proposeLabel, type ApproxGroup } from './lib/duplicates';
 import type { DishIndex } from './lib/suggest';
 import type { MealStore } from './lib/types';
 
@@ -34,8 +34,18 @@ export function ApproximateDuplicates({ store, dishes }: { store: MealStore; dis
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState('');
+  // Les plats déjà souvent mangés sous leur nom sont sans doute des plats à part : masqués par défaut.
+  const [showFrequent, setShowFrequent] = useState(false);
 
-  const groups = useMemo(() => approximateGroups(store.meals, dishes, ignored), [store.meals, dishes, ignored]);
+  const allGroups = useMemo(() => approximateGroups(store.meals, dishes, ignored), [store.meals, dishes, ignored]);
+  const hiddenFrequent = allGroups.reduce((n, g) => n + g.candidates.filter((c) => c.frequent).length, 0);
+  const groups = useMemo(
+    () =>
+      allGroups
+        .map((g) => (showFrequent ? g : { ...g, candidates: g.candidates.filter((c) => !c.frequent) }))
+        .filter((g) => g.candidates.length > 0),
+    [allGroups, showFrequent],
+  );
   const lowercase = useMemo(() => prefersLowercase(store.meals), [store.meals]);
 
   const picked = (group: ApproxGroup) => group.candidates.filter((c) => checked[group.signature]?.has(c.label));
@@ -101,6 +111,14 @@ export function ApproximateDuplicates({ store, dishes }: { store: MealStore; dis
       {groups.length === 0 ? (
         <p className="dup-empty">
           {store.meals.length === 0 ? "Aucun repas pour l'instant." : 'Aucun plat approchant trouvé.'}
+          {hiddenFrequent > 0 && (
+            <>
+              {' '}
+              <button className="link" onClick={() => setShowFrequent(true)}>
+                Afficher les plats souvent mangés tels quels ({hiddenFrequent})
+              </button>
+            </>
+          )}
           {ignored.size > 0 && (
             <>
               {' '}
@@ -116,6 +134,11 @@ export function ApproximateDuplicates({ store, dishes }: { store: MealStore; dis
             <span>
               {groups.length} {groups.length > 1 ? 'plats de base' : 'plat de base'} · {groups.reduce((n, g) => n + g.candidates.length, 0)} plats plus détaillés
             </span>
+            {hiddenFrequent > 0 && (
+              <button className="link" onClick={() => setShowFrequent(!showFrequent)}>
+                {showFrequent ? 'Masquer' : 'Afficher aussi'} les plats souvent mangés tels quels ({hiddenFrequent})
+              </button>
+            )}
             {ignored.size > 0 && (
               <button className="link" onClick={restoreIgnored}>
                 Réafficher les écartés ({ignored.size})
@@ -126,7 +149,7 @@ export function ApproximateDuplicates({ store, dishes }: { store: MealStore; dis
           <ul className="suspect-list">
             {groups.slice(0, visible).map((group) => {
               const chosen = picked(group);
-              const mealCount = group.baseCount + chosen.reduce((n, c) => n + c.mealCount, 0);
+              const toRename = mealsToRename([...group.base, ...chosen.flatMap((c) => c.occurrences)], nameOf(group));
               return (
                 <li key={group.signature} className="suspect">
                   <p className="approx-base">
@@ -151,6 +174,7 @@ export function ApproximateDuplicates({ store, dishes }: { store: MealStore; dis
                             <small>
                               {candidate.mealCount} repas · en plus : {candidate.shown.join(', ')}
                               {candidate.likely ? ' · probable' : ''}
+                              {candidate.frequent ? ' · souvent mangé tel quel' : ''}
                             </small>
                           </span>
                         </label>
@@ -178,7 +202,7 @@ export function ApproximateDuplicates({ store, dishes }: { store: MealStore; dis
                         ? 'Fusion en cours…'
                         : chosen.length === 0
                           ? 'Coche au moins un plat'
-                          : `Fusionner (${mealCount} repas)`}
+                          : `Renommer ${toRename} repas`}
                     </button>
                     <button className="ghost-btn" disabled={busy !== null} onClick={() => ignore(group)}>
                       Pas des doublons

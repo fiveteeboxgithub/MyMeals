@@ -43,6 +43,8 @@ export interface Suggestion {
   recent?: boolean;
   /** Plat de la liste noire (seulement quand `suggest` a reçu l'option `includeBlacklist`). */
   blacklisted?: boolean;
+  /** Jours écoulés depuis la dernière fois (s'il a déjà été mangé). */
+  daysSince?: number;
   reason: string;
 }
 
@@ -369,6 +371,7 @@ export function suggest(index: DishIndex, date: string, slot: Slot, options: Sug
       count,
       recent: !dish.generic && nearestGap < 7,
       blacklisted: listed,
+      daysSince: eaten ? now - lastEaten : undefined,
       reason: eaten ? `${count} fois · ${ago(now - lastEaten)}` : `${count} fois`,
     });
   }
@@ -469,4 +472,56 @@ export function pickProposal(ranked: Suggestion[], level: number, seed: string):
     }
   }
   return best ?? candidates[0];
+}
+
+/**
+ * Plats oubliés : souvent mangés autrefois (au moins `minCount` fois), mais plus depuis au moins un an.
+ * Classés comme les autres propositions, avec tout l'historique pris en compte.
+ */
+export function forgottenDishes(
+  index: DishIndex,
+  date: string,
+  slot: Slot,
+  options: Pick<SuggestOptions, 'exclude' | 'blacklist' | 'today'> & { minCount?: number } = {},
+): Suggestion[] {
+  const { minCount = 4, ...rest } = options;
+  return suggest(index, date, slot, { ...rest, historyMonths: 0 }).filter(
+    (s) => !s.blacklisted && (s.daysSince ?? 0) >= 365 && s.count >= minCount,
+  );
+}
+
+/** Retire « restes », « reste de »… au début d'un libellé ; renvoie null si ce n'est pas un repas de restes. */
+export function leftoverOf(name: string): string | null {
+  const match = /^restes?\s*(?:de |du |des |d['’])?(.*)$/.exec(fold(name));
+  if (!match) return null;
+  const rest = match[1].trim();
+  return rest ? rest : null;
+}
+
+/**
+ * Plats qui, d'habitude, laissent des restes : ceux pour lesquels l'historique contient au moins
+ * `minCount` fois un repas « restes <plat> » dans les trois jours qui suivent ce plat.
+ * Renvoie, pour chaque plat (sa clé), le nombre de fois.
+ */
+export function leftoverHabits(meals: Meal[], index: DishIndex, minCount = 2): Map<string, number> {
+  const keysByDay = new Map<number, Set<string>>();
+  for (const meal of meals) {
+    const dish = index.byKey.get(normalize(meal.name));
+    if (!dish || dish.generic) continue;
+    const day = dayNumber(meal.date);
+    if (!keysByDay.has(day)) keysByDay.set(day, new Set());
+    keysByDay.get(day)!.add(dish.key);
+  }
+  const counts = new Map<string, number>();
+  for (const meal of meals) {
+    const rest = leftoverOf(meal.name);
+    if (!rest) continue;
+    const dish = index.byKey.get(normalize(rest));
+    if (!dish || dish.generic) continue;
+    const day = dayNumber(meal.date);
+    const before = [0, 1, 2, 3].some((back) => keysByDay.get(day - back)?.has(dish.key));
+    if (before) counts.set(dish.key, (counts.get(dish.key) ?? 0) + 1);
+  }
+  for (const [key, count] of counts) if (count < minCount) counts.delete(key);
+  return counts;
 }

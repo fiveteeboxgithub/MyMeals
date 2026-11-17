@@ -235,6 +235,18 @@ export interface ApproxCandidate {
   shown: string[];
   /** Les mots en plus ne sont que de l'habillage (« fumé », « maison »…) : très probablement le même plat. */
   likely: boolean;
+  /**
+   * Plat déjà souvent mangé sous ce nom (au moins FREQUENT_MIN fois) sans être un simple habillage :
+   * c'est sans doute un plat à part (« poisson pané/purée » à côté de « poisson/purée »).
+   */
+  frequent: boolean;
+}
+
+export const FREQUENT_MIN = 5;
+
+/** Nombre de repas qui changeraient vraiment de nom (ceux qui ne s'appellent pas déjà `name`). */
+export function mealsToRename(occurrences: Occurrence[], name: string): number {
+  return occurrences.filter((o) => o.label !== name.trim()).reduce((sum, o) => sum + o.count, 0);
 }
 
 export interface ApproxGroup {
@@ -302,6 +314,7 @@ export function approximateGroups(meals: Meal[], index: DishIndex, ignored: Read
           extra,
           shown: extra.map((word) => showWord(label, word)),
           likely: extra.every((word) => QUALIFIERS.has(word)),
+          frequent: countOf(dish) >= FREQUENT_MIN && !extra.every((word) => QUALIFIERS.has(word)),
         };
       })
       .sort((a, b) => Number(b.likely) - Number(a.likely) || b.mealCount - a.mealCount || a.label.localeCompare(b.label));

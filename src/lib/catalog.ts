@@ -79,6 +79,8 @@ export interface CatalogDish {
   tags: Concept[];
   /** 'h' : plutôt d'octobre à mars ; 'e' : plutôt d'avril à septembre ; '' : toute l'année. */
   season: '' | 'h' | 'e';
+  /** Idée ajoutée par l'utilisateur (« Mes idées »). */
+  own?: boolean;
 }
 
 const RAW: [name: string, core: string, tags: string, season?: 'h' | 'e'][] = [

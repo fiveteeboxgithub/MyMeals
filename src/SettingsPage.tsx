@@ -1,0 +1,226 @@
+import type { ReactNode } from 'react';
+import type { Blacklist } from './lib/blacklist';
+import type { CalendarInfo } from './lib/google';
+import { MAX_BLACKLIST_CHARS, MAX_IDEAS_CHARS, type SharedSettings } from './lib/settings';
+import { HISTORY_WINDOWS, RANDOMNESS_LEVELS, type DishIndex } from './lib/suggest';
+import { PERIODS } from './lib/surprise';
+import type { SlotMode } from './PlanningView';
+import { ThemeSettings } from './ThemePicker';
+
+const SLOT_MODES: { value: SlotMode; label: string }[] = [
+  { value: 'midi', label: 'Midi' },
+  { value: 'soir', label: 'Soir' },
+  { value: 'both', label: 'Les deux' },
+];
+
+interface SettingsProps {
+  shared: SharedSettings;
+  update: (patch: Partial<SharedSettings>) => void;
+  slotMode: SlotMode;
+  setSlotMode: (mode: SlotMode) => void;
+  pendingOnly: boolean;
+  setPendingOnly: (value: boolean) => void;
+  blacklist: Blacklist;
+  blacklistKeys: ReadonlySet<string>;
+  dishes: DishIndex;
+  ideas: string[];
+  /** Idées déjà mangées depuis (elles ne sont plus proposées). */
+  eatenIdeas: string[];
+  /** Agendas Google (undefined sans Google, null pendant le chargement). */
+  calendars?: CalendarInfo[] | null;
+  isShown: (calendar: CalendarInfo) => boolean;
+  setShown: (calendar: CalendarInfo, shown: boolean) => void;
+  reloadCalendars?: () => void;
+  account: ReactNode;
+}
+
+function Switch({ checked, onChange, children }: { checked: boolean; onChange: (value: boolean) => void; children: ReactNode }) {
+  return (
+    <label className="switch">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span className="switch-track" aria-hidden="true" />
+      {children}
+    </label>
+  );
+}
+
+/** Tous les réglages, regroupés sur une page. */
+export function SettingsPage(props: SettingsProps) {
+  const { shared, update, blacklist, blacklistKeys, dishes } = props;
+  return (
+    <div className="settings-page">
+      <section>
+        <h2>Planning</h2>
+        <p className="settings-label">Repas affichés</p>
+        <div className="segmented" role="group" aria-label="Repas affichés">
+          {SLOT_MODES.map((mode) => (
+            <button key={mode.value} aria-pressed={props.slotMode === mode.value} onClick={() => props.setSlotMode(mode.value)}>
+              {mode.label}
+            </button>
+          ))}
+        </div>
+        <Switch checked={props.pendingOnly} onChange={props.setPendingOnly}>
+          À décider seulement (masque les créneaux déjà décidés)
+        </Switch>
+      </section>
+
+      <section>
+        <h2>Propositions</h2>
+        <label className="setting">
+          Hasard
+          <select value={shared.randomness} onChange={(e) => update({ randomness: Number(e.target.value) })}>
+            {RANDOMNESS_LEVELS.map((level, i) => (
+              <option key={level.label} value={i}>
+                {level.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="setting">
+          Historique pris en compte
+          <select value={shared.historyMonths} onChange={(e) => update({ historyMonths: Number(e.target.value) })}>
+            {HISTORY_WINDOWS.map((w) => (
+              <option key={w.months} value={w.months}>
+                {w.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="setting">
+          Goûts pour « Surprise Me »
+          <select value={shared.surprisePeriod} onChange={(e) => update({ surprisePeriod: Number(e.target.value) })}>
+            {PERIODS.map((p) => (
+              <option key={p.months} value={p.months}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
+      <section>
+        <h2>Liste noire</h2>
+        <Switch checked={shared.includeBlacklist} onChange={(value) => update({ includeBlacklist: value })}>
+          Inclure la liste noire (rarement)
+        </Switch>
+        <label className="blacklist">
+          Plats à ne pas proposer
+          <textarea
+            value={shared.blacklistText}
+            rows={4}
+            maxLength={MAX_BLACKLIST_CHARS}
+            spellCheck={false}
+            autoCapitalize="off"
+            placeholder={'kebab\nwafu\n/\\bpho\\b/'}
+            onChange={(e) => update({ blacklistText: e.target.value })}
+          />
+        </label>
+        <p className="blacklist-help">
+          Un mot ou une expression par ligne : tous les plats dont le nom <em>contient</em> ce texte sont cachés (« kebab » cache
+          aussi « Kebabs frites »). Entoure une ligne de barres pour une expression régulière : <code>/\bpho\b/</code>,{' '}
+          <code>/^(sushi|maki)/</code>. Le menu ⋯ d'une proposition permet aussi d'ajouter un plat d'un geste. Ces plats ne
+          reviennent qu'avec l'option ci-dessus (environ une proposition sur dix), par le menu ⋯ (« Un plat de la liste noire »),
+          ou en cherchant leur nom.
+        </p>
+        {blacklist.invalid.map((entry) => (
+          <p key={entry.line} className="dup-error" role="alert">
+            Ligne ignorée {entry.line} : {entry.error}
+          </p>
+        ))}
+        {blacklist.entries > 0 && (
+          <p className="blacklist-help">
+            {blacklistKeys.size === 0
+              ? "Aucun plat de ton historique n'est concerné pour l'instant."
+              : `${blacklistKeys.size} ${blacklistKeys.size > 1 ? 'plats concernés' : 'plat concerné'} : ${[...blacklistKeys]
+                  .slice(0, 8)
+                  .map((key) => dishes.byKey.get(key)?.label ?? key)
+                  .join(', ')}${blacklistKeys.size > 8 ? '…' : ''}.`}
+          </p>
+        )}
+      </section>
+
+      <section>
+        <h2>Mes idées</h2>
+        <label className="blacklist">
+          Plats à essayer, un par ligne
+          <textarea
+            value={shared.ideasText}
+            rows={5}
+            maxLength={MAX_IDEAS_CHARS}
+            placeholder={'risotto aux asperges\npoulet yassa\nsoupe pho maison'}
+            onChange={(e) => update({ ideasText: e.target.value })}
+          />
+        </label>
+        <p className="blacklist-help">
+          « Surprise Me » les propose avec les idées du catalogue, un peu plus souvent. Une idée disparaît d'elle-même dès qu'elle
+          apparaît dans tes repas.
+          {props.ideas.length > 0 && (
+            <>
+              {' '}
+              {props.ideas.length} {props.ideas.length > 1 ? 'idées' : 'idée'}
+              {props.eatenIdeas.length > 0 && <>, dont {props.eatenIdeas.length} déjà mangée{props.eatenIdeas.length > 1 ? 's' : ''} : {props.eatenIdeas.slice(0, 5).join(', ')}</>}.
+            </>
+          )}
+        </p>
+      </section>
+
+      <section>
+        <h2>Heures des repas</h2>
+        <div className="times">
+          <label className="setting">
+            Midi
+            <input type="time" step={900} value={shared.lunchTime} onChange={(e) => e.target.value && update({ lunchTime: e.target.value })} />
+          </label>
+          <label className="setting">
+            Soir
+            <input type="time" step={900} value={shared.dinnerTime} onChange={(e) => e.target.value && update({ dinnerTime: e.target.value })} />
+          </label>
+        </div>
+        <p className="blacklist-help">
+          Heure des repas ajoutés depuis l'application (ils durent une heure), et repère pour les événements de tes autres
+          agendas : une heure avant le repas, jusqu'à deux heures après (deux heures et demie le soir).
+        </p>
+      </section>
+
+      {props.calendars !== undefined && (
+        <section>
+          <h2>Autres agendas</h2>
+          <p className="blacklist-help">
+            Les événements de ces agendas qui tombent pendant un repas s'affichent à côté du créneau, à titre d'information. Rien
+            n'est modifié dans ces agendas.
+          </p>
+          {props.calendars === null ? (
+            <p className="blacklist-help">Chargement de la liste…</p>
+          ) : (
+            <ul className="calendar-list">
+              {props.calendars.map((calendar) => (
+                <li key={calendar.id}>
+                  <label className="approx-candidate">
+                    <input type="checkbox" checked={props.isShown(calendar)} onChange={(e) => props.setShown(calendar, e.target.checked)} />
+                    <span className="dot" style={calendar.color ? { background: calendar.color } : undefined} aria-hidden="true" />
+                    <span className="dup-label">{calendar.name}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          {props.reloadCalendars && (
+            <button className="link" onClick={props.reloadCalendars}>
+              Recharger la liste des agendas
+            </button>
+          )}
+        </section>
+      )}
+
+      <section>
+        <h2>Couleur de fond</h2>
+        <ThemeSettings />
+      </section>
+
+      <section>
+        <h2>Compte</h2>
+        <div className="account">{props.account}</div>
+      </section>
+    </div>
+  );
+}

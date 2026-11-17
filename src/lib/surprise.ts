@@ -17,6 +17,8 @@ export const DEFAULT_PERIOD_MONTHS = 60;
 
 export interface Surprise {
   name: string;
+  /** Vient de « Mes idées ». */
+  own?: boolean;
   /** Familles du plat que l'on retrouve le plus dans les repas récents. */
   because: string[];
   score: number;
@@ -74,30 +76,49 @@ function inSeason(entry: CatalogDish, month: number): boolean {
  * récents : un plat est bien classé si ses familles (poisson, riz…) reviennent
  * souvent dans les repas de la période, et s'il est de saison à la date visée.
  */
+/** Les idées de l'utilisateur ont un peu plus de chances : il les a choisies. */
+export const OWN_IDEA_BOOST = 1.5;
+
+/** Lit la liste « Mes idées » : une idée par ligne, sans doublon. */
+export function parseIdeas(text: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const idea = line.replace(/\s+/g, ' ').trim();
+    if (!idea || idea.startsWith('#') || seen.has(normalize(idea))) continue;
+    seen.add(normalize(idea));
+    out.push(idea);
+  }
+  return out;
+}
+
 export function surpriseIdeas(
   index: DishIndex,
   date: string,
   months: number,
   today: string,
   blacklist?: BlacklistFilter,
+  ownIdeas: string[] = [],
 ): Surprise[] {
   // Les repas de la liste noire (restos…) ne disent rien de ce que tu aimes cuisiner.
   const profile = tasteProfile(index, months, today, blacklist?.keys);
   const dishWords = index.dishes.map((d) => d.key.split(' '));
   const month = monthOf(date);
   const ideas: Surprise[] = [];
-  for (const entry of CATALOG) {
+  // Tes idées passent par le même calcul : leurs familles sont déduites de leur nom.
+  const own: CatalogDish[] = ownIdeas.map((name) => ({ name, core: normalize(name), tags: conceptsOf(normalize(name)), season: '', own: true }));
+  for (const entry of [...own, ...CATALOG]) {
     if (isKnown(entry, dishWords, index)) continue;
     const listed = blacklist?.matches(entry.name) ?? false;
     if (listed && !blacklist?.include) continue;
     const weights = entry.tags.map((tag) => profile.get(tag) ?? 0);
-    const affinity = weights.reduce((sum, w) => sum + w, 0) / weights.length;
+    const affinity = weights.length > 0 ? weights.reduce((sum, w) => sum + w, 0) / weights.length : 0;
     const because = entry.tags
       .filter((tag) => (profile.get(tag) ?? 0) > 0)
       .sort((a, b) => profile.get(b)! - profile.get(a)!)
       .slice(0, 2)
       .map((tag) => CONCEPTS[tag].label);
-    ideas.push({ name: entry.name, because, score: (affinity + 0.01) * (inSeason(entry, month) ? 1 : 0.3) * (listed ? BLACKLIST_PENALTY : 1) });
+    ideas.push({ name: entry.name, because, score: (affinity + 0.01) * (inSeason(entry, month) ? 1 : 0.3) * (listed ? BLACKLIST_PENALTY : 1) * (entry.own ? OWN_IDEA_BOOST : 1), own: entry.own === true });
   }
   return ideas.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }

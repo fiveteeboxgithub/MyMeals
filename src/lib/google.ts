@@ -9,7 +9,21 @@ const API = 'https://www.googleapis.com/calendar/v3';
 const TOKEN_KEY = 'mymeals.google.token';
 
 /** Heures de début des repas créés depuis l'application. */
-const SLOT_START: Record<Slot, number> = { midi: 13, soir: 20 };
+let mealTimes: Record<Slot, string> = { midi: '13:00', soir: '20:00' };
+
+/** Heures (HH:MM) des repas créés depuis l'application, réglables. */
+export function setMealTimes(times: Record<Slot, string>): void {
+  mealTimes = times;
+}
+
+/** Ajoute des minutes à une date et une heure locales (AAAA-MM-JJ, HH:MM), en passant au lendemain si besoin. */
+export function shiftTime(date: string, time: string, minutes: number): string {
+  const [h, m] = time.split(':').map(Number);
+  const total = h * 60 + m + minutes;
+  const day = addDays(date, Math.floor(total / 1440));
+  const inDay = ((total % 1440) + 1440) % 1440;
+  return `${day}T${String(Math.floor(inDay / 60)).padStart(2, '0')}:${String(inDay % 60).padStart(2, '0')}:00`;
+}
 
 /** La connexion Google a expiré ou a été refusée : il faut se reconnecter. */
 export class AuthError extends Error {}
@@ -282,14 +296,13 @@ export function insertEvent(
   slot: Slot,
   name: string,
 ): Promise<GoogleEvent> {
-  const hour = SLOT_START[slot];
-  const at = (h: number) => (h < 24 ? `${date}T${String(h).padStart(2, '0')}:00:00` : `${addDays(date, 1)}T00:00:00`);
+  const time = mealTimes[slot];
   return call<GoogleEvent>(token, `/calendars/${encodeURIComponent(calendar.id)}/events?fields=id,status,summary,start`, {
     method: 'POST',
     body: JSON.stringify({
       summary: name,
-      start: { dateTime: at(hour), timeZone: calendar.timeZone },
-      end: { dateTime: at(hour + 1), timeZone: calendar.timeZone },
+      start: { dateTime: shiftTime(date, time, 0), timeZone: calendar.timeZone },
+      end: { dateTime: shiftTime(date, time, 60), timeZone: calendar.timeZone },
     }),
   });
 }
@@ -368,7 +381,13 @@ export async function readSettingsEvent(token: string, calendar: GoogleCalendar)
 }
 
 /** Écrit l'événement des réglages : le met à jour, le recrée s'il a été supprimé, ou le crée la première fois. */
+/** Taille prudente du texte d'un événement (Google n'en garde qu'environ 8 000 caractères). */
+export const MAX_EVENT_TEXT = 7800;
+
 export async function writeSettingsEvent(token: string, calendar: GoogleCalendar, payload: unknown): Promise<void> {
+  if (encodeSettings(payload).length > MAX_EVENT_TEXT) {
+    throw new Error("Réglages trop longs pour l'agenda : raccourcis la liste noire ou « Mes idées ». Ils restent enregistrés sur cet appareil.");
+  }
   const base = `/calendars/${encodeURIComponent(calendar.id)}/events`;
   const body = {
     summary: SETTINGS_TITLE,
@@ -387,4 +406,82 @@ export async function writeSettingsEvent(token: string, calendar: GoogleCalendar
     if (!(e instanceof NotFoundError)) throw e;
     await call<unknown>(token, `${base}?fields=id`, { method: 'POST', body: JSON.stringify({ id: SETTINGS_EVENT_ID, ...body }) });
   }
+}
+
+/** Un agenda de la liste de l'utilisateur. */
+export interface CalendarInfo {
+  id: string;
+  name: string;
+  primary: boolean;
+  /** Coché dans Google Agenda (affiché par défaut). */
+  selected: boolean;
+  color?: string;
+}
+
+export async function listCalendars(token: string): Promise<CalendarInfo[]> {
+  const out: CalendarInfo[] = [];
+  let pageToken: string | undefined;
+  do {
+    const query = new URLSearchParams({
+      maxResults: '250',
+      fields: 'items(id,summary,summaryOverride,primary,selected,backgroundColor),nextPageToken',
+    });
+    if (pageToken) query.set('pageToken', pageToken);
+    const page = await call<{
+      items?: { id: string; summary?: string; summaryOverride?: string; primary?: boolean; selected?: boolean; backgroundColor?: string }[];
+      nextPageToken?: string;
+    }>(token, `/users/me/calendarList?${query}`);
+    for (const item of page.items ?? []) {
+      out.push({
+        id: item.id,
+        name: item.summaryOverride || item.summary || item.id,
+        primary: item.primary === true,
+        selected: item.selected === true,
+        color: item.backgroundColor,
+      });
+    }
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+  return out;
+}
+
+/** Événement d'un autre agenda, réduit à ce qu'on affiche. */
+export interface TimedEvent {
+  id: string;
+  title: string;
+  /** Début et fin (horodatages en millisecondes). */
+  start: number;
+  end: number;
+}
+
+/** Événements à heure fixe d'un agenda entre deux instants (les événements « journée entière » sont ignorés). */
+export async function listTimedEvents(token: string, calendarId: string, from: Date, to: Date): Promise<TimedEvent[]> {
+  const out: TimedEvent[] = [];
+  let pageToken: string | undefined;
+  do {
+    const query = new URLSearchParams({
+      singleEvents: 'true',
+      orderBy: 'startTime',
+      timeMin: from.toISOString(),
+      timeMax: to.toISOString(),
+      maxResults: '250',
+      fields: 'items(id,status,summary,start,end),nextPageToken',
+    });
+    if (pageToken) query.set('pageToken', pageToken);
+    const page = await call<{
+      items?: { id: string; status?: string; summary?: string; start?: { dateTime?: string }; end?: { dateTime?: string } }[];
+      nextPageToken?: string;
+    }>(token, `/calendars/${encodeURIComponent(calendarId)}/events?${query}`);
+    for (const item of page.items ?? []) {
+      if (item.status === 'cancelled' || !item.start?.dateTime || !item.end?.dateTime) continue;
+      out.push({
+        id: item.id,
+        title: item.summary?.trim() || '(sans titre)',
+        start: Date.parse(item.start.dateTime),
+        end: Date.parse(item.end.dateTime),
+      });
+    }
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+  return out;
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { longDate } from './lib/dates';
-import { compileRegex, findOccurrences, hasQuery, proposeLabel } from './lib/duplicates';
+import { compileRegex, findOccurrences, hasQuery, mealsToRename, proposeLabel } from './lib/duplicates';
 import type { DishIndex } from './lib/suggest';
 import type { MealStore } from './lib/types';
 import { ApproximateDuplicates } from './ApproximateDuplicates';
@@ -264,7 +264,7 @@ function ManualSearch({ store }: { store: MealStore }) {
             <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} autoFocus />
           </label>
           <p>
-            Fusionner {checked.length} libellés ? Les {mealCount} repas cochés seront renommés en{' '}
+            Fusionner {checked.length} libellés ? {mealsToRename(checked, label)} repas seront renommés en{' '}
             <strong>« {label.trim() || '…'} »</strong>. Cela modifie les événements du calendrier.
           </p>
           <div className="dup-actions">

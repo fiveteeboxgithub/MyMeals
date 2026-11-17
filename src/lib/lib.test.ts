@@ -826,15 +826,29 @@ describe('réglages partagés et connexion', async () => {
   });
 
   it('valide les réglages venus de l’agenda', () => {
-    const ok = parseSettingsRecord({ updatedAt: 12, settings: { blacklistText: 'kebab\nwafu', includeBlacklist: true, randomness: 4, historyMonths: 120, surprisePeriod: 0 } });
-    expect(ok).toEqual({ updatedAt: 12, settings: { blacklistText: 'kebab\nwafu', includeBlacklist: true, randomness: 4, historyMonths: 120, surprisePeriod: 0 } });
+    const full = { blacklistText: 'kebab\nwafu', includeBlacklist: true, randomness: 4, historyMonths: 120, surprisePeriod: 0, ideasText: 'poulet yassa', lunchTime: '12:30', dinnerTime: '19:45' };
+    expect(parseSettingsRecord({ updatedAt: 12, settings: full })).toEqual({ updatedAt: 12, settings: full });
+    // Réglages enregistrés par une version plus ancienne : les nouveaux champs prennent leur valeur par défaut.
+    const old = parseSettingsRecord({ updatedAt: 12, settings: { blacklistText: 'kebab', includeBlacklist: false, randomness: 3, historyMonths: 60, surprisePeriod: 60 } })!;
+    expect(old.settings.ideasText).toBe('');
+    expect(old.settings.lunchTime).toBe('13:00');
+    expect(old.settings.dinnerTime).toBe('20:00');
     // Valeurs absurdes : retour au défaut, champ par champ.
-    const bad = parseSettingsRecord({ updatedAt: 3, settings: { blacklistText: 42, includeBlacklist: 'oui', randomness: 99, historyMonths: 7, surprisePeriod: -1 } });
+    const bad = parseSettingsRecord({ updatedAt: 3, settings: { blacklistText: 42, includeBlacklist: 'oui', randomness: 99, historyMonths: 7, surprisePeriod: -1, ideasText: 3, lunchTime: '25:00', dinnerTime: '8h' } });
     expect(bad).toEqual({ updatedAt: 3, settings: DEFAULT_SETTINGS });
     expect(parseSettingsRecord(null)).toBeNull();
     expect(parseSettingsRecord({ settings: {} })).toBeNull();
     expect(parseSettingsRecord({ updatedAt: 'x', settings: {} })).toBeNull();
-    expect(parseSettingsRecord({ updatedAt: 1, settings: { blacklistText: 'x'.repeat(10000) } })!.settings.blacklistText).toHaveLength(4000);
+    expect(parseSettingsRecord({ updatedAt: 1, settings: { blacklistText: 'x'.repeat(10000) } })!.settings.blacklistText).toHaveLength(2500);
+    expect(parseSettingsRecord({ updatedAt: 1, settings: { ideasText: 'x'.repeat(10000) } })!.settings.ideasText).toHaveLength(3500);
+    // Des listes pleines, avec des lignes de taille réaliste, tiennent dans le texte d'un événement Google.
+    const { encodeSettings, MAX_EVENT_TEXT } = google;
+    const line = 'pâtes à la crème\n'; // 17 caractères
+    const full2 = {
+      updatedAt: Date.now(),
+      settings: { ...DEFAULT_SETTINGS, blacklistText: line.repeat(147).slice(0, 2500), ideasText: line.repeat(206).slice(0, 3500) },
+    };
+    expect(encodeSettings(full2).length).toBeLessThan(MAX_EVENT_TEXT);
   });
 
   it('écrit et relit les réglages dans le texte de l’événement', () => {
@@ -871,5 +885,122 @@ describe('réglages partagés et connexion', async () => {
     expect(google.tokenRemainingMs()).toBe(0);
     google.rememberToken('périmé', 30); // moins d'une minute : déjà jugé périmé
     expect(google.storedToken()).toBeNull();
+  });
+});
+
+describe('planification', async () => {
+  const { forgottenDishes, leftoverHabits, leftoverOf } = await import('./suggest');
+  const { overlapsBySlot, shownByDefault, slotWindow, clock } = await import('./otherCalendars');
+  const { weekText } = await import('./weekText');
+  const { shiftTime } = await import('./google');
+  const { parseIdeas, surpriseIdeas } = await import('./surprise');
+  const { mealsToRename, approximateGroups, groupByLabel } = await import('./duplicates');
+
+  it('reconnaît un repas de restes', () => {
+    expect(leftoverOf('restes tartiflette')).toBe('tartiflette');
+    expect(leftoverOf('Restes de la tartiflette')).toBe('la tartiflette');
+    expect(leftoverOf("reste d'hachis parmentier")).toBe('hachis parmentier');
+    expect(leftoverOf('restes')).toBeNull();
+    expect(leftoverOf('tartiflette')).toBeNull();
+  });
+
+  it('apprend quels plats laissent des restes', () => {
+    const meals: Meal[] = [];
+    for (const [a, b] of [['2026-01-10', '2026-01-11'], ['2026-02-07', '2026-02-09'], ['2026-03-07', '2026-03-08']]) {
+      meals.push(meal(a, 'soir', 'tartiflette'), meal(b, 'soir', 'restes tartiflette'));
+    }
+    meals.push(meal('2026-04-01', 'soir', 'lasagnes'), meal('2026-04-02', 'soir', 'restes lasagnes')); // une seule fois
+    meals.push(meal('2026-05-01', 'soir', 'restes curry')); // sans curry avant
+    const habits = leftoverHabits(meals, buildIndex(meals));
+    expect([...habits.entries()]).toEqual([[normalize('tartiflette'), 3]]);
+  });
+
+  it('retrouve les plats oubliés', () => {
+    const meals: Meal[] = [];
+    for (let i = 0; i < 10; i++) meals.push(meal(addDays('2022-01-04', i * 30), 'soir', 'hachis parmentier')); // il y a des années
+    for (let i = 0; i < 2; i++) meals.push(meal(addDays('2022-01-05', i * 30), 'soir', 'osso buco')); // trop rare
+    for (let i = 0; i < 10; i++) meals.push(meal(addDays('2026-06-01', i * 14), 'soir', 'curry')); // récent
+    const list = forgottenDishes(buildIndex(meals), '2026-11-24', 'soir', { today: '2026-11-16' });
+    expect(list.map((s) => s.label)).toEqual(['hachis parmentier']);
+    expect(list[0].daysSince).toBeGreaterThan(3 * 365);
+  });
+
+  it('rapproche les événements des autres agendas des créneaux de repas', () => {
+    const at = (date: string, h: number, m = 0) => new Date(...(date.split('-').map(Number) as [number, number, number]).map((v, i) => (i === 1 ? v - 1 : v)) as [number, number, number], h, m).getTime();
+    const ev = (title: string, date: string, h1: number, m1: number, h2: number, m2: number) => ({ id: title, title, start: at(date, h1, m1), end: at(date, h2, m2), calendarName: 'x' });
+    const events = [
+      ev('Match', '2026-11-25', 21, 0, 22, 50), // pendant le dîner
+      ev('Dîner chez Paul', '2026-11-28', 19, 30, 23, 0),
+      ev('Réunion', '2026-11-26', 15, 0, 16, 0), // ni midi ni soir
+      ev('Rendez-vous', '2026-11-26', 11, 30, 12, 15), // midi
+      ev('Cours', '2026-11-27', 18, 0, 18, 55), // juste avant la fenêtre du soir (19 h)
+    ];
+    const days = ['2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27', '2026-11-28', '2026-11-29'];
+    const map = overlapsBySlot(events, days, { midi: '13:00', soir: '20:00' });
+    expect([...map.entries()].map(([k, v]) => `${k}:${v.map((e) => e.title).join(',')}`)).toEqual([
+      '2026-11-25|soir:Match',
+      '2026-11-26|midi:Rendez-vous',
+      '2026-11-28|soir:Dîner chez Paul',
+    ]);
+    // Avec un dîner à 19 h, le cours de 18 h tombe dans la fenêtre.
+    expect(overlapsBySlot(events, days, { midi: '13:00', soir: '19:00' }).get('2026-11-27|soir')?.[0].title).toBe('Cours');
+    const [from, to] = slotWindow('2026-11-25', 'soir', '20:00');
+    expect((to - from) / 60_000).toBe(210);
+    expect(clock(at('2026-11-25', 21, 0))).toBe('21 h');
+    expect(clock(at('2026-11-25', 19, 5))).toBe('19 h 05');
+  });
+
+  it('choisit les agendas affichés par défaut', () => {
+    const cal = (id: string, selected = true) => ({ id, name: id, primary: false, selected });
+    expect(shownByDefault(cal('me@gmail.com'), 'repas@group')).toBe(true);
+    expect(shownByDefault(cal('repas@group'), 'repas@group')).toBe(false);
+    expect(shownByDefault(cal('p#weeknum@group.v.calendar.google.com'), 'r')).toBe(false);
+    expect(shownByDefault(cal('i_88#sunrise@group.v.calendar.google.com'), 'r')).toBe(false);
+    expect(shownByDefault(cal('travail@group', false), 'r')).toBe(false);
+  });
+
+  it('met la semaine en texte', () => {
+    const days = ['2026-11-23', '2026-11-24', '2026-11-25'];
+    const bySlot = new Map([
+      ['2026-11-23|soir', [meal('2026-11-23', 'soir', 'pizza')]],
+      ['2026-11-24|midi', [meal('2026-11-24', 'midi', 'salade'), meal('2026-11-24', 'midi', 'soupe')]],
+    ]);
+    expect(weekText(days, ['soir'], bySlot, new Set(['2026-11-25|soir']))).toBe(
+      ['Repas du 23 novembre au 25 novembre 2026', 'Lundi 23 novembre — soir : pizza', 'Mardi 24 novembre — midi : salade + soupe ; soir : à décider', 'Mercredi 25 novembre — soir : pas de repas'].join('\n'),
+    );
+  });
+
+  it('calcule l’heure de début et de fin des repas créés', () => {
+    expect(shiftTime('2026-11-23', '20:00', 0)).toBe('2026-11-23T20:00:00');
+    expect(shiftTime('2026-11-23', '12:45', 60)).toBe('2026-11-23T13:45:00');
+    expect(shiftTime('2026-11-23', '23:30', 60)).toBe('2026-11-24T00:30:00');
+  });
+
+  it('lit « Mes idées » et les propose avec le catalogue', () => {
+    expect(parseIdeas('  poulet yassa \n\n# commentaire\nPoulet Yassa\nrisotto aux asperges')).toEqual(['poulet yassa', 'risotto aux asperges']);
+    const ideas = surpriseIdeas(buildIndex([]), '2026-11-20', 24, '2026-11-16', undefined, ['gâteau de crêpes au saumon']);
+    const own = ideas.find((i) => i.name === 'gâteau de crêpes au saumon')!;
+    expect(own.own).toBe(true);
+    // Une idée déjà mangée n'est plus proposée.
+    const eaten = [meal('2026-10-01', 'soir', 'gâteau de crêpes au saumon')];
+    expect(surpriseIdeas(buildIndex(eaten), '2026-11-20', 24, '2026-11-16', undefined, ['gâteau de crêpes au saumon']).some((i) => i.own)).toBe(false);
+  });
+
+  it('compte seulement les repas qui changent vraiment de nom', () => {
+    const occ = groupByLabel([meal('2026-01-01', 'soir', 'chili'), meal('2026-01-02', 'soir', 'chili'), meal('2026-01-03', 'soir', 'Chili')]);
+    expect(mealsToRename(occ, 'chili')).toBe(1);
+    expect(mealsToRename(occ, 'Chili')).toBe(2);
+    expect(mealsToRename(occ, 'chili con carne')).toBe(3);
+  });
+
+  it('repère les plats approchants souvent mangés tels quels', () => {
+    const meals: Meal[] = [];
+    for (let i = 0; i < 8; i++) meals.push(meal(addDays('2026-01-01', i), 'soir', 'poisson/purée'));
+    for (let i = 0; i < 6; i++) meals.push(meal(addDays('2026-02-01', i), 'soir', 'poisson pané/purée'));
+    meals.push(meal('2026-03-01', 'soir', 'poisson/purée/fromage'));
+    const group = approximateGroups(meals, buildIndex(meals))[0];
+    const byLabel = new Map(group.candidates.map((c) => [c.label, c]));
+    expect(byLabel.get('poisson pané/purée')!.frequent).toBe(true);
+    expect(byLabel.get('poisson/purée/fromage')!.frequent).toBe(false);
   });
 });

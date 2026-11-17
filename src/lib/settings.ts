@@ -12,6 +12,11 @@ export interface SharedSettings {
   randomness: number;
   historyMonths: number;
   surprisePeriod: number;
+  /** Idées de plats à essayer, une par ligne (proposées par « Surprise Me »). */
+  ideasText: string;
+  /** Heures (HH:MM) des repas créés depuis l'application. */
+  lunchTime: string;
+  dinnerTime: string;
 }
 
 /** Réglages et date (en ms) de leur dernière modification : la plus récente l'emporte. */
@@ -26,9 +31,28 @@ export const DEFAULT_SETTINGS: SharedSettings = {
   randomness: DEFAULT_RANDOMNESS,
   historyMonths: DEFAULT_HISTORY_MONTHS,
   surprisePeriod: DEFAULT_PERIOD_MONTHS,
+  ideasText: '',
+  lunchTime: '13:00',
+  dinnerTime: '20:00',
 };
 
-const MAX_BLACKLIST_CHARS = 4000;
+/**
+ * Tailles maximales : l'ensemble doit tenir dans le texte d'un événement Google (environ 8 000 caractères).
+ */
+export const MAX_BLACKLIST_CHARS = 2500;
+export const MAX_IDEAS_CHARS = 3500;
+
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Heure HH:MM valable, sinon null. */
+export function validTime(value: unknown): string | null {
+  return typeof value === 'string' && TIME.test(value) ? value : null;
+}
+
+/** Vrai si les deux jeux de réglages sont identiques. */
+export function sameSettings(a: SharedSettings, b: SharedSettings): boolean {
+  return (Object.keys(DEFAULT_SETTINGS) as (keyof SharedSettings)[]).every((key) => a[key] === b[key]);
+}
 
 /** Valide ce qui vient de l'agenda (qui a pu être modifié à la main) : une valeur douteuse retombe sur le défaut. */
 export function parseSettingsRecord(payload: unknown): SettingsRecord | null {
@@ -46,6 +70,9 @@ export function parseSettingsRecord(payload: unknown): SettingsRecord | null {
       randomness: pick(s.randomness, RANDOMNESS_LEVELS.map((_, i) => i), DEFAULT_SETTINGS.randomness),
       historyMonths: pick(s.historyMonths, HISTORY_WINDOWS.map((w) => w.months), DEFAULT_SETTINGS.historyMonths),
       surprisePeriod: pick(s.surprisePeriod, PERIODS.map((p) => p.months), DEFAULT_SETTINGS.surprisePeriod),
+      ideasText: typeof s.ideasText === 'string' ? s.ideasText.slice(0, MAX_IDEAS_CHARS) : DEFAULT_SETTINGS.ideasText,
+      lunchTime: validTime(s.lunchTime) ?? DEFAULT_SETTINGS.lunchTime,
+      dinnerTime: validTime(s.dinnerTime) ?? DEFAULT_SETTINGS.dinnerTime,
     },
   };
 }
