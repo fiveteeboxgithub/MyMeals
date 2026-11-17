@@ -495,43 +495,47 @@ export function PlanningView(props: PlanningProps) {
                               <small>{shown.note}</small>
                             </span>
                           </button>
-                          <button
-                            className="icon"
-                            onClick={() => {
-                              if (override) dropOverride(key);
-                              else setRejected({ ...rejected, [key]: [...(rejected[key] ?? []), proposal.key] });
-                            }}
-                            aria-label={`Autre proposition pour ${where}`}
-                            title="Autre proposition"
-                          >
-                            ↻
-                          </button>
-                          <ProposalMenu label={`Plus d'options pour ${where}`} open={menuFor === key} onToggle={(open) => setMenuFor(open ? key : null)}>
-                            <MenuItem icon="✨" label="Surprise Me" hint="un plat jamais noté" onClick={() => surpriseSlot(key, date)} />
-                            <MenuItem icon="🕰️" label="Un plat oublié" hint="souvent mangé, plus depuis un an" onClick={() => forgottenSlot(key, date, slot)} />
-                            {blacklistKeys.size > 0 && (
-                              <MenuItem icon="🍽️" label="Un plat de la liste noire" hint="resto, à emporter…" onClick={() => blacklistSlot(key, date, slot)} />
-                            )}
-                            <MenuItem
-                              icon={isFavorite(shown.name) ? '☆' : '⭐'}
-                              label={isFavorite(shown.name) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-                              hint={isFavorite(shown.name) ? undefined : 'proposé plus souvent'}
-                              onClick={() => toggleFavorite(shown.name)}
-                            />
-                            <MenuItem icon="∅" label={`Pas de repas ce ${SLOT_LABEL[slot].toLowerCase()}`} onClick={() => setSkip(key, true)} />
-                            <MenuItem
-                              icon="🚫"
-                              label="Ne plus jamais proposer ce plat"
-                              hint="l'ajoute à la liste noire"
+                          <div className="proposal-actions">
+                            <button
+                              className="icon"
+                              onClick={() => {
+                                if (override) dropOverride(key);
+                                else setRejected({ ...rejected, [key]: [...(rejected[key] ?? []), proposal.key] });
+                              }}
+                              aria-label={`Autre proposition pour ${where}`}
+                              title="Autre proposition"
+                            >
+                              ↻
+                            </button>
+                            <button
+                              className="icon ban"
                               onClick={() => {
                                 blacklistDish(shown.name);
                                 if (override) dropOverride(key);
                               }}
-                            />
-                          </ProposalMenu>
-                          <button className="icon accept" onClick={() => accept(date, slot, shown.name)} aria-label={`Accepter ${shown.name}`} title="Accepter">
-                            ✓
-                          </button>
+                              aria-label={`Ne plus jamais proposer ${shown.name}`}
+                              title="Ne plus jamais proposer ce plat (liste noire)"
+                            >
+                              🚫
+                            </button>
+                            <ProposalMenu label={`Plus d'options pour ${where}`} open={menuFor === key} onToggle={(open) => setMenuFor(open ? key : null)}>
+                              <MenuItem icon="✨" label="Surprise Me" hint="un plat jamais noté" onClick={() => surpriseSlot(key, date)} />
+                              <MenuItem icon="🕰️" label="Un plat oublié" hint="souvent mangé, plus depuis un an" onClick={() => forgottenSlot(key, date, slot)} />
+                              {blacklistKeys.size > 0 && (
+                                <MenuItem icon="🍽️" label="Un plat de la liste noire" hint="resto, à emporter…" onClick={() => blacklistSlot(key, date, slot)} />
+                              )}
+                              <MenuItem
+                                icon={isFavorite(shown.name) ? '☆' : '⭐'}
+                                label={isFavorite(shown.name) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                                hint={isFavorite(shown.name) ? undefined : 'proposé plus souvent'}
+                                onClick={() => toggleFavorite(shown.name)}
+                              />
+                              <MenuItem icon="∅" label={`Pas de repas ce ${SLOT_LABEL[slot].toLowerCase()}`} onClick={() => setSkip(key, true)} />
+                            </ProposalMenu>
+                            <button className="icon accept" onClick={() => accept(date, slot, shown.name)} aria-label={`Accepter ${shown.name}`} title="Accepter">
+                              ✓
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <button className="add" onClick={() => setEditing({ date, slot })}>

@@ -347,6 +347,23 @@ small {
   gap: 5px;
 }
 
+.proposal-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+
+/* Sur un écran étroit, les boutons passent sous le nom plutôt que de l'écraser. */
+.proposal {
+  flex-wrap: wrap;
+}
+
+.proposal-name {
+  flex: 1 1 150px;
+}
+
 .proposal .icon {
   flex-basis: 34px;
   height: 34px;
@@ -1065,11 +1082,6 @@ small {
 
 .proposal {
   position: relative;
-  flex-wrap: nowrap;
-}
-
-.proposal-name {
-  flex: 1 1 auto;
 }
 
 .menu-wrap {
@@ -1322,8 +1334,8 @@ small {
   .app.wide .week {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    /* en-tête ; midi : libellé, plat, autres agendas ; soir : idem */
-    grid-template-rows: repeat(7, auto);
+    /* en-tête ; midi : libellé, plat, boutons, autres agendas ; soir : idem */
+    grid-template-rows: repeat(9, auto);
     column-gap: 10px;
     row-gap: 0;
   }
@@ -1332,7 +1344,7 @@ small {
     margin-bottom: 0;
     padding: 10px;
     display: grid;
-    grid-row: span 7;
+    grid-row: span 9;
     grid-template-rows: subgrid;
     grid-template-columns: minmax(0, 1fr);
     row-gap: 0;
@@ -1381,11 +1393,30 @@ small {
   }
 
   .app.wide .slot-midi {
-    grid-row: 2 / span 3;
+    grid-row: 2 / span 4;
   }
 
   .app.wide .slot-soir {
-    grid-row: 5 / span 3;
+    grid-row: 6 / span 4;
+  }
+
+  /* Le nom et les boutons d'une proposition vont dans deux rangées distinctes : les boutons
+     s'alignent d'un jour à l'autre, quelle que soit la longueur du nom. */
+  .app.wide .proposal {
+    display: contents;
+  }
+
+  .app.wide .proposal-actions {
+    grid-row: 3;
+    align-self: stretch;
+    margin-left: 0;
+    display: flex;
+    gap: 6px;
+    padding: 2px 0 4px;
+  }
+
+  .app.wide .slot .others {
+    grid-row: 4;
   }
 
   .app.wide .slot-body {
@@ -1393,9 +1424,25 @@ small {
   }
 
   .app.wide .slot > *,
-  .app.wide .slot-body > * {
+  .app.wide .slot-body > *,
+  .app.wide .proposal > * {
     min-width: 0;
     align-self: start;
+  }
+
+  .app.wide .proposal > .proposal-actions {
+    align-self: start;
+    justify-self: stretch;
+  }
+
+  .app.wide .slot-label {
+    grid-row: 1;
+  }
+
+  .app.wide .slot-body > .meal,
+  .app.wide .slot-body > .add,
+  .app.wide .proposal-name {
+    grid-row: 2;
   }
 
   .app.wide .meal,
