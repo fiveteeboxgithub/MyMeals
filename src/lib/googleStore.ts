@@ -3,6 +3,7 @@ import {
   AuthError,
   SyncExpiredError,
   deleteEvent,
+  setEventNote,
   eventToMeal,
   findCalendar,
   forgetToken,
@@ -26,6 +27,7 @@ import {
 } from './google';
 import { parseSettingsRecord, type SettingsRecord } from './settings';
 import type { Meal, MealStore, Slot } from './types';
+import { withNote } from './store';
 
 const CACHE_KEY = 'mymeals.google.v1';
 
@@ -34,6 +36,8 @@ interface Cache {
   /** Adresse du compte Google, pour renouveler la connexion sans demander de choisir un compte. */
   account?: string;
   syncToken?: string;
+  /** Vrai une fois l'agenda relu en entier avec les notes (descriptions) des repas. */
+  notes?: boolean;
   meals: Meal[];
 }
 
@@ -54,6 +58,11 @@ function applyEvents(meals: Meal[], events: GoogleEvent[]): Meal[] {
     else byId.delete(event.id);
   }
   return [...byId.values()];
+}
+
+/** Repas en cours de création (pas encore dans l'agenda) : une relecture complète ne doit pas les effacer. */
+function keepPending(meals: Meal[]): Meal[] {
+  return meals.filter((m) => m.id.startsWith('tmp-'));
 }
 
 export interface GoogleMealStore extends MealStore {
@@ -140,16 +149,17 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
           if (account) commit((c) => ({ ...c, account }));
         }
         let changes;
-        let full = !cacheRef.current.syncToken;
+        // Les copies faites avant les notes sont relues en entier une fois, pour récupérer les descriptions.
+        let full = !cacheRef.current.syncToken || !cacheRef.current.notes;
         try {
-          changes = await listChanges(accessToken, calendar.id, cacheRef.current.syncToken);
+          changes = await listChanges(accessToken, calendar.id, full ? undefined : cacheRef.current.syncToken);
         } catch (e) {
           if (!(e instanceof SyncExpiredError)) throw e;
           full = true;
           changes = await listChanges(accessToken, calendar.id);
         }
         const { events, syncToken } = changes;
-        commit((c) => ({ ...c, syncToken, meals: applyEvents(full ? [] : c.meals, events) }));
+        commit((c) => ({ ...c, syncToken, notes: true, meals: applyEvents(full ? keepPending(c.meals) : c.meals, events) }));
         // Les réglages se relisent une fois par session, et quand l'événement spécial a changé.
         if (!settingsLoaded.current || events.some((event) => event.id === SETTINGS_EVENT_ID)) {
           try {
@@ -356,6 +366,23 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     [commit, fail, withAccess],
   );
 
+  /** Écrit la note d'un repas dans la description de son événement. */
+  const setNote = useCallback(
+    (id: string, rawNote: string) => {
+      const note = rawNote.trim();
+      withAccess((a) => {
+        const meal = cacheRef.current.meals.find((m) => m.id === id);
+        if (!meal || id.startsWith('tmp-') || (meal.note ?? '') === note) return;
+        commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === id ? withNote(m, note) : m)) }));
+        setEventNote(a.token, a.calendar, id, note).catch((e) => {
+          commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === id ? withNote(m, meal.note ?? '') : m)) }));
+          fail(e);
+        });
+      });
+    },
+    [commit, fail, withAccess],
+  );
+
   /** Envoie les réglages en attente, si la connexion est valable (sinon ils attendent la prochaine). */
   const flushSettings = useCallback(() => {
     const record = pendingSettings.current;
@@ -465,6 +492,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     clearSlot,
     removeMeal,
     renameMeals,
+    setNote,
     settings,
     saveSettings,
     connected: token !== null,

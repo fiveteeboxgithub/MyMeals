@@ -9,6 +9,8 @@ import { DEFAULT_PERIOD_MONTHS, PERIODS } from './surprise';
 export interface SharedSettings {
   blacklistText: string;
   includeBlacklist: boolean;
+  /** Plats favoris, même syntaxe que la liste noire : ils reviennent plus souvent. */
+  favoritesText: string;
   randomness: number;
   historyMonths: number;
   surprisePeriod: number;
@@ -28,6 +30,7 @@ export interface SettingsRecord {
 export const DEFAULT_SETTINGS: SharedSettings = {
   blacklistText: '',
   includeBlacklist: false,
+  favoritesText: '',
   randomness: DEFAULT_RANDOMNESS,
   historyMonths: DEFAULT_HISTORY_MONTHS,
   surprisePeriod: DEFAULT_PERIOD_MONTHS,
@@ -41,6 +44,7 @@ export const DEFAULT_SETTINGS: SharedSettings = {
  */
 export const MAX_BLACKLIST_CHARS = 2500;
 export const MAX_IDEAS_CHARS = 3500;
+export const MAX_FAVORITES_CHARS = 800;
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -67,6 +71,7 @@ export function parseSettingsRecord(payload: unknown): SettingsRecord | null {
     settings: {
       blacklistText: typeof s.blacklistText === 'string' ? s.blacklistText.slice(0, MAX_BLACKLIST_CHARS) : DEFAULT_SETTINGS.blacklistText,
       includeBlacklist: s.includeBlacklist === true,
+      favoritesText: typeof s.favoritesText === 'string' ? s.favoritesText.slice(0, MAX_FAVORITES_CHARS) : DEFAULT_SETTINGS.favoritesText,
       randomness: pick(s.randomness, RANDOMNESS_LEVELS.map((_, i) => i), DEFAULT_SETTINGS.randomness),
       historyMonths: pick(s.historyMonths, HISTORY_WINDOWS.map((w) => w.months), DEFAULT_SETTINGS.historyMonths),
       surprisePeriod: pick(s.surprisePeriod, PERIODS.map((p) => p.months), DEFAULT_SETTINGS.surprisePeriod),

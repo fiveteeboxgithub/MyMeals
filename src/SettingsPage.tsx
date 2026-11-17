@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Blacklist } from './lib/blacklist';
 import type { CalendarInfo } from './lib/google';
-import { MAX_BLACKLIST_CHARS, MAX_IDEAS_CHARS, type SharedSettings } from './lib/settings';
+import { MAX_BLACKLIST_CHARS, MAX_FAVORITES_CHARS, MAX_IDEAS_CHARS, type SharedSettings } from './lib/settings';
 import { HISTORY_WINDOWS, RANDOMNESS_LEVELS, type DishIndex } from './lib/suggest';
 import { PERIODS } from './lib/surprise';
 import type { SlotMode } from './PlanningView';
@@ -22,6 +22,8 @@ interface SettingsProps {
   setPendingOnly: (value: boolean) => void;
   blacklist: Blacklist;
   blacklistKeys: ReadonlySet<string>;
+  favorites: Blacklist;
+  favoriteKeys: ReadonlySet<string>;
   dishes: DishIndex;
   ideas: string[];
   /** Idées déjà mangées depuis (elles ne sont plus proposées). */
@@ -135,6 +137,42 @@ export function SettingsPage(props: SettingsProps) {
                   .slice(0, 8)
                   .map((key) => dishes.byKey.get(key)?.label ?? key)
                   .join(', ')}${blacklistKeys.size > 8 ? '…' : ''}.`}
+          </p>
+        )}
+      </section>
+
+      <section>
+        <h2>Favoris</h2>
+        <label className="blacklist">
+          Plats à proposer plus souvent
+          <textarea
+            value={shared.favoritesText}
+            rows={3}
+            maxLength={MAX_FAVORITES_CHARS}
+            spellCheck={false}
+            autoCapitalize="off"
+            placeholder={'lasagnes\nblanquette de veau'}
+            onChange={(e) => update({ favoritesText: e.target.value })}
+          />
+        </label>
+        <p className="blacklist-help">
+          Même écriture que la liste noire (un mot par ligne, ou <code>/motif/</code>), mais à l'envers : ces plats comptent
+          deux fois et demie plus dans les propositions. Le plus simple : l'étoile ☆ dans la fenêtre d'un repas, ou « Ajouter
+          aux favoris » dans le menu ⋯ d'une proposition.
+        </p>
+        {props.favorites.invalid.map((entry) => (
+          <p key={entry.line} className="dup-error" role="alert">
+            Ligne ignorée {entry.line} : {entry.error}
+          </p>
+        ))}
+        {props.favorites.entries > 0 && (
+          <p className="blacklist-help">
+            {props.favoriteKeys.size === 0
+              ? "Aucun plat de ton historique n'est concerné pour l'instant."
+              : `${props.favoriteKeys.size} ${props.favoriteKeys.size > 1 ? 'plats favoris' : 'plat favori'} : ${[...props.favoriteKeys]
+                  .slice(0, 8)
+                  .map((key) => dishes.byKey.get(key)?.label ?? key)
+                  .join(', ')}${props.favoriteKeys.size > 8 ? '…' : ''}.`}
           </p>
         )}
       </section>

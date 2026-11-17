@@ -826,7 +826,7 @@ describe('réglages partagés et connexion', async () => {
   });
 
   it('valide les réglages venus de l’agenda', () => {
-    const full = { blacklistText: 'kebab\nwafu', includeBlacklist: true, randomness: 4, historyMonths: 120, surprisePeriod: 0, ideasText: 'poulet yassa', lunchTime: '12:30', dinnerTime: '19:45' };
+    const full = { blacklistText: 'kebab\nwafu', includeBlacklist: true, favoritesText: '', randomness: 4, historyMonths: 120, surprisePeriod: 0, ideasText: 'poulet yassa', lunchTime: '12:30', dinnerTime: '19:45' };
     expect(parseSettingsRecord({ updatedAt: 12, settings: full })).toEqual({ updatedAt: 12, settings: full });
     // Réglages enregistrés par une version plus ancienne : les nouveaux champs prennent leur valeur par défaut.
     const old = parseSettingsRecord({ updatedAt: 12, settings: { blacklistText: 'kebab', includeBlacklist: false, randomness: 3, historyMonths: 60, surprisePeriod: 60 } })!;
@@ -1042,5 +1042,63 @@ describe('statistiques', async () => {
       { year: 2026, count: 2 },
     ]);
     expect(yearSummary(index, meals, '2026-11-18', new Set(['kebab']))).toEqual({ year: '2026', meals: 5, dishes: 3, newDishes: 2, listed: 1 });
+  });
+});
+
+describe('notes et favoris', () => {
+  it('convertit une description HTML de Google en texte simple', async () => {
+    const { noteFromDescription } = await import('./notes');
+    expect(noteFromDescription('Trop salé<br>Recette : <a href="https://ex.fr/r">https://ex.fr/r</a>')).toBe('Trop salé\nRecette : https://ex.fr/r');
+    expect(noteFromDescription('<ul><li>sel</li><li>poivre</li></ul>')).toBe('• sel\n• poivre');
+    expect(noteFromDescription('<a href="https://ex.fr">la recette</a> &amp; plus')).toBe('la recette (https://ex.fr) & plus');
+    expect(noteFromDescription('Les enfants ont adoré <3')).toBe('Les enfants ont adoré <3');
+    expect(noteFromDescription(undefined)).toBe('');
+  });
+
+  it('repère les liens d’une note sans la ponctuation qui suit', async () => {
+    const { splitLinks } = await import('./notes');
+    expect(splitLinks('voir https://ex.fr/r. Bon')).toEqual([
+      { text: 'voir ' },
+      { text: 'https://ex.fr/r', href: 'https://ex.fr/r' },
+      { text: '. Bon' },
+    ]);
+  });
+
+  it('regroupe les notes par plat, les plus récentes d’abord', async () => {
+    const { notesByDish } = await import('./notes');
+    const meals: Meal[] = [
+      { id: '1', date: '2025-01-01', slot: 'soir', name: 'Lasagnes', source: 'google', note: 'trop salé' },
+      { id: '2', date: '2026-01-01', slot: 'soir', name: 'lasagne', source: 'google', note: 'parfait' },
+      { id: '3', date: '2026-02-01', slot: 'soir', name: 'pizza', source: 'google' },
+    ];
+    const index = buildIndex(meals);
+    const notes = notesByDish(meals, index);
+    expect(notes.size).toBe(1);
+    expect([...notes.values()][0].map((n) => n.note)).toEqual(['parfait', 'trop salé']);
+  });
+
+  it('les favoris montent dans le classement, la liste noire l’emporte', () => {
+    const meals: Meal[] = [];
+    for (let i = 0; i < 6; i++) meals.push({ id: `p${i}`, date: addDays('2026-01-05', i * 30), slot: 'soir', name: 'pizza', source: 'google' });
+    for (let i = 0; i < 4; i++) meals.push({ id: `c${i}`, date: addDays('2026-01-06', i * 40), slot: 'soir', name: 'curry', source: 'google' });
+    const index = buildIndex(meals);
+    const plain = suggest(index, '2026-11-20', 'soir', { today: '2026-11-17' });
+    const fav = suggest(index, '2026-11-20', 'soir', { today: '2026-11-17', favorites: new Set(['curry']) });
+    const score = (list: Suggestion[], key: string) => list.find((s) => s.key === key)!.score;
+    expect(score(fav, 'curry')).toBeCloseTo(score(plain, 'curry') * 2.5);
+    expect(fav.find((s) => s.key === 'curry')!.reason.startsWith('⭐ favori')).toBe(true);
+    const both = suggest(index, '2026-11-20', 'soir', { today: '2026-11-17', favorites: new Set(['curry']), blacklist: new Set(['curry']), includeBlacklist: true });
+    expect(both.find((s) => s.key === 'curry')!.favorite).toBe(false);
+  });
+
+  it('retire une ligne de la liste sans toucher aux règles plus larges', async () => {
+    const { removeFromList } = await import('./blacklist');
+    expect(removeFromList('pâtes\nLasagnes\n/curry/', 'lasagnes')).toBe('pâtes\n/curry/');
+  });
+
+  it('garde les favoris enregistrés dans l’agenda', async () => {
+    const { parseSettingsRecord } = await import('./settings');
+    expect(parseSettingsRecord({ updatedAt: 1, settings: { favoritesText: 'curry' } })!.settings.favoritesText).toBe('curry');
+    expect(parseSettingsRecord({ updatedAt: 1, settings: {} })!.settings.favoritesText).toBe('');
   });
 });

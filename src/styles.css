@@ -1503,3 +1503,98 @@ small {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* Favoris et notes */
+.icon.star {
+  flex: 0 0 auto;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.icon.star.on {
+  color: #d29a12;
+}
+.current .icon.star {
+  vertical-align: middle;
+  margin: 0 2px;
+}
+.sheet-proposal > span {
+  flex: 1 1 auto;
+}
+.meal-card + .meal-card {
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+}
+.note {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+.note .note-text {
+  flex: 1 1 auto;
+}
+.note-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.note-text a {
+  color: var(--accent);
+}
+.note-add {
+  margin: 6px 0 0;
+  padding: 0;
+}
+.note-edit textarea {
+  width: 100%;
+  margin: 6px 0;
+  padding: 10px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  resize: vertical;
+}
+.note-actions {
+  display: flex;
+  gap: 8px;
+}
+.past-notes {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+.past-notes summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.past-notes ul {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+.past-notes li {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.past-notes li:last-child {
+  border-bottom: 0;
+}
+.past-notes small {
+  color: var(--muted);
+}
+.note-mark {
+  margin-left: 6px;
+  font-size: 0.85em;
+}
+.tag.fav {
+  background: transparent;
+  padding: 0;
+}

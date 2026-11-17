@@ -1,3 +1,4 @@
+import { noteFromDescription } from './notes';
 import { addDays } from './dates';
 import { LUNCH_LIMIT_HOUR, type Meal, type Slot } from './types';
 
@@ -70,6 +71,7 @@ export interface GoogleEvent {
   id: string;
   status?: string;
   summary?: string;
+  description?: string;
   start?: { dateTime?: string; date?: string };
 }
 
@@ -274,7 +276,7 @@ export async function listChanges(
     const query = new URLSearchParams({
       singleEvents: 'true',
       maxResults: '2500',
-      fields: 'items(id,status,summary,start),nextPageToken,nextSyncToken',
+      fields: 'items(id,status,summary,description,start),nextPageToken,nextSyncToken',
     });
     if (syncToken) query.set('syncToken', syncToken);
     if (pageToken) query.set('pageToken', pageToken);
@@ -315,6 +317,15 @@ export function renameEvent(token: string, calendar: GoogleCalendar, eventId: st
   );
 }
 
+/** Écrit la note d'un repas dans la description de l'événement (texte vide : la retire). */
+export function setEventNote(token: string, calendar: GoogleCalendar, eventId: string, note: string): Promise<GoogleEvent> {
+  return call<GoogleEvent>(
+    token,
+    `/calendars/${encodeURIComponent(calendar.id)}/events/${encodeURIComponent(eventId)}?fields=id,status,summary,start`,
+    { method: 'PATCH', body: JSON.stringify({ description: note }) },
+  );
+}
+
 export function deleteEvent(token: string, calendar: GoogleCalendar, eventId: string): Promise<void> {
   return call<void>(token, `/calendars/${encodeURIComponent(calendar.id)}/events/${encodeURIComponent(eventId)}`, {
     method: 'DELETE',
@@ -328,11 +339,13 @@ export function eventToMeal(event: GoogleEvent): Meal | null {
   if (event.status === 'cancelled' || !name || !event.start) return null;
   // Google renvoie l'heure dans le fuseau de l'agenda : on lit la date et l'heure telles quelles.
   const { dateTime, date } = event.start;
+  const note = noteFromDescription(event.description);
+  const extra = note ? { note } : {};
   if (dateTime) {
     const hour = Number(dateTime.slice(11, 13));
-    return { id: event.id, date: dateTime.slice(0, 10), slot: hour < LUNCH_LIMIT_HOUR ? 'midi' : 'soir', name, source: 'google' };
+    return { id: event.id, date: dateTime.slice(0, 10), slot: hour < LUNCH_LIMIT_HOUR ? 'midi' : 'soir', name, source: 'google', ...extra };
   }
-  if (date) return { id: event.id, date, slot: 'soir', name, source: 'google' };
+  if (date) return { id: event.id, date, slot: 'soir', name, source: 'google', ...extra };
   return null;
 }
 
@@ -386,7 +399,7 @@ export const MAX_EVENT_TEXT = 7800;
 
 export async function writeSettingsEvent(token: string, calendar: GoogleCalendar, payload: unknown): Promise<void> {
   if (encodeSettings(payload).length > MAX_EVENT_TEXT) {
-    throw new Error("Réglages trop longs pour l'agenda : raccourcis la liste noire ou « Mes idées ». Ils restent enregistrés sur cet appareil.");
+    throw new Error("Réglages trop longs pour l'agenda : raccourcis la liste noire, les favoris ou « Mes idées ». Ils restent enregistrés sur cet appareil.");
   }
   const base = `/calendars/${encodeURIComponent(calendar.id)}/events`;
   const body = {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { BlacklistFilter } from './lib/blacklist';
 import { addDays, dayName, longDate, mondayOf, shortDate, weekday } from './lib/dates';
 import type { CalendarInfo, TimedEvent } from './lib/google';
+import type { PastNote } from './lib/notes';
 import { overlapsBySlot, weekRange, type OtherEvent } from './lib/otherCalendars';
 import type { SharedSettings } from './lib/settings';
 import { useSkippedSlots } from './lib/store';
@@ -60,6 +61,11 @@ interface PlanningProps {
   loading: boolean;
   flash: (text: string, undo?: () => void) => void;
   blacklistDish: (name: string) => void;
+  favoriteKeys: ReadonlySet<string>;
+  isFavorite: (name: string) => boolean;
+  toggleFavorite: (name: string) => void;
+  /** Notes des repas, par plat. */
+  notes: Map<string, PastNote[]>;
   onSurprisePeriod: (months: number) => void;
   calendars?: CalendarsApi;
   shownCalendars: CalendarInfo[];
@@ -156,7 +162,8 @@ function MenuItem({ icon, label, hint, onClick }: { icon: string; label: string;
 
 export function PlanningView(props: PlanningProps) {
   const { store, dishes, today, shared, ideas, slotMode, pendingOnly, blacklistKeys, blacklistFilter, resetToken, loading, flash, blacklistDish } = props;
-  const { meals, setSlot, clearSlot, removeMeal } = store;
+  const { favoriteKeys, isFavorite, toggleFavorite } = props;
+  const { meals, setSlot, clearSlot, removeMeal, setNote } = store;
   const { randomness, historyMonths, includeBlacklist } = shared;
   const thisMonday = mondayOf(today);
   const [monday, setMonday] = useState(thisMonday);
@@ -243,7 +250,7 @@ export function PlanningView(props: PlanningProps) {
           pendingLeftover = null;
           continue;
         }
-        const ranked = suggest(dishes, date, slot, { exclude: used, weekWords, historyMonths, blacklist: blacklistKeys, includeBlacklist });
+        const ranked = suggest(dishes, date, slot, { exclude: used, weekWords, historyMonths, blacklist: blacklistKeys, includeBlacklist, favorites: favoriteKeys });
         // Chaque appui sur ↻ change le tirage (on compte les appuis, pas les plats distincts).
         const draw = `${seed}|${key}|${rejected[key]?.length ?? 0}`;
         // Liste noire incluse : une proposition sur dix environ en vient, les autres jamais.
@@ -259,7 +266,7 @@ export function PlanningView(props: PlanningProps) {
       }
     }
     return out;
-  }, [days, monday, today, bySlot, usual, habits, dishes, rejected, skipped, randomness, historyMonths, seed, activeSlots, blacklistKeys, includeBlacklist]);
+  }, [days, monday, today, bySlot, usual, habits, dishes, rejected, skipped, randomness, historyMonths, seed, activeSlots, blacklistKeys, includeBlacklist, favoriteKeys]);
 
   /** Un créneau attend une décision s'il est à venir, vide, non retiré et habituellement rempli. */
   const needsDecision = (date: string, slot: Slot) => {
@@ -449,6 +456,11 @@ export function PlanningView(props: PlanningProps) {
                       {planned ? (
                         <button className="meal" onClick={() => setEditing({ date, slot })}>
                           <Breakable text={planned.map((m) => m.name).join(' + ')} />
+                          {planned.some((m) => m.note) && (
+                            <span className="note-mark" title={planned.map((m) => m.note).filter(Boolean).join('\n')} aria-label="avec une note">
+                              📝
+                            </span>
+                          )}
                         </button>
                       ) : skipped.has(key) ? (
                         <button className="add skipped" onClick={() => setEditing({ date, slot })}>
@@ -477,6 +489,12 @@ export function PlanningView(props: PlanningProps) {
                             {blacklistKeys.size > 0 && (
                               <MenuItem icon="🍽️" label="Un plat de la liste noire" hint="resto, à emporter…" onClick={() => blacklistSlot(key, date, slot)} />
                             )}
+                            <MenuItem
+                              icon={isFavorite(shown.name) ? '☆' : '⭐'}
+                              label={isFavorite(shown.name) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                              hint={isFavorite(shown.name) ? undefined : 'proposé plus souvent'}
+                              onClick={() => toggleFavorite(shown.name)}
+                            />
                             <MenuItem icon="∅" label="Pas de repas ce jour-là" onClick={() => setSkip(key, true)} />
                             <MenuItem
                               icon="🚫"
@@ -514,7 +532,11 @@ export function PlanningView(props: PlanningProps) {
           current={bySlot.get(`${editing.date}|${editing.slot}`)}
           proposal={editing.proposal}
           others={others.get(`${editing.date}|${editing.slot}`)}
-          suggestions={suggest(dishes, editing.date, editing.slot, { blacklist: blacklistKeys, includeBlacklist: true })}
+          suggestions={suggest(dishes, editing.date, editing.slot, { blacklist: blacklistKeys, includeBlacklist: true, favorites: favoriteKeys })}
+          isFavorite={isFavorite}
+          onToggleFavorite={toggleFavorite}
+          notes={props.notes}
+          onSetNote={setNote}
           includeBlacklist={includeBlacklist}
           blacklistFilter={blacklistFilter}
           ideas={ideas}

@@ -14,6 +14,8 @@ export interface Meal {
   slot: Slot;
   name: string;
   source: 'import' | 'app' | 'google';
+  /** Note libre (lien de recette, « trop salé »…) : la description de l'événement Google. */
+  note?: string;
 }
 
 /** Ce dont le planning a besoin, que les repas viennent du navigateur ou de Google Agenda. */
@@ -32,4 +34,6 @@ export interface MealStore {
   removeMeal: (id: string) => void;
   /** Donne le même nom à tous les repas indiqués. Renvoie le nombre de repas renommés ou en échec. */
   renameMeals: (ids: string[], name: string) => Promise<{ renamed: number; failed: number }>;
+  /** Remplace la note d'un repas (texte vide : la retire). */
+  setNote: (id: string, note: string) => void;
 }

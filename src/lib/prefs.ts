@@ -6,6 +6,7 @@ export const KEYS = {
   historyMonths: 'mymeals.historyMonths',
   surprisePeriod: 'mymeals.surprise.months',
   ideasText: 'mymeals.ideas.text',
+  favoritesText: 'mymeals.favorites.text',
   lunchTime: 'mymeals.time.midi',
   dinnerTime: 'mymeals.time.soir',
   slotMode: 'mymeals.slotMode',

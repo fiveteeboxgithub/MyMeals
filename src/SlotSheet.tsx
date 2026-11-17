@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BlacklistFilter } from './lib/blacklist';
 import { dayName, shortDate } from './lib/dates';
+import { MAX_NOTE_CHARS, dishKeyOf, splitLinks, type PastNote } from './lib/notes';
 import { clock, type OtherEvent } from './lib/otherCalendars';
 import { fold, normalize, type DishIndex, type Suggestion } from './lib/suggest';
 import { PERIODS, pickSurprise, surpriseIdeas, type Surprise } from './lib/surprise';
@@ -25,6 +26,10 @@ interface SheetProps {
   blacklistFilter: BlacklistFilter;
   ideas: string[];
   onRemoveMeal: (id: string) => void;
+  isFavorite: (name: string) => boolean;
+  onToggleFavorite: (name: string) => void;
+  notes: Map<string, PastNote[]>;
+  onSetNote: (id: string, note: string) => void;
   dishes: DishIndex;
   today: string;
   randomness: number;
@@ -87,46 +92,35 @@ export function SlotSheet(props: SheetProps) {
           </button>
         </div>
         {others && others.length > 0 && <OtherEvents events={others} />}
-        {current && current.length === 1 && (
+        {current && current.length > 1 && (
           <p className="current">
-            Prévu : <strong>{current[0].name}</strong>
-            <button className="link danger" onClick={onClear}>
-              Retirer
-            </button>
+            {current.length} repas sont prévus sur ce créneau. Choisir un plat ci-dessous remplace seulement le premier
+            (« {current[0].name} »).
           </p>
         )}
+        {current?.map((meal) => (
+          <MealCard key={meal.id} meal={meal} onRemove={() => (current.length === 1 ? onClear() : onRemoveMeal(meal.id))} {...props} />
+        ))}
         {current && current.length > 1 && (
-          <div className="current">
-            <p>
-              {current.length} repas sont prévus sur ce créneau. Choisir un plat ci-dessous remplace seulement le premier
-              (« {current[0].name} »).
-            </p>
-            <ul className="current-list">
-              {current.map((meal) => (
-                <li key={meal.id}>
-                  <strong>{meal.name}</strong>
-                  <button className="link danger" onClick={() => onRemoveMeal(meal.id)}>
-                    Retirer
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <button className="link danger" onClick={onClear}>
-              Tout retirer
-            </button>
-          </div>
+          <button className="link danger" onClick={onClear}>
+            Tout retirer
+          </button>
         )}
         {!current && proposal && (
-          <div className="sheet-proposal">
-            <span>
-              <small>Proposition</small>
-              <strong>{proposal.name}</strong>
-              <small>{proposal.note}</small>
-            </span>
-            <button className="ghost-btn primary" onClick={() => onPick(proposal.name)}>
-              ✓ Choisir
-            </button>
-          </div>
+          <>
+            <div className="sheet-proposal">
+              <span>
+                <small>Proposition</small>
+                <strong>{proposal.name}</strong>
+                <small>{proposal.note}</small>
+              </span>
+              <FavoriteButton name={proposal.name} {...props} />
+              <button className="ghost-btn primary" onClick={() => onPick(proposal.name)}>
+                ✓ Choisir
+              </button>
+            </div>
+            <PastNotes list={props.notes.get(dishKeyOf(proposal.name, props.dishes)) ?? []} />
+          </>
         )}
         {!current && (
           <p className="current">
@@ -164,6 +158,7 @@ export function SlotSheet(props: SheetProps) {
               <button onClick={() => onPick(s.label)}>
                 <span>
                   {s.label}
+                  {s.favorite && <small className="tag fav">⭐</small>}
                   {s.blacklisted && <small className="tag">liste noire</small>}
                   {s.variants.length > 0 && <small className="variants">aussi écrit : {variantsLine(s.variants)}</small>}
                 </span>
@@ -180,6 +175,136 @@ export function SlotSheet(props: SheetProps) {
         )}
       </div>
     </div>
+  );
+}
+
+/** Étoile qui ajoute un plat aux favoris ou l'en retire. */
+function FavoriteButton({ name, isFavorite, onToggleFavorite }: { name: string } & Pick<SheetProps, 'isFavorite' | 'onToggleFavorite'>) {
+  const on = isFavorite(name);
+  return (
+    <button
+      className={`icon star${on ? ' on' : ''}`}
+      onClick={() => onToggleFavorite(name)}
+      aria-pressed={on}
+      aria-label={on ? `Retirer « ${name} » des favoris` : `Ajouter « ${name} » aux favoris`}
+      title={on ? 'Favori (proposé plus souvent)' : 'Ajouter aux favoris'}
+    >
+      {on ? '★' : '☆'}
+    </button>
+  );
+}
+
+/** Texte d'une note, avec ses liens cliquables. */
+export function NoteText({ note }: { note: string }) {
+  return (
+    <span className="note-text">
+      {splitLinks(note).map((part, i) =>
+        part.href ? (
+          <a key={i} href={part.href} target="_blank" rel="noopener noreferrer">
+            {part.text}
+          </a>
+        ) : (
+          <span key={i}>{part.text}</span>
+        ),
+      )}
+    </span>
+  );
+}
+
+/** Un repas prévu : son nom, l'étoile des favoris, sa note (modifiable) et celles des fois précédentes. */
+function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
+  const { meal, onRemove, onSetNote, notes, dishes } = props;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(meal.note ?? '');
+  const pending = meal.id.startsWith('tmp-');
+  const past = (notes.get(dishKeyOf(meal.name, dishes)) ?? []).filter((n) => n.id !== meal.id);
+
+  function startEditing() {
+    setDraft(meal.note ?? '');
+    setEditing(true);
+  }
+
+  function save() {
+    onSetNote(meal.id, draft);
+    setEditing(false);
+  }
+
+  return (
+    <div className="meal-card">
+      <p className="current">
+        Prévu : <strong>{meal.name}</strong>
+        <FavoriteButton name={meal.name} {...props} />
+        <button className="link danger" onClick={onRemove}>
+          Retirer
+        </button>
+      </p>
+      {editing ? (
+        <div className="note-edit">
+          <textarea
+            value={draft}
+            rows={3}
+            maxLength={MAX_NOTE_CHARS}
+            autoFocus
+            placeholder="Lien de la recette, « trop salé », « les enfants ont adoré »…"
+            aria-label={`Note pour ${meal.name}`}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save();
+            }}
+          />
+          <div className="note-actions">
+            <button className="ghost-btn primary" onClick={save}>
+              Enregistrer
+            </button>
+            <button
+              className="ghost-btn"
+              onClick={() => {
+                setDraft(meal.note ?? '');
+                setEditing(false);
+              }}
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      ) : meal.note ? (
+        <div className="note">
+          <span aria-hidden="true">📝</span>
+          <NoteText note={meal.note} />
+          <button className="link" onClick={startEditing}>
+            Modifier
+          </button>
+        </div>
+      ) : (
+        <button className="link note-add" onClick={startEditing} disabled={pending} title={pending ? "En cours d'enregistrement dans l'agenda" : undefined}>
+          📝 Ajouter une note
+        </button>
+      )}
+      <PastNotes list={past} />
+    </div>
+  );
+}
+
+/** Notes laissées les fois précédentes sur le même plat. */
+function PastNotes({ list }: { list: PastNote[] }) {
+  if (list.length === 0) return null;
+  return (
+    <details className="past-notes" open={list.length <= 2}>
+      <summary>
+        {list.length === 1 ? 'Note de la fois précédente' : `Notes des fois précédentes (${list.length})`}
+      </summary>
+      <ul>
+        {list.slice(0, 10).map((n) => (
+          <li key={n.id}>
+            <small>
+              {shortDate(n.date)} {n.date.slice(0, 4)}
+              {n.name !== list[0].name ? ` · ${n.name}` : ''}
+            </small>
+            <NoteText note={n.note} />
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

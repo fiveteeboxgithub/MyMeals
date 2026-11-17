@@ -108,19 +108,47 @@ repas ne comptent plus dans le calcul de tes goûts. Ils reviennent seulement si
 - tu ouvres la fenêtre d'un créneau et choisis « Afficher aussi les plats de la liste noire », ou tu
   cherches un nom précis (ils portent alors l'étiquette « liste noire »).
 
-La liste et l'option font partie des **réglages partagés** (section suivante).
+La liste et l'option font partie des **réglages partagés** (voir plus bas).
+
+## Favoris
+
+L'inverse de la liste noire : les plats favoris comptent **deux fois et demie** plus dans les propositions
+(ils restent soumis au délai entre deux fois et à la variété de la semaine). On les ajoute d'un geste :
+
+- l'étoile ☆ à côté d'un repas prévu ou de la proposition, dans la fenêtre d'un créneau ;
+- « Ajouter aux favoris » dans le menu **⋯** d'une proposition.
+
+Dans **Réglages → Favoris**, la liste s'écrit comme la liste noire (un mot par ligne, qui retient tout plat
+le contenant, ou `/motif/`). Une proposition favorite porte la mention « ⭐ favori ». Si un plat est favori
+par une règle plus large (« pâtes »), l'étoile ne peut pas l'en retirer : il faut modifier la règle. Si un
+plat est à la fois favori et sur la liste noire, la liste noire l'emporte. Les favoris font partie des
+réglages partagés (800 caractères au plus).
+
+## Notes sur les repas
+
+Chaque repas peut porter une note : un lien de recette, « trop salé », « les enfants ont adoré ». C'est la
+**description de l'événement** dans Google Agenda : elle s'y voit, et une description écrite depuis Google
+Agenda apparaît dans l'application (le HTML de Google est converti en texte, les liens restent cliquables).
+
+- Dans la fenêtre d'un créneau : « 📝 Ajouter une note », ou « Modifier ». Une note vide retire la description.
+- Sous le repas apparaissent les **notes des fois précédentes** du même plat (toutes ses écritures), les plus
+  récentes d'abord ; elles s'affichent aussi sous une proposition, avant de la choisir.
+- Dans le planning, un 📝 signale un repas qui a une note.
+
+La première synchronisation après cette mise à jour relit tout l'agenda une fois, pour récupérer les
+descriptions existantes.
 
 ## Réglages partagés
 
 Avec Google Agenda, les réglages qui décrivent tes goûts sont enregistrés dans l'agenda lui-même, pour être
-retrouvés sur tous les appareils et par le foyer : la liste noire et son option, le niveau de hasard,
+retrouvés sur tous les appareils et par le foyer : la liste noire et son option, les favoris, le niveau de hasard,
 l'historique pris en compte, la période des goûts de « Surprise Me », « Mes idées » et les heures des
 repas. Ils vivent dans un **événement
 spécial** de l'agenda « Repas » : « ⚙ MyMeals : réglages (ne pas supprimer) », une journée entière le
 1er janvier 2100, privée et sans rappel, d'identifiant fixe (`mmealsreglages00`). Son texte contient une phrase
 d'explication puis les réglages en JSON. L'application ne le compte jamais comme un repas.
 Pour tenir dans ce texte (environ 8 000 caractères chez Google), la liste noire est limitée à
-2 500 caractères et « Mes idées » à 3 500 ; un enregistrement trop long est refusé avec un message, et les
+2 500 caractères, les favoris à 800 et « Mes idées » à 3 500 ; un enregistrement trop long est refusé avec un message, et les
 réglages restent sur l'appareil.
 
 - Un réglage modifié est envoyé à l'agenda environ une seconde après la dernière frappe.

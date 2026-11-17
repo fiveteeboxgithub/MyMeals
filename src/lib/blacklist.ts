@@ -78,3 +78,15 @@ export function addToBlacklist(text: string, entry: string): string {
   const base = text.replace(/\s+$/, '');
   return base ? `${base}\n${clean}` : clean;
 }
+
+/**
+ * Retire une ligne d'une liste (liste noire ou favoris), sans tenir compte des majuscules ni des accents.
+ * Une règle plus large (« pâtes », un motif) qui couvre aussi ce plat n'est pas touchée.
+ */
+export function removeFromList(text: string, entry: string): string {
+  const folded = fold(entry.replace(/\s+/g, ' ').trim());
+  return text
+    .split(/\r?\n/)
+    .filter((line) => fold(line.trim()) !== folded)
+    .join('\n');
+}

@@ -43,6 +43,8 @@ export interface Suggestion {
   recent?: boolean;
   /** Plat de la liste noire (seulement quand `suggest` a reçu l'option `includeBlacklist`). */
   blacklisted?: boolean;
+  /** Plat favori (score multiplié par `FAVORITE_BOOST`). */
+  favorite?: boolean;
   /** Jours écoulés depuis la dernière fois (s'il a déjà été mangé). */
   daysSince?: number;
   reason: string;
@@ -262,6 +264,8 @@ export const DEFAULT_HISTORY_MONTHS = 60;
 export const BLACKLIST_PENALTY = 0.1;
 /** Avec l'option « inclure la liste noire », environ une proposition sur dix vient de la liste. */
 export const BLACKLIST_CHANCE = 0.1;
+/** Les plats favoris comptent pour deux fois et demie : ils reviennent nettement plus souvent, sans tout écraser. */
+export const FAVORITE_BOOST = 2.5;
 
 function seasonWeight(a: number, b: number): number {
   const diff = Math.abs(a - b);
@@ -308,6 +312,8 @@ export interface SuggestOptions {
   blacklist?: ReadonlySet<string>;
   /** Garde les plats de la liste noire (repérés par `blacklisted`), avec un score divisé par dix. */
   includeBlacklist?: boolean;
+  /** Clés des plats favoris. */
+  favorites?: ReadonlySet<string>;
 }
 
 /**
@@ -319,7 +325,7 @@ export interface SuggestOptions {
  * semaine contient déjà un plat proche.
  */
 export function suggest(index: DishIndex, date: string, slot: Slot, options: SuggestOptions = {}): Suggestion[] {
-  const { exclude, weekWords, historyMonths, blacklist, includeBlacklist } = options;
+  const { exclude, weekWords, historyMonths, blacklist, includeBlacklist, favorites } = options;
   const target = dayNumber(date);
   const now = dayNumber(options.today ?? todayIso());
   const windowDays = historyMonths ? Math.round(historyMonths * 30.44) : undefined;
@@ -361,7 +367,9 @@ export function suggest(index: DishIndex, date: string, slot: Slot, options: Sug
       const repeats = Math.max(0, ...dish.words.map((w) => weekWords?.get(w) ?? 0));
       score *= Math.pow(REPEAT_PENALTY, repeats);
     }
+    const favorite = !listed && (favorites?.has(dish.key) ?? false);
     if (listed) score *= BLACKLIST_PENALTY;
+    if (favorite) score *= FAVORITE_BOOST;
     out.push({
       key: dish.key,
       label: dish.label,
@@ -371,8 +379,9 @@ export function suggest(index: DishIndex, date: string, slot: Slot, options: Sug
       count,
       recent: !dish.generic && nearestGap < 7,
       blacklisted: listed,
+      favorite,
       daysSince: eaten ? now - lastEaten : undefined,
-      reason: eaten ? `${count} fois · ${ago(now - lastEaten)}` : `${count} fois`,
+      reason: `${favorite ? '⭐ favori · ' : ''}${eaten ? `${count} fois · ${ago(now - lastEaten)}` : `${count} fois`}`,
     });
   }
   return out.sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));

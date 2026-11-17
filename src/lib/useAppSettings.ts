@@ -3,6 +3,7 @@ import { KEYS, readChoice, readPref, requestPersistentStorage, writePref } from 
 import {
   DEFAULT_SETTINGS,
   MAX_BLACKLIST_CHARS,
+  MAX_FAVORITES_CHARS,
   MAX_IDEAS_CHARS,
   decideSync,
   loadSettingsStamp,
@@ -20,6 +21,7 @@ export function loadSharedSettings(): SharedSettings {
   return {
     blacklistText: (readPref(KEYS.blacklistText) ?? '').slice(0, MAX_BLACKLIST_CHARS),
     includeBlacklist: readPref(KEYS.includeBlacklist) === '1',
+    favoritesText: (readPref(KEYS.favoritesText) ?? '').slice(0, MAX_FAVORITES_CHARS),
     randomness: readChoice(KEYS.randomness, RANDOMNESS_LEVELS.map((_, i) => i), DEFAULT_SETTINGS.randomness),
     historyMonths: readChoice(KEYS.historyMonths, HISTORY_WINDOWS.map((w) => w.months), DEFAULT_SETTINGS.historyMonths),
     surprisePeriod: readChoice(KEYS.surprisePeriod, PERIODS.map((p) => p.months), DEFAULT_SETTINGS.surprisePeriod),
@@ -36,6 +38,7 @@ function saveSharedSettings(settings: SharedSettings): void {
   writePref(KEYS.historyMonths, String(settings.historyMonths));
   writePref(KEYS.surprisePeriod, String(settings.surprisePeriod));
   writePref(KEYS.ideasText, settings.ideasText);
+  writePref(KEYS.favoritesText, settings.favoritesText);
   writePref(KEYS.lunchTime, settings.lunchTime);
   writePref(KEYS.dinnerTime, settings.dinnerTime);
 }

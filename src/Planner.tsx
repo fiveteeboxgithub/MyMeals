@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { DuplicatesPage } from './Duplicates';
-import { addToBlacklist, blacklistedKeys, parseBlacklist, type BlacklistFilter } from './lib/blacklist';
+import { addToBlacklist, blacklistedKeys, parseBlacklist, removeFromList, type BlacklistFilter } from './lib/blacklist';
+import { dishKeyOf, notesByDish } from './lib/notes';
 import { todayIso } from './lib/dates';
 import { setMealTimes, type CalendarInfo, type TimedEvent } from './lib/google';
 import { shownByDefault } from './lib/otherCalendars';
 import { KEYS, readPref, writePref } from './lib/prefs';
-import type { SharedSettings } from './lib/settings';
+import { MAX_FAVORITES_CHARS, type SharedSettings } from './lib/settings';
 import { buildIndex, normalize } from './lib/suggest';
 import { parseIdeas } from './lib/surprise';
 import type { MealStore, SettingsSync } from './lib/types';
@@ -125,6 +126,40 @@ export function Planner(props: PlannerProps) {
     [shared.blacklistText, change, dishes, blacklistKeys, showFlash],
   );
 
+  // Favoris : même syntaxe que la liste noire ; ils reviennent plus souvent dans les propositions.
+  const favorites = useMemo(() => parseBlacklist(shared.favoritesText), [shared.favoritesText]);
+  const favoriteKeys = useMemo(() => blacklistedKeys(dishes, favorites), [dishes, favorites]);
+  const isFavorite = useCallback(
+    (name: string) => favorites.matches(name) || favoriteKeys.has(dishKeyOf(name, dishes)),
+    [favorites, favoriteKeys, dishes],
+  );
+  /** Ajoute ou retire un plat des favoris, avec de quoi annuler. */
+  const toggleFavorite = useCallback(
+    (name: string) => {
+      const previous = shared.favoritesText;
+      const undo = () => change({ favoritesText: previous });
+      if (!isFavorite(name)) {
+        const next = addToBlacklist(previous, name);
+        if (next.length > MAX_FAVORITES_CHARS) {
+          showFlash('La liste des favoris est pleine : fais de la place dans Réglages → Favoris.');
+          return;
+        }
+        change({ favoritesText: next });
+        showFlash(`⭐ « ${name} » est dans tes favoris : il sera proposé plus souvent.`, undo);
+        return;
+      }
+      const next = removeFromList(previous, name);
+      if (parseBlacklist(next).matches(name) || blacklistedKeys(dishes, parseBlacklist(next)).has(dishKeyOf(name, dishes))) {
+        showFlash(`« ${name} » est favori par une règle plus large : modifie-la dans Réglages → Favoris.`);
+        return;
+      }
+      change({ favoritesText: next });
+      showFlash(`« ${name} » n'est plus dans tes favoris.`, undo);
+    },
+    [shared.favoritesText, change, isFavorite, dishes, showFlash],
+  );
+  const notes = useMemo(() => notesByDish(store.meals, dishes), [store.meals, dishes]);
+
   // Autres agendas : la liste (pour les réglages) et ceux affichés à côté des créneaux.
   const listCalendars = props.calendars?.list;
   const eventsOf = props.calendars?.events;
@@ -196,6 +231,10 @@ export function Planner(props: PlannerProps) {
           loading={props.loading ?? false}
           flash={showFlash}
           blacklistDish={blacklistDish}
+          favoriteKeys={favoriteKeys}
+          isFavorite={isFavorite}
+          toggleFavorite={toggleFavorite}
+          notes={notes}
           onSurprisePeriod={(months) => change({ surprisePeriod: months })}
           calendars={eventsApi}
           shownCalendars={shownCalendars}
@@ -219,6 +258,8 @@ export function Planner(props: PlannerProps) {
           }}
           blacklist={blacklist}
           blacklistKeys={blacklistKeys}
+          favorites={favorites}
+          favoriteKeys={favoriteKeys}
           dishes={dishes}
           ideas={ideas}
           eatenIdeas={eatenIdeas}

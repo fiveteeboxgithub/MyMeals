@@ -21,6 +21,13 @@ function save(meals: Meal[]): void {
   }
 }
 
+/** Le repas avec cette note (une note vide retire le champ). */
+export function withNote(meal: Meal, note: string): Meal {
+  if (note) return { ...meal, note };
+  const { note: _removed, ...rest } = meal;
+  return rest;
+}
+
 export function useMeals() {
   const [meals, setMeals] = useState<Meal[]>(load);
 
@@ -70,6 +77,11 @@ export function useMeals() {
     [update],
   );
 
+  const setNote = useCallback(
+    (id: string, note: string) => update((current) => current.map((m) => (m.id === id ? withNote(m, note.trim()) : m))),
+    [update],
+  );
+
   const clearAll = useCallback(() => update(() => []), [update]);
 
   const renameMeals = useCallback(
@@ -83,7 +95,7 @@ export function useMeals() {
     [meals, update],
   );
 
-  return { meals, importMeals, setSlot, clearSlot, removeMeal, clearAll, renameMeals };
+  return { meals, importMeals, setSlot, clearSlot, removeMeal, clearAll, renameMeals, setNote };
 }
 
 const SKIPPED_KEY = 'mymeals.skipped.v1';
