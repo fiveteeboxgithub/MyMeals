@@ -24,6 +24,7 @@ import { pickSurprise, surpriseIdeas } from './lib/surprise';
 import { SLOTS, type Meal, type MealStore, type Slot } from './lib/types';
 import { weekText } from './lib/weekText';
 import { Breakable } from './Breakable';
+import { DishThumb } from './DishThumb';
 import { OtherEvents, SLOT_LABEL, SlotSheet, type ShownProposal } from './SlotSheet';
 
 export type SlotMode = Slot | 'both';
@@ -54,6 +55,7 @@ interface PlanningProps {
   ideas: string[];
   slotMode: SlotMode;
   pendingOnly: boolean;
+  showImages: boolean;
   blacklistKeys: ReadonlySet<string>;
   blacklistFilter: BlacklistFilter;
   /** Change quand les réglages changent : les tirages en cours sont alors oubliés. */
@@ -454,13 +456,16 @@ export function PlanningView(props: PlanningProps) {
                     <span className="slot-label">{SLOT_LABEL[slot]}</span>
                     <div className="slot-body">
                       {planned ? (
-                        <button className="meal" onClick={() => setEditing({ date, slot })}>
+                        <button className="meal with-thumb" onClick={() => setEditing({ date, slot })}>
+                          <DishThumb name={planned[0].name} enabled={props.showImages} />
+                          <span className="meal-text">
                           <Breakable text={planned.map((m) => m.name).join(' + ')} />
                           {planned.some((m) => m.note) && (
                             <span className="note-mark" title={planned.map((m) => m.note).filter(Boolean).join('\n')} aria-label="avec une note">
                               📝
                             </span>
                           )}
+                          </span>
                         </button>
                       ) : skipped.has(key) ? (
                         <button className="add skipped" onClick={() => setEditing({ date, slot })}>
@@ -468,9 +473,12 @@ export function PlanningView(props: PlanningProps) {
                         </button>
                       ) : proposal && shown ? (
                         <div className="proposal">
-                          <button className="proposal-name" onClick={() => setEditing({ date, slot, proposal: shown })}>
-                            <Breakable text={override ? `${override.icon} ${override.name}` : proposal.label} />
-                            <small>{shown.note}</small>
+                          <button className="proposal-name with-thumb" onClick={() => setEditing({ date, slot, proposal: shown })}>
+                            <DishThumb name={shown.name} enabled={props.showImages} />
+                            <span className="meal-text">
+                              <Breakable text={override ? `${override.icon} ${override.name}` : proposal.label} />
+                              <small>{shown.note}</small>
+                            </span>
                           </button>
                           <button
                             className="icon"
@@ -533,6 +541,7 @@ export function PlanningView(props: PlanningProps) {
           proposal={editing.proposal}
           others={others.get(`${editing.date}|${editing.slot}`)}
           suggestions={suggest(dishes, editing.date, editing.slot, { blacklist: blacklistKeys, includeBlacklist: true, favorites: favoriteKeys })}
+          showImages={props.showImages}
           isFavorite={isFavorite}
           onToggleFavorite={toggleFavorite}
           notes={props.notes}

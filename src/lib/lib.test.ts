@@ -1102,3 +1102,25 @@ describe('notes et favoris', () => {
     expect(parseSettingsRecord({ updatedAt: 1, settings: {} })!.settings.favoritesText).toBe('');
   });
 });
+
+describe('images des plats', () => {
+  it('cherche la première partie du plat, sans les restes', async () => {
+    const { imageQuery } = await import('./dishImages');
+    expect(imageQuery('agneau/pates')).toBe('agneau');
+    expect(imageQuery('restes de lasagnes')).toBe('lasagnes');
+    expect(imageQuery('restes')).toBe('');
+    expect(imageQuery('Poulet (four) + riz')).toBe('Poulet');
+  });
+
+  it('écarte les homonymies, les pages sans image et les résultats sans rapport', async () => {
+    const { pickImage } = await import('./dishImages');
+    const pages = [
+      { title: 'Boursin', index: 1, thumbnail: { source: 'https://upload.wikimedia.org/b.jpg' } },
+      { title: 'Escalope', index: 2, thumbnail: { source: 'https://upload.wikimedia.org/e.jpg' } },
+    ];
+    expect(pickImage(pages, 'escalopes', false)?.title).toBe('Escalope');
+    expect(pickImage([{ title: 'Potée', pageprops: { disambiguation: '' }, thumbnail: { source: 'x' } }], 'potée', true)).toBeNull();
+    expect(pickImage([{ title: 'Potée', missing: true }], 'potée', true)).toBeNull();
+    expect(pickImage([{ title: 'Croque-monsieur', thumbnail: { source: 'c.jpg' } }], 'croque monsieur', true)?.url).toBe('c.jpg');
+  });
+});

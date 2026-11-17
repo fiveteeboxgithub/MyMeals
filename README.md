@@ -138,6 +138,21 @@ Agenda apparaît dans l'application (le HTML de Google est converti en texte, le
 La première synchronisation après cette mise à jour relit tout l'agenda une fois, pour récupérer les
 descriptions existantes.
 
+## Images des plats
+
+À côté des plats prévus et proposés, une petite photo trouvée sur **Wikipédia en français** (images libres de
+Wikimedia Commons), sans aucune IA ni clé d'API : l'application cherche l'article du même nom que le plat, sinon
+les premiers résultats de recherche dont le titre partage un mot avec le plat, en écartant les pages d'homonymie.
+Pour un plat composé, seule la première partie est cherchée (« agneau/pates » → « agneau ») ; « restes de X »
+cherche « X ». Pas de résultat fiable : pas d'image.
+
+- Chaque plat n'est cherché qu'une fois puis gardé sur l'appareil (un plat sans image est recherché à nouveau au
+  bout d'un mois), deux recherches à la fois au plus. Seul le nom du plat est envoyé à Wikipédia.
+- Dans la fenêtre d'un créneau, l'image est plus grande, avec un lien vers l'article (source et licence) et
+  « Pas la bonne image », qui la retire pour ce plat sur cet appareil.
+- **Réglages → Planning → Images des plats** les désactive (aucune requête n'est alors faite) ; on y rétablit
+  aussi les images écartées. Ce réglage est propre à chaque appareil.
+
 ## Réglages partagés
 
 Avec Google Agenda, les réglages qui décrivent tes goûts sont enregistrés dans l'agenda lui-même, pour être

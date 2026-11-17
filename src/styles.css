@@ -1606,3 +1606,52 @@ small {
   background: transparent;
   padding: 0;
 }
+
+/* Images des plats (Wikipédia) */
+.with-thumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.meal-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.dish-thumb {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--line);
+}
+.dish-picture {
+  margin: 8px 0 0;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.dish-picture img {
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--line);
+}
+.dish-picture figcaption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.dish-picture figcaption a {
+  color: var(--muted);
+}
+.dish-picture .link {
+  padding: 0;
+  font-size: 0.8rem;
+}

@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { hiddenImageCount, resetHiddenImages } from './lib/dishImages';
+import { useState, type ReactNode } from 'react';
 import type { Blacklist } from './lib/blacklist';
 import type { CalendarInfo } from './lib/google';
 import { MAX_BLACKLIST_CHARS, MAX_FAVORITES_CHARS, MAX_IDEAS_CHARS, type SharedSettings } from './lib/settings';
@@ -13,6 +14,27 @@ const SLOT_MODES: { value: SlotMode; label: string }[] = [
   { value: 'both', label: 'Les deux' },
 ];
 
+/** Images écartées avec « Pas la bonne image », et de quoi les rétablir. */
+function HiddenImages() {
+  const [count, setCount] = useState(hiddenImageCount);
+  if (count === 0) return null;
+  return (
+    <>
+      {' '}
+      {count} {count > 1 ? 'images écartées' : 'image écartée'}.{' '}
+      <button
+        className="link"
+        onClick={() => {
+          resetHiddenImages();
+          setCount(0);
+        }}
+      >
+        Les rétablir
+      </button>
+    </>
+  );
+}
+
 interface SettingsProps {
   shared: SharedSettings;
   update: (patch: Partial<SharedSettings>) => void;
@@ -20,6 +42,8 @@ interface SettingsProps {
   setSlotMode: (mode: SlotMode) => void;
   pendingOnly: boolean;
   setPendingOnly: (value: boolean) => void;
+  showImages: boolean;
+  setShowImages: (value: boolean) => void;
   blacklist: Blacklist;
   blacklistKeys: ReadonlySet<string>;
   favorites: Blacklist;
@@ -64,6 +88,14 @@ export function SettingsPage(props: SettingsProps) {
         <Switch checked={props.pendingOnly} onChange={props.setPendingOnly}>
           À décider seulement (masque les créneaux déjà décidés)
         </Switch>
+        <Switch checked={props.showImages} onChange={props.setShowImages}>
+          Images des plats (Wikipédia)
+        </Switch>
+        <p className="blacklist-help">
+          Une photo trouvée sur Wikipédia à côté des plats prévus et proposés, sans aucune IA : seul le nom du plat est envoyé
+          à Wikipédia, une fois par plat. Réglage propre à cet appareil.
+          {props.showImages && <HiddenImages />}
+        </p>
       </section>
 
       <section>

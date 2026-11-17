@@ -12,6 +12,7 @@ export const KEYS = {
   slotMode: 'mymeals.slotMode',
   pendingOnly: 'mymeals.pendingOnly',
   calendars: 'mymeals.calendars.shown',
+  images: 'mymeals.images.show',
 } as const;
 
 export function readPref(key: string): string | null {

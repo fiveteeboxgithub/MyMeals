@@ -87,6 +87,8 @@ export function Planner(props: PlannerProps) {
   );
   const [slotMode, setSlotMode] = useState<SlotMode>(loadSlotMode);
   const [pendingOnly, setPendingOnly] = useState(() => readPref(KEYS.pendingOnly) === '1');
+  // Images des plats (Wikipédia) : affichées sauf si on les a désactivées sur cet appareil.
+  const [showImages, setShowImages] = useState(() => readPref(KEYS.images) !== '0');
   const [flash, setFlash] = useState<{ text: string; undo?: () => void } | null>(null);
   const showFlash = useCallback((text: string, undo?: () => void) => setFlash({ text, undo }), []);
   // Le message s'efface tout seul après quelques secondes (un peu plus quand il propose « Annuler »).
@@ -225,6 +227,7 @@ export function Planner(props: PlannerProps) {
           ideas={ideas}
           slotMode={slotMode}
           pendingOnly={pendingOnly}
+          showImages={showImages}
           blacklistKeys={blacklistKeys}
           blacklistFilter={blacklistFilter}
           resetToken={resetToken}
@@ -255,6 +258,11 @@ export function Planner(props: PlannerProps) {
           setPendingOnly={(value) => {
             setPendingOnly(value);
             writePref(KEYS.pendingOnly, value ? '1' : '0');
+          }}
+          showImages={showImages}
+          setShowImages={(value) => {
+            setShowImages(value);
+            writePref(KEYS.images, value ? '1' : '0');
           }}
           blacklist={blacklist}
           blacklistKeys={blacklistKeys}

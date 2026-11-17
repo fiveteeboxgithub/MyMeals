@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BlacklistFilter } from './lib/blacklist';
 import { dayName, shortDate } from './lib/dates';
+import { DishPicture } from './DishThumb';
 import { MAX_NOTE_CHARS, dishKeyOf, splitLinks, type PastNote } from './lib/notes';
 import { clock, type OtherEvent } from './lib/otherCalendars';
 import { fold, normalize, type DishIndex, type Suggestion } from './lib/suggest';
@@ -26,6 +27,7 @@ interface SheetProps {
   blacklistFilter: BlacklistFilter;
   ideas: string[];
   onRemoveMeal: (id: string) => void;
+  showImages: boolean;
   isFavorite: (name: string) => boolean;
   onToggleFavorite: (name: string) => void;
   notes: Map<string, PastNote[]>;
@@ -119,6 +121,7 @@ export function SlotSheet(props: SheetProps) {
                 ✓ Choisir
               </button>
             </div>
+            <DishPicture name={proposal.name} enabled={props.showImages} />
             <PastNotes list={props.notes.get(dishKeyOf(proposal.name, props.dishes)) ?? []} />
           </>
         )}
@@ -238,6 +241,7 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
           Retirer
         </button>
       </p>
+      <DishPicture name={meal.name} enabled={props.showImages} />
       {editing ? (
         <div className="note-edit">
           <textarea
