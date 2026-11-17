@@ -51,7 +51,7 @@ Il est moins bien classé :
 - s'il n'a plus été mangé depuis plus d'un an ;
 - si la semaine contient déjà un plat avec le même ingrédient.
 
-Le bloc « Réglages des propositions » (sous le sélecteur de semaine) comporte trois réglages,
+La section « Propositions » de l'onglet **Réglages** comporte trois réglages,
 mémorisés sur l'appareil :
 
 - **Hasard** (Aucun, Faible, Moyen, Fort, Très fort, Total ; Fort par défaut) : sans hasard,
@@ -77,12 +77,12 @@ intégré (`src/lib/catalog.ts`), où chaque plat est décrit par des familles
 (poisson, riz, gratins…). Elles sont classées selon la part de ces familles dans
 les repas de la période choisie (6 mois à tout l'historique, 5 ans par défaut) et selon la
 saison, puis tirées au sort parmi les mieux classées : le niveau de hasard règle combien d'idées
-sont en lice (voir « Réglages des propositions »).
+sont en lice (voir la section « Propositions » des réglages).
 
 ## Liste noire
 
 Pour les plats que tu ne veux pas voir proposés (noms de restos, plats de restaurant ou à emporter),
-le bloc « Réglages des propositions » contient une **liste noire** : une entrée par ligne.
+l'onglet **Réglages** contient une **liste noire** : une entrée par ligne.
 
 - Un mot ou une expression (`kebab`, `chez paul`) : tous les plats dont le nom **contient** ce texte sont
   cachés, sans tenir compte des majuscules ni des accents (« kebab » cache aussi « Kebabs frites »).
@@ -92,10 +92,10 @@ le bloc « Réglages des propositions » contient une **liste noire** : une entr
   pas « photo »), `/^(sushi|maki)/`. Une expression mal formée est signalée et ignorée.
 - Les lignes vides et celles qui commencent par `#` sont ignorées.
 
-**Ajouter un plat d'un geste** : le bouton **🚫** d'une proposition du planning (ou d'une idée « Surprise Me »)
+**Ajouter un plat d'un geste** : « Ne plus jamais proposer ce plat », dans le menu **⋯** d'une proposition du planning (ou d'une idée « Surprise Me »),
 ajoute son nom à la liste noire, retire aussitôt la proposition et affiche un message avec « Annuler ». Le
 message indique combien de plats sont masqués si la ligne en touche plusieurs (« kebab » masque aussi
-« kebab frites ») ; on peut ensuite affiner la ligne dans le bloc « Réglages des propositions ».
+« kebab frites ») ; on peut ensuite affiner la ligne dans les réglages.
 
 Les plats concernés ne sont **jamais** proposés dans le planning, ni dans la liste de la fenêtre d'un
 créneau, ni par « Surprise Me » (les idées du catalogue dont le nom correspond sont retirées), et leurs
@@ -103,8 +103,8 @@ repas ne comptent plus dans le calcul de tes goûts. Ils reviennent seulement si
 
 - tu actives **« Inclure la liste noire (rarement) »** : environ une proposition sur dix vient alors de la
   liste, les neuf autres jamais ;
-- tu appuies sur le bouton **🍽️** d'une proposition (visible quand la liste concerne au moins un plat de
-  ton historique) : il propose un plat de la liste noire, un autre à chaque appui ;
+- tu choisis « Un plat de la liste noire » dans le menu **⋯** d'une proposition (visible quand la liste
+  concerne au moins un plat de ton historique) : un autre à chaque fois ;
 - tu ouvres la fenêtre d'un créneau et choisis « Afficher aussi les plats de la liste noire », ou tu
   cherches un nom précis (ils portent alors l'étiquette « liste noire »).
 
@@ -114,10 +114,14 @@ La liste et l'option font partie des **réglages partagés** (section suivante).
 
 Avec Google Agenda, les réglages qui décrivent tes goûts sont enregistrés dans l'agenda lui-même, pour être
 retrouvés sur tous les appareils et par le foyer : la liste noire et son option, le niveau de hasard,
-l'historique pris en compte et la période des goûts de « Surprise Me ». Ils vivent dans un **événement
+l'historique pris en compte, la période des goûts de « Surprise Me », « Mes idées » et les heures des
+repas. Ils vivent dans un **événement
 spécial** de l'agenda « Repas » : « ⚙ MyMeals : réglages (ne pas supprimer) », une journée entière le
 1er janvier 2100, privée et sans rappel, d'identifiant fixe (`mmealsreglages00`). Son texte contient une phrase
 d'explication puis les réglages en JSON. L'application ne le compte jamais comme un repas.
+Pour tenir dans ce texte (environ 8 000 caractères chez Google), la liste noire est limitée à
+2 500 caractères et « Mes idées » à 3 500 ; un enregistrement trop long est refusé avec un message, et les
+réglages restent sur l'appareil.
 
 - Un réglage modifié est envoyé à l'agenda environ une seconde après la dernière frappe.
 - Chaque appareil garde aussi une copie locale (`localStorage`) : l'application marche hors connexion.
@@ -179,17 +183,61 @@ coché le plus utilisé, modifiable) puis, après confirmation, renomme tous les
 cochés. Avec Google Agenda, ce sont les événements de l'agenda qui sont renommés ;
 ceux qui échouent gardent leur nom.
 
-## Affichage
+## Organisation de l'application
 
-- **Repas affichés** : un sélecteur « Midi / Soir / Les deux » (« Soir » par défaut)
-  choisit les créneaux montrés dans le planning. Seuls les créneaux affichés reçoivent
-  des propositions ; les repas déjà prévus comptent toujours pour la variété de la semaine.
-- **Couleur de fond** : le bouton 🎨 de l'en-tête propose dix thèmes (Auto, Crème, Blanc,
-  Menthe, Ciel, Rose, Sable, Ardoise, Nuit, Minuit) et une couleur libre. Le texte, les
-  cartes et les boutons s'adaptent pour rester lisibles (contraste d'au moins 4,5:1, vérifié
-  par les tests). « Auto » suit le mode clair ou sombre de l'appareil.
+Quatre onglets : **Planning**, **Doublons**, **Stats** et **Réglages**. L'en-tête n'affiche un bouton que
+lorsqu'il faut agir (se connecter, importer un fichier). Sur un écran large, la semaine s'affiche en sept
+colonnes.
 
-Les deux réglages sont mémorisés sur l'appareil.
+### Planning
+
+- **Changer de semaine** : flèches, balayage gauche/droite sur téléphone, bouton « Aujourd'hui ».
+- **Une proposition** garde deux boutons, **↻** (une autre) et **✓** (accepter). Le menu **⋯** regroupe le
+  reste, avec un libellé : « Surprise Me » (un plat jamais noté, catalogue ou « Mes idées »), « Un plat
+  oublié » (mangé au moins quatre fois, plus depuis un an), « Un plat de la liste noire », « Pas de repas ce
+  jour-là », « Ne plus jamais proposer ce plat ».
+- **Restes** : l'application apprend quels plats laissent des restes (au moins deux repas « restes <plat> »
+  dans les trois jours qui suivent ce plat). Quand un tel plat est prévu, le créneau suivant (parmi les
+  trois suivants) propose ses restes ; ce n'est qu'une proposition, ↻ en donne une autre.
+- **Accepter** affiche un message avec « Annuler ». « ✓ Tout accepter » remplit d'un coup les créneaux à
+  venir qui ont une proposition (et s'annule de même). « Partager la semaine » ouvre le partage du téléphone,
+  ou copie la semaine en texte.
+- **Autres agendas** : les événements à heure fixe de tes autres agendas Google qui tombent pendant un repas
+  (d'une heure avant jusqu'à deux heures après le midi, deux heures et demie après le soir) s'affichent sous le
+  créneau, en lecture seule, à titre d'information. Rien n'est décidé ni modifié pour toi. Les événements
+  « journée entière » sont ignorés. Les agendas affichés se choisissent dans les réglages (par défaut : ceux
+  cochés dans Google Agenda, sans les numéros de semaine ni le lever et coucher du soleil).
+- **Fenêtre d'un créneau** : la proposition en cours en tête (avec « ✓ Choisir »), les événements des autres
+  agendas, la recherche d'un plat ; Échap la ferme.
+- Au premier chargement sur un appareil, « Chargement de l'agenda… » s'affiche jusqu'à la fin de la lecture.
+
+### Réglages
+
+- **Planning** : repas affichés (Midi / Soir / Les deux, « Soir » par défaut) et « À décider seulement ».
+- **Propositions**, **Liste noire** (voir plus haut).
+- **Mes idées** : plats à essayer, un par ligne (3 500 caractères au plus). « Surprise Me » les propose avec
+  le catalogue, un peu plus souvent ; une idée disparaît d'elle-même dès qu'elle apparaît dans tes repas.
+- **Heures des repas** : heure des repas créés depuis l'application (13 h et 20 h par défaut, d'une durée
+  d'une heure), et repère pour les autres agendas.
+- **Autres agendas**, **Couleur de fond** (dix thèmes et une couleur libre, texte toujours lisible), **Compte**
+  (connexion Google, déconnexion ; en mode fichier, « Tout effacer »).
+
+Les réglages partagés (liste noire, propositions, idées, heures) suivent la règle de la section précédente ;
+les réglages d'affichage, la couleur et le choix des agendas restent propres à chaque appareil.
+
+### Stats
+
+Chiffres de l'année (repas notés, plats différents, nouveaux plats, repas de la liste noire), « Il y a un an
+ce jour-là », les plats les plus mangés sur douze mois et autour de la saison en cours, et le nombre de
+nouveaux plats goûtés chaque année.
+
+### Installer l'application
+
+Le site est une application installable : depuis le navigateur du téléphone, « Ajouter à l'écran
+d'accueil ». Elle s'ouvre alors en plein écran et hors connexion (la dernière copie du planning ; les
+modifications demandent la connexion). Un service worker (`public/sw.js`) charge toujours la dernière version
+de la page quand le réseau est là ; les fichiers versionnés viennent du cache ; les appels à Google ne sont
+jamais mis en cache.
 
 ## Connexion Google
 
