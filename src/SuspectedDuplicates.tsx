@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { longDate } from './lib/dates';
-import { suspectedGroups, type SuspectedGroup } from './lib/duplicates';
+import { applyInitialStyle, prefersLowercase, proposeLabel, suspectedGroups, type Occurrence, type SuspectedGroup } from './lib/duplicates';
 import type { DishIndex } from './lib/suggest';
 import type { MealStore } from './lib/types';
 
@@ -25,10 +25,16 @@ function saveIgnored(ignored: ReadonlySet<string>): void {
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+const renamedText = (n: number) => `${n} ${n > 1 ? 'repas renommés' : 'repas renommé'}`;
 
-/** Doublons que l'on soupçonne déjà : il ne reste qu'à confirmer (ou à écarter) chaque groupe. */
+/**
+ * Doublons que l'on soupçonne déjà. Tous les libellés d'un groupe sont cochés d'avance : on décoche ceux
+ * qui n'en font pas partie, puis on confirme. Seuls les libellés cochés sont renommés.
+ */
 export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishes: DishIndex }) {
   const [ignored, setIgnored] = useState(loadIgnored);
+  // Libellés décochés, par groupe : tout est coché tant qu'on n'a rien décoché.
+  const [unchecked, setUnchecked] = useState<Record<string, ReadonlySet<string>>>({});
   const [names, setNames] = useState<Record<string, string>>({});
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [busy, setBusy] = useState<string | null>(null);
@@ -36,23 +42,50 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
   const [result, setResult] = useState('');
 
   const groups = useMemo(() => suspectedGroups(store.meals, dishes, ignored), [store.meals, dishes, ignored]);
+  const lowercase = useMemo(() => prefersLowercase(store.meals), [store.meals]);
+
+  const pickedOf = (group: SuspectedGroup): Occurrence[] =>
+    group.occurrences.filter((o) => !unchecked[group.signature]?.has(o.label));
+  /** Nom proposé d'après les libellés cochés : le plus utilisé, écrit comme le reste du calendrier. */
+  const proposalOf = (group: SuspectedGroup) => {
+    const picked = pickedOf(group);
+    return picked.length === 0 ? group.proposal : applyInitialStyle(proposeLabel(picked, lowercase), lowercase);
+  };
+  const nameOf = (group: SuspectedGroup) => (names[group.signature] ?? proposalOf(group)).trim();
+  const mealsOf = (occurrences: Occurrence[]) => occurrences.reduce((sum, o) => sum + o.count, 0);
+  /** Y a-t-il quelque chose à renommer ? (un seul libellé coché, déjà au bon nom : non) */
+  const changes = (group: SuspectedGroup) => pickedOf(group).some((o) => o.label !== nameOf(group));
+
   const total = groups.reduce((sum, g) => sum + g.mealCount, 0);
-  const nameOf = (group: SuspectedGroup) => (names[group.signature] ?? group.proposal).trim();
+  const active = groups.filter((g) => pickedOf(g).length > 0 && nameOf(g) && changes(g));
+  const activeMeals = active.reduce((sum, g) => sum + mealsOf(pickedOf(g)), 0);
+
+  function toggle(group: SuspectedGroup, label: string) {
+    const next = new Set(unchecked[group.signature] ?? []);
+    if (next.has(label)) next.delete(label);
+    else next.add(label);
+    setUnchecked({ ...unchecked, [group.signature]: next });
+  }
+
+  function selectAll(group: SuspectedGroup, all: boolean) {
+    setUnchecked({ ...unchecked, [group.signature]: all ? new Set() : new Set(group.occurrences.map((o) => o.label)) });
+  }
 
   async function merge(group: SuspectedGroup) {
     const name = nameOf(group);
-    if (!name || busy) return;
+    const picked = pickedOf(group);
+    if (!name || picked.length === 0 || busy) return;
     setBusy(group.signature);
     setResult('');
     const { renamed, failed } = await store.renameMeals(
-      group.occurrences.flatMap((o) => o.ids),
+      picked.flatMap((o) => o.ids),
       name,
     );
     setBusy(null);
     setResult(
       failed > 0
-        ? `${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'} en « ${name} », ${failed} en échec : ils ont gardé leur nom.`
-        : `${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'} en « ${name} ».`,
+        ? `${renamedText(renamed)} en « ${name} », ${failed} en échec : ils ont gardé leur nom.`
+        : `${renamedText(renamed)} en « ${name} ».`,
     );
   }
 
@@ -60,17 +93,15 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
     if (busy) return;
     setConfirmAll(false);
     setResult('');
-    const todo = [...groups];
+    const todo = [...active];
     let renamed = 0;
     let failed = 0;
     let merged = 0;
     for (const group of todo) {
-      const name = nameOf(group);
-      if (!name) continue;
       setBusy(`all:${merged + 1}/${todo.length}`);
       const outcome = await store.renameMeals(
-        group.occurrences.flatMap((o) => o.ids),
-        name,
+        pickedOf(group).flatMap((o) => o.ids),
+        nameOf(group),
       );
       renamed += outcome.renamed;
       failed += outcome.failed;
@@ -81,8 +112,8 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
     setBusy(null);
     setResult(
       failed > 0
-        ? `${plural(merged, 'groupe fusionné', 'groupes fusionnés')} (${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'}), puis arrêt : ${failed} ${failed > 1 ? "repas n'ont" : "repas n'a"} pas pu être renommé${failed > 1 ? 's' : ''}.`
-        : `${plural(merged, 'groupe fusionné', 'groupes fusionnés')} : ${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'}.`,
+        ? `${plural(merged, 'groupe fusionné', 'groupes fusionnés')} (${renamedText(renamed)}), puis arrêt : ${failed} ${failed > 1 ? "repas n'ont" : "repas n'a"} pas pu être renommé${failed > 1 ? 's' : ''}.`
+        : `${plural(merged, 'groupe fusionné', 'groupes fusionnés')} : ${renamedText(renamed)}.`,
     );
   }
 
@@ -101,12 +132,13 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
     <section className="duplicates" aria-label="Doublons suspectés">
       <p className="dup-intro">
         Ces libellés ont les mêmes mots, à une majuscule, un accent, un pluriel, l'ordre des mots ou une faute de frappe près.
-        Vérifie le nom retenu, puis confirme la fusion, ou écarte le groupe si ce ne sont pas les mêmes plats.
+        Tout est coché d'avance : décoche ce qui n'est pas le même plat, vérifie le nom retenu, puis confirme. Seuls les
+        libellés cochés sont renommés.
       </p>
 
       {result && (
         <p className="notice" role="status">
-          {result}
+          <span>{result}</span>
           <button className="link" onClick={() => setResult('')} aria-label="Fermer le message">
             ✕
           </button>
@@ -141,8 +173,8 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
           {confirmAll ? (
             <div className="dup-merge">
               <p>
-                Fusionner les <strong>{groups.length} groupes</strong> ({total} repas) sous le nom retenu pour chacun ? Cela
-                modifie les événements du calendrier.
+                Fusionner <strong>{plural(active.length, 'groupe', 'groupes')}</strong> ({activeMeals} repas cochés) sous le nom
+                retenu pour chacun ? Seuls les libellés cochés sont renommés. Cela modifie les événements du calendrier.
               </p>
               <div className="dup-actions">
                 <button className="ghost-btn primary" onClick={() => void mergeAll()}>
@@ -156,8 +188,8 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
           ) : (
             groups.length > 1 && (
               <div className="dup-actions">
-                <button className="ghost-btn" disabled={busy !== null} onClick={() => setConfirmAll(true)}>
-                  Tout confirmer ({groups.length})
+                <button className="ghost-btn" disabled={busy !== null || active.length === 0} onClick={() => setConfirmAll(true)}>
+                  Tout confirmer ({active.length})
                 </button>
                 {busy?.startsWith('all:') && <span className="dup-hint">Fusion {busy.slice(4)}…</span>}
               </div>
@@ -165,44 +197,69 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
           )}
 
           <ul className="suspect-list">
-            {groups.slice(0, visible).map((group) => (
-              <li key={group.signature} className="suspect">
-                <ul className="suspect-labels">
-                  {group.occurrences.map((o) => (
-                    <li key={o.label}>
-                      <span className="dup-label">
-                        {o.label}
-                        <small>
-                          {o.count} repas · dernier le {longDate(o.lastDate)}
-                        </small>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="suspect-reason">Différence : {group.reasons.join(', ')}.</p>
-                <label className="suspect-name">
-                  Nom retenu
-                  <input
-                    type="text"
-                    value={names[group.signature] ?? group.proposal}
-                    onChange={(e) => setNames({ ...names, [group.signature]: e.target.value })}
-                    disabled={busy !== null}
-                  />
-                </label>
-                <div className="dup-actions">
-                  <button
-                    className="ghost-btn primary"
-                    disabled={busy !== null || !nameOf(group)}
-                    onClick={() => void merge(group)}
-                  >
-                    {busy === group.signature ? 'Fusion en cours…' : `Confirmer (${group.mealCount} repas)`}
-                  </button>
-                  <button className="ghost-btn" disabled={busy !== null} onClick={() => ignore(group)}>
-                    Pas des doublons
-                  </button>
-                </div>
-              </li>
-            ))}
+            {groups.slice(0, visible).map((group) => {
+              const picked = pickedOf(group);
+              return (
+                <li key={group.signature} className="suspect">
+                  <div className="suspect-tools">
+                    <button className="link" disabled={busy !== null || picked.length === group.occurrences.length} onClick={() => selectAll(group, true)}>
+                      Tout cocher
+                    </button>
+                    <button className="link" disabled={busy !== null || picked.length === 0} onClick={() => selectAll(group, false)}>
+                      Tout décocher
+                    </button>
+                  </div>
+                  <ul className="suspect-labels">
+                    {group.occurrences.map((o) => (
+                      <li key={o.label}>
+                        <label className="approx-candidate">
+                          <input
+                            type="checkbox"
+                            checked={!unchecked[group.signature]?.has(o.label)}
+                            onChange={() => toggle(group, o.label)}
+                            disabled={busy !== null}
+                          />
+                          <span className="dup-label">
+                            {o.label}
+                            <small>
+                              {o.count} repas · dernier le {longDate(o.lastDate)}
+                            </small>
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="suspect-reason">Différence : {group.reasons.join(', ')}.</p>
+                  <label className="suspect-name">
+                    Nom retenu
+                    <input
+                      type="text"
+                      value={names[group.signature] ?? proposalOf(group)}
+                      onChange={(e) => setNames({ ...names, [group.signature]: e.target.value })}
+                      disabled={busy !== null}
+                    />
+                  </label>
+                  <div className="dup-actions">
+                    <button
+                      className="ghost-btn primary"
+                      disabled={busy !== null || picked.length === 0 || !nameOf(group) || !changes(group)}
+                      onClick={() => void merge(group)}
+                    >
+                      {busy === group.signature
+                        ? 'Fusion en cours…'
+                        : picked.length === 0
+                          ? 'Coche au moins un libellé'
+                          : !changes(group)
+                            ? 'Rien à changer'
+                            : `Confirmer (${mealsOf(picked)} repas)`}
+                    </button>
+                    <button className="ghost-btn" disabled={busy !== null} onClick={() => ignore(group)}>
+                      Pas des doublons
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
           {groups.length > visible && (
             <div className="dup-actions">

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DuplicatesPage } from './Duplicates';
-import { blacklistedKeys, parseBlacklist, type BlacklistFilter } from './lib/blacklist';
+import { addToBlacklist, blacklistedKeys, parseBlacklist, type BlacklistFilter } from './lib/blacklist';
 import {
   DEFAULT_SETTINGS,
   decideSync,
@@ -41,10 +41,20 @@ export function App() {
   return GOOGLE_CLIENT_ID ? <GoogleApp /> : <LocalApp />;
 }
 
-function Notice({ text, onClose }: { text: string; onClose: () => void }) {
+function Notice({ text, onClose, action }: { text: string; onClose: () => void; action?: { label: string; onClick: () => void } }) {
   return (
     <p className="notice" role="status">
-      {text}
+      <span>
+        {text}
+        {action && (
+          <>
+            {' '}
+            <button className="link" onClick={action.onClick}>
+              {action.label}
+            </button>
+          </>
+        )}
+      </span>
       <button className="link" onClick={onClose} aria-label="Fermer le message">
         ✕
       </button>
@@ -312,7 +322,7 @@ function Planner({ store, action, banner, footer, settingsSync }: PlannerProps) 
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
   const surprisesShown = useRef(new Set<string>());
   const blacklistShown = useRef(new Set<string>());
-  const [flash, setFlash] = useState('');
+  const [flash, setFlash] = useState<{ text: string; undo?: () => void } | null>(null);
   const [blacklistText, setBlacklistText] = useState(() => loadText(BLACKLIST_TEXT_KEY));
   const [includeBlacklist, setIncludeBlacklist] = useState(() => loadText(BLACKLIST_INCLUDE_KEY) === '1');
   // Date de la dernière modification des réglages partagés : la plus récente (ici ou dans l'agenda) l'emporte.
@@ -372,6 +382,30 @@ function Planner({ store, action, banner, footer, settingsSync }: PlannerProps) 
     () => ({ matches: blacklist.matches, keys: blacklistKeys, include: includeBlacklist }),
     [blacklist, blacklistKeys, includeBlacklist],
   );
+
+  /** Remplace le texte de la liste noire (saisie à la main ou ajout depuis une proposition). */
+  function updateBlacklist(text: string) {
+    setBlacklistText(text);
+    setRejected({});
+    setOverrides({});
+    remember(BLACKLIST_TEXT_KEY, text);
+    requestPersistentStorage();
+    touchSettings();
+  }
+
+  /** Ajoute un plat à la liste noire depuis une proposition, avec de quoi annuler. */
+  function blacklistDish(name: string) {
+    const previous = blacklistText;
+    const next = addToBlacklist(previous, name);
+    if (next === previous) return;
+    updateBlacklist(next);
+    const hidden = [...blacklistedKeys(dishes, parseBlacklist(next))]
+      .filter((key) => !blacklistKeys.has(key))
+      .map((key) => dishes.byKey.get(key)?.label ?? key);
+    const more =
+      hidden.length > 1 ? ` (${hidden.length} plats masqués : ${hidden.slice(0, 4).join(', ')}${hidden.length > 4 ? '…' : ''})` : '';
+    setFlash({ text: `« ${name} » est sur la liste noire${more}.`, undo: () => updateBlacklist(previous) });
+  }
   const usual = useMemo(() => usualSlots(meals, today), [meals, today]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(monday, i)), [monday]);
 
@@ -468,7 +502,7 @@ function Planner({ store, action, banner, footer, settingsSync }: PlannerProps) 
       (s) => s.blacklisted,
     );
     if (ranked.length === 0) {
-      setFlash("Aucun plat de la liste noire dans ton historique pour l'instant.");
+      setFlash({ text: "Aucun plat de la liste noire dans ton historique pour l'instant." });
       return;
     }
     let fresh = ranked.filter((s) => !blacklistShown.current.has(s.key));
@@ -479,7 +513,7 @@ function Planner({ store, action, banner, footer, settingsSync }: PlannerProps) 
     const pick = pickProposal(fresh, randomness, `${Math.random()}|bl|${key}`);
     if (!pick) return;
     blacklistShown.current.add(pick.key);
-    setFlash('');
+    setFlash(null);
     setOverrides({ ...overrides, [key]: { name: pick.label, icon: '🍽️', note: `Liste noire · ${pick.reason}` } });
   }
 
@@ -650,14 +684,7 @@ function Planner({ store, action, banner, footer, settingsSync }: PlannerProps) 
               spellCheck={false}
               autoCapitalize="off"
               placeholder={'kebab\nwafu\n/\\bpho\\b/'}
-              onChange={(e) => {
-                setBlacklistText(e.target.value);
-                setRejected({});
-                setOverrides({});
-                remember(BLACKLIST_TEXT_KEY, e.target.value);
-                requestPersistentStorage();
-                touchSettings();
-              }}
+              onChange={(e) => updateBlacklist(e.target.value)}
             />
           </label>
           <p className="blacklist-help">
@@ -684,7 +711,23 @@ function Planner({ store, action, banner, footer, settingsSync }: PlannerProps) 
         </details>
       )}
 
-      {flash && <Notice text={flash} onClose={() => setFlash('')} />}
+      {flash && (
+        <Notice
+          text={flash.text}
+          onClose={() => setFlash(null)}
+          action={
+            flash.undo
+              ? {
+                  label: 'Annuler',
+                  onClick: () => {
+                    flash.undo?.();
+                    setFlash(null);
+                  },
+                }
+              : undefined
+          }
+        />
+      )}
 
       <main className="week">
         {visibleDays.length === 0 && <p className="all-done">Tout est décidé pour cette semaine.</p>}
@@ -752,6 +795,17 @@ function Planner({ store, action, banner, footer, settingsSync }: PlannerProps) 
                           🍽️
                         </button>
                       )}
+                      <button
+                        className="icon"
+                        onClick={() => {
+                          blacklistDish(override?.name ?? proposal.label);
+                          if (override) dropOverride(key);
+                        }}
+                        aria-label={`Ne plus jamais proposer ${override?.name ?? proposal.label}`}
+                        title="Liste noire : ne plus jamais proposer ce plat"
+                      >
+                        🚫
+                      </button>
                       <button
                         className="icon accept"
                         onClick={() => {

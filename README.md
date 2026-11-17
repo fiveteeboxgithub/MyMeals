@@ -92,6 +92,11 @@ le bloc « Réglages des propositions » contient une **liste noire** : une entr
   pas « photo »), `/^(sushi|maki)/`. Une expression mal formée est signalée et ignorée.
 - Les lignes vides et celles qui commencent par `#` sont ignorées.
 
+**Ajouter un plat d'un geste** : le bouton **🚫** d'une proposition du planning (ou d'une idée « Surprise Me »)
+ajoute son nom à la liste noire, retire aussitôt la proposition et affiche un message avec « Annuler ». Le
+message indique combien de plats sont masqués si la ligne en touche plusieurs (« kebab » masque aussi
+« kebab frites ») ; on peut ensuite affiner la ligne dans le bloc « Réglages des propositions ».
+
 Les plats concernés ne sont **jamais** proposés dans le planning, ni dans la liste de la fenêtre d'un
 créneau, ni par « Surprise Me » (les idées du catalogue dont le nom correspond sont retirées), et leurs
 repas ne comptent plus dans le calcul de tes goûts. Ils reviennent seulement si :
@@ -138,8 +143,9 @@ et laisse les autres ; c'est la même règle avec Google Agenda et avec l'import
 **Doublons suspectés (affichés en premier).** L'application repère elle-même les libellés qui
 désignent probablement le même plat : mêmes mots à une majuscule, un accent, un pluriel, l'ordre
 des mots ou une faute d'une lettre près (le regroupement est celui des propositions de repas,
-voir plus haut). Chaque groupe est une carte avec ses libellés (nombre de repas, dernier repas),
-ce qui les distingue (« majuscules ou accents », « singulier ou pluriel », « ordre des mots »,
+voir plus haut). Chaque groupe est une carte avec ses libellés, **tous cochés d'avance** (nombre de repas, dernier repas ;
+« Tout cocher » / « Tout décocher » par carte) : on décoche ce qui n'est pas le même plat, et seuls les
+libellés cochés sont renommés, y compris avec « Tout confirmer ». La carte indique ce qui les distingue (« majuscules ou accents », « singulier ou pluriel », « ordre des mots »,
 « faute de frappe probable »), le nom retenu (le libellé le plus utilisé, écrit avec la même
 première lettre que le reste du calendrier ; modifiable) et deux boutons : « Confirmer » renomme
 tous les repas du groupe, « Pas des doublons » écarte le groupe (mémorisé sur l'appareil, avec un

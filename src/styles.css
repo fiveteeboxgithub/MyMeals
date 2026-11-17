@@ -482,7 +482,7 @@ small {
 
   /* Jusqu'à cinq boutons sur une ligne, même sur un petit écran : ils se partagent la place. */
   .proposal .icon {
-    flex: 1 1 40px;
+    flex: 1 1 36px;
     max-width: 56px;
     height: 34px;
     border-radius: 999px;
@@ -989,4 +989,16 @@ small {
   height: 22px;
   margin: 2px 0 0;
   accent-color: var(--accent);
+}
+
+.notice > span {
+  min-width: 0;
+}
+
+.suspect-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin: 0 0 4px;
+  font-size: 0.8rem;
 }

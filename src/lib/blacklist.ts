@@ -65,3 +65,16 @@ export interface BlacklistFilter {
   /** Option « inclure la liste noire » : les idées concernées reviennent, mais rarement. */
   include: boolean;
 }
+
+/**
+ * Ajoute une ligne à la liste noire (texte brut, une entrée par ligne). Rien n'est ajouté si la
+ * ligne y est déjà (sans tenir compte des majuscules ni des accents).
+ */
+export function addToBlacklist(text: string, entry: string): string {
+  const clean = entry.replace(/\s+/g, ' ').trim();
+  if (!clean) return text;
+  const folded = fold(clean);
+  if (text.split(/\r?\n/).some((line) => fold(line.trim()) === folded)) return text;
+  const base = text.replace(/\s+$/, '');
+  return base ? `${base}\n${clean}` : clean;
+}

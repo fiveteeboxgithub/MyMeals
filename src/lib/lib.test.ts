@@ -700,7 +700,7 @@ describe('thème', async () => {
 });
 
 describe('liste noire', async () => {
-  const { blacklistedKeys, parseBlacklist } = await import('./blacklist');
+  const { addToBlacklist, blacklistedKeys, parseBlacklist } = await import('./blacklist');
   const { BLACKLIST_PENALTY } = await import('./suggest');
   const { surpriseIdeas, tasteProfile } = await import('./surprise');
 
@@ -715,6 +715,18 @@ describe('liste noire', async () => {
     expect(list.matches('# un commentaire')).toBe(false);
     expect(parseBlacklist('café').matches('Cafe gourmand')).toBe(true);
     expect(parseBlacklist('').matches('kebab')).toBe(false);
+  });
+
+  it('ajoute une ligne à la liste noire sans doublon', () => {
+    expect(addToBlacklist('', 'kebab')).toBe('kebab');
+    expect(addToBlacklist('kebab', 'wafu')).toBe('kebab\nwafu');
+    expect(addToBlacklist('kebab\n\n', 'wafu')).toBe('kebab\nwafu');
+    expect(addToBlacklist('kebab\nwafu', '  Wafu ')).toBe('kebab\nwafu'); // déjà là, à la casse près
+    expect(addToBlacklist('Pâtes au pesto', 'pates au pesto')).toBe('Pâtes au pesto'); // à l'accent près
+    expect(addToBlacklist('kebab', '   ')).toBe('kebab');
+    expect(addToBlacklist('kebab', 'poisson   /  riz')).toBe('kebab\npoisson / riz');
+    // Le plat ajouté est bien masqué ensuite.
+    expect(parseBlacklist(addToBlacklist('kebab', 'chez paul : pizza')).matches('Chez Paul : pizza')).toBe(true);
   });
 
   it('accepte des expressions régulières entre barres obliques', () => {
