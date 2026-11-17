@@ -503,7 +503,7 @@ export function PlanningView(props: PlanningProps) {
                               hint={isFavorite(shown.name) ? undefined : 'proposé plus souvent'}
                               onClick={() => toggleFavorite(shown.name)}
                             />
-                            <MenuItem icon="∅" label="Pas de repas ce jour-là" onClick={() => setSkip(key, true)} />
+                            <MenuItem icon="∅" label={`Pas de repas ce ${SLOT_LABEL[slot].toLowerCase()}`} onClick={() => setSkip(key, true)} />
                             <MenuItem
                               icon="🚫"
                               label="Ne plus jamais proposer ce plat"
