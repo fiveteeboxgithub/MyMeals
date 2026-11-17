@@ -173,6 +173,29 @@ describe('suggest', () => {
     expect(ranked[0].label).toBe('poisson');
   });
 
+  it('ignore les repas plus vieux que la période choisie, et donne plus de poids aux anciens quand elle s’allonge', () => {
+    const history: Meal[] = [];
+    // « hachis » : un soir sur deux semaines pendant 3 ans, fini il y a 18 mois.
+    for (let i = 0; i < 80; i++) history.push(meal(addDays('2023-05-02', i * 14), 'soir', 'hachis'));
+    // « curry » : mangé récemment, mais moins souvent.
+    for (let i = 0; i < 8; i++) history.push(meal(addDays('2026-05-05', i * 14), 'soir', 'curry'));
+    const index = buildIndex(history);
+    const rank = (historyMonths?: number) =>
+      suggest(index, '2026-11-24', 'soir', { today: '2026-11-16', historyMonths }).map((s) => s.label);
+    // 6 mois : le hachis, plus mangé depuis des mois, n'est même pas candidat.
+    expect(rank(6)).toEqual(['curry']);
+    // 12 mois : le hachis a été mangé jusqu'en mai, il est donc de nouveau candidat.
+    expect(rank(12)).toHaveLength(2);
+    expect(rank(60)).toHaveLength(2);
+    expect(rank(0)).toHaveLength(2);
+    // Sans option, comportement historique : aucun plat écarté.
+    expect(rank(undefined)).toContain('hachis');
+    const scoreOf = (months: number | undefined) =>
+      suggest(index, '2026-11-24', 'soir', { today: '2026-11-16', historyMonths: months }).find((s) => s.label === 'hachis')!.score;
+    expect(scoreOf(0)).toBeGreaterThan(scoreOf(60));
+    expect(scoreOf(60)).toBeGreaterThan(scoreOf(24));
+  });
+
   it('laisse s’effacer les plats abandonnés', () => {
     const history: Meal[] = [];
     for (let i = 0; i < 40; i++) history.push(meal(addDays('2019-01-08', i * 14), 'soir', 'hachis'));
@@ -300,11 +323,35 @@ describe('surprise', async () => {
     expect(summer.indexOf('Ceviche de dorade')).toBeLessThan(names.indexOf('Ceviche de dorade'));
   });
 
+  it('élargit le tirage de Surprise Me avec le niveau de hasard', () => {
+    const ideas = surpriseIdeas(index, '2026-11-20', 12, '2026-11-16');
+    expect(ideas.length).toBeGreaterThan(400);
+    const distinct = (level: number) => {
+      const seen = new Set<string>();
+      for (let i = 0; i < 800; i++) seen.add(pickSurprise(ideas, new Set(), level)!.name);
+      return seen.size;
+    };
+    expect(distinct(0)).toBe(1);
+    expect(distinct(1)).toBeLessThanOrEqual(10);
+    expect(distinct(2)).toBeGreaterThan(distinct(1));
+    expect(distinct(3)).toBeGreaterThan(distinct(2));
+    expect(distinct(4)).toBeGreaterThan(distinct(3));
+    expect(distinct(5)).toBeGreaterThan(distinct(4));
+    expect(distinct(5)).toBeGreaterThan(300);
+    // Sans hasard, c'est toujours la première idée du classement.
+    expect(pickSurprise(ideas, new Set(), 0)!.name).toBe(ideas[0].name);
+  });
+
+  it('calcule les goûts sur tout l’historique quand la période est 0', () => {
+    expect(tasteProfile(index, 0, '2026-11-16').get('boeuf')).toBeCloseTo(60 / 101);
+    expect(tasteProfile(index, 0, '2026-11-16').get('poisson')).toBeCloseTo(40 / 101);
+  });
+
   it('ne répète pas une idée déjà montrée', () => {
     const ideas = surpriseIdeas(index, '2026-11-20', 12, '2026-11-16');
     const shown = new Set<string>();
     for (let i = 0; i < ideas.length; i++) {
-      const pick = pickSurprise(ideas, shown, () => 0.5)!;
+      const pick = pickSurprise(ideas, shown, 2, () => 0.5)!;
       expect(shown.has(pick.name)).toBe(false);
       shown.add(pick.name);
     }
@@ -341,6 +388,35 @@ describe('pickProposal', () => {
     const medium = draws(2);
     const topHalf = medium.filter((s) => s.score > 25).length;
     expect(topHalf).toBeGreaterThan(medium.length / 2);
+  });
+
+  it('élargit le choix aux niveaux très fort et total', () => {
+    const big: Suggestion[] = Array.from({ length: 300 }, (_, i) => ({ ...ranked[0], key: `g${i}`, label: `g ${i}`, score: 300 - i }));
+    const distinct = (level: number) => new Set(Array.from({ length: 3000 }, (_, i) => pickProposal(big, level, `s${i}`)!.key)).size;
+    const [d2, d3, d4, d5] = [distinct(2), distinct(3), distinct(4), distinct(5)];
+    expect(d2).toBeLessThanOrEqual(30);
+    expect(d3).toBeGreaterThan(d2);
+    expect(d3).toBeLessThanOrEqual(80);
+    expect(d4).toBeGreaterThan(d3);
+    expect(d4).toBeLessThanOrEqual(200);
+    expect(d5).toBeGreaterThan(d4);
+    expect(d5).toBe(300);
+    // Au niveau total, les 300 plats ont à peu près la même chance.
+    const counts = new Map<string, number>();
+    for (let i = 0; i < 6000; i++) {
+      const key = pickProposal(big, 5, `t${i}`)!.key;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    expect(counts.size).toBe(300);
+    expect(Math.max(...counts.values())).toBeLessThan(60);
+    expect(Math.min(...counts.values())).toBeGreaterThan(2);
+  });
+
+  it('évite un plat mangé la semaine dernière tant qu’il reste autre chose', () => {
+    const withRecent = ranked.map((s, i) => (i < 5 ? { ...s, recent: true } : s));
+    for (let i = 0; i < 200; i++) expect(pickProposal(withRecent, 5, `r${i}`)!.recent).not.toBe(true);
+    const onlyRecent = ranked.slice(0, 3).map((s) => ({ ...s, recent: true }));
+    expect(pickProposal(onlyRecent, 5, 'x')).toBeDefined();
   });
 
   it('gère les listes vides ou sans score', () => {

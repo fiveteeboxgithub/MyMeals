@@ -6,7 +6,9 @@ import { useGoogleMeals } from './lib/googleStore';
 import { parseIcs } from './lib/ics';
 import { useMeals, useSkippedSlots } from './lib/store';
 import {
+  DEFAULT_HISTORY_MONTHS,
   DEFAULT_RANDOMNESS,
+  HISTORY_WINDOWS,
   RANDOMNESS_LEVELS,
   buildIndex,
   fold,
@@ -177,6 +179,38 @@ function loadPendingOnly(): boolean {
   }
 }
 
+const HISTORY_KEY = 'mymeals.historyMonths';
+
+function loadHistoryMonths(): number {
+  try {
+    const stored = localStorage.getItem(HISTORY_KEY);
+    const months = stored === null ? NaN : Number(stored);
+    return HISTORY_WINDOWS.some((w) => w.months === months) ? months : DEFAULT_HISTORY_MONTHS;
+  } catch {
+    return DEFAULT_HISTORY_MONTHS;
+  }
+}
+
+const PERIOD_KEY = 'mymeals.surprise.months';
+
+function loadPeriod(): number {
+  try {
+    const stored = localStorage.getItem(PERIOD_KEY);
+    const months = stored === null ? NaN : Number(stored);
+    return PERIODS.some((p) => p.months === months) ? months : DEFAULT_PERIOD_MONTHS;
+  } catch {
+    return DEFAULT_PERIOD_MONTHS;
+  }
+}
+
+function remember(key: string, value: number): void {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    // le réglage vaudra pour cette session
+  }
+}
+
 const RANDOMNESS_KEY = 'mymeals.randomness';
 
 function loadRandomness(): number {
@@ -227,6 +261,8 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
   // Propositions déjà écartées avec ↻, par créneau.
   const [rejected, setRejected] = useState<Record<string, string[]>>({});
   const [randomness, setRandomness] = useState(loadRandomness);
+  const [historyMonths, setHistoryMonths] = useState(loadHistoryMonths);
+  const [surprisePeriod, setSurprisePeriod] = useState(loadPeriod);
   // Change à chaque ouverture de l'application, pour ne pas revoir le même tirage.
   const [seed] = useState(() => String(Math.random()));
   const [pendingOnly, setPendingOnly] = useState(loadPendingOnly);
@@ -273,18 +309,19 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
       for (const slot of activeSlots) {
         const key = `${date}|${slot}`;
         if (bySlot.has(key) || skipped.has(key) || !usual.has(`${weekday(date)}-${slot}`)) continue;
-        const ranked = suggest(dishes, date, slot, { exclude: used, weekWords });
+        const ranked = suggest(dishes, date, slot, { exclude: used, weekWords, historyMonths });
         const tried = new Set(rejected[key]);
         const fresh = ranked.filter((s) => !tried.has(s.key));
         // Quand tout a été écarté, on repart du classement complet.
-        const pick = pickProposal(fresh.length > 0 ? fresh : ranked, randomness, `${seed}|${key}`);
+        // Chaque appui sur ↻ change le tirage : le nombre de propositions déjà écartées entre dans la graine.
+        const pick = pickProposal(fresh.length > 0 ? fresh : ranked, randomness, `${seed}|${key}|${tried.size}`);
         if (!pick) continue;
         out.set(key, pick);
         count(pick.key);
       }
     }
     return out;
-  }, [days, today, bySlot, usual, dishes, rejected, skipped, randomness, seed, activeSlots]);
+  }, [days, today, bySlot, usual, dishes, rejected, skipped, randomness, historyMonths, seed, activeSlots]);
 
   const sunday = days[6];
 
@@ -299,11 +336,11 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
     .filter((day) => day.slots.length > 0);
 
   function surpriseSlot(key: string, date: string) {
-    const ideas = surpriseIdeas(dishes, date, loadPeriod(), today);
-    let pick = pickSurprise(ideas, surprisesShown.current);
+    const ideas = surpriseIdeas(dishes, date, surprisePeriod, today);
+    let pick = pickSurprise(ideas, surprisesShown.current, randomness);
     if (!pick && ideas.length > 0) {
       surprisesShown.current.clear();
-      pick = pickSurprise(ideas, surprisesShown.current);
+      pick = pickSurprise(ideas, surprisesShown.current, randomness);
     }
     if (!pick) return;
     surprisesShown.current.add(pick.name);
@@ -388,20 +425,22 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
           <span className="switch-track" aria-hidden="true" />
           À décider seulement
         </label>
-        {meals.length > 0 && (
+      </div>
+
+      {meals.length > 0 && (
+        <details className="advanced">
+          <summary>Réglages des propositions</summary>
           <label className="setting">
-            Hasard des propositions
+            Hasard
             <select
               value={randomness}
               onChange={(e) => {
                 const level = Number(e.target.value);
                 setRandomness(level);
                 setRejected({});
-                try {
-                  localStorage.setItem(RANDOMNESS_KEY, String(level));
-                } catch {
-                  // le réglage vaudra pour cette session
-                }
+                setSurprises({});
+                surprisesShown.current.clear();
+                remember(RANDOMNESS_KEY, level);
               }}
             >
               {RANDOMNESS_LEVELS.map((level, i) => (
@@ -411,8 +450,45 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
               ))}
             </select>
           </label>
-        )}
-      </div>
+          <label className="setting">
+            Historique pris en compte
+            <select
+              value={historyMonths}
+              onChange={(e) => {
+                const months = Number(e.target.value);
+                setHistoryMonths(months);
+                setRejected({});
+                remember(HISTORY_KEY, months);
+              }}
+            >
+              {HISTORY_WINDOWS.map((w) => (
+                <option key={w.months} value={w.months}>
+                  {w.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="setting">
+            Goûts pour « Surprise Me »
+            <select
+              value={surprisePeriod}
+              onChange={(e) => {
+                const months = Number(e.target.value);
+                setSurprisePeriod(months);
+                setSurprises({});
+                surprisesShown.current.clear();
+                remember(PERIOD_KEY, months);
+              }}
+            >
+              {PERIODS.map((p) => (
+                <option key={p.months} value={p.months}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </details>
+      )}
 
       <main className="week">
         {visibleDays.length === 0 && <p className="all-done">Tout est décidé pour cette semaine.</p>}
@@ -515,6 +591,14 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
           suggestions={suggest(dishes, editing.date, editing.slot)}
           dishes={dishes}
           today={today}
+          randomness={randomness}
+          period={surprisePeriod}
+          onPeriodChange={(months) => {
+            setSurprisePeriod(months);
+            setSurprises({});
+            surprisesShown.current.clear();
+            remember(PERIOD_KEY, months);
+          }}
           skipped={skipped.has(`${editing.date}|${editing.slot}`)}
           onSkip={(skip) => {
             setSkip(`${editing.date}|${editing.slot}`, skip);
@@ -543,6 +627,9 @@ interface SheetProps {
   suggestions: Suggestion[];
   dishes: DishIndex;
   today: string;
+  randomness: number;
+  period: number;
+  onPeriodChange: (months: number) => void;
   skipped: boolean;
   onSkip: (skip: boolean) => void;
   onPick: (name: string) => void;
@@ -550,7 +637,7 @@ interface SheetProps {
   onClose: () => void;
 }
 
-function SlotSheet({ date, slot, current, suggestions, dishes, today, skipped, onSkip, onPick, onClear, onClose }: SheetProps) {
+function SlotSheet({ date, slot, current, suggestions, dishes, today, randomness, period, onPeriodChange, skipped, onSkip, onPick, onClear, onClose }: SheetProps) {
   const [query, setQuery] = useState('');
   // Chaque mot saisi doit se retrouver dans une des écritures du plat, dans n'importe quel ordre.
   const needles = fold(query).split(/[\s/]+/).filter(Boolean);
@@ -605,7 +692,7 @@ function SlotSheet({ date, slot, current, suggestions, dishes, today, skipped, o
             aria-label="Chercher ou saisir un plat"
           />
         </form>
-        <SurpriseMe date={date} dishes={dishes} today={today} onPick={onPick} />
+        <SurpriseMe date={date} dishes={dishes} today={today} randomness={randomness} months={period} onMonthsChange={onPeriodChange} onPick={onPick} />
         <ul className="choices">
           {query.trim() && !exact && (
             <li>
@@ -634,38 +721,30 @@ function SlotSheet({ date, slot, current, suggestions, dishes, today, skipped, o
   );
 }
 
-const PERIOD_KEY = 'mymeals.surprise.months';
-
-function loadPeriod(): number {
-  try {
-    const stored = Number(localStorage.getItem(PERIOD_KEY));
-    return PERIODS.some((p) => p.months === stored) ? stored : DEFAULT_PERIOD_MONTHS;
-  } catch {
-    return DEFAULT_PERIOD_MONTHS;
-  }
-}
-
 interface SurpriseProps {
   date: string;
   dishes: DishIndex;
   today: string;
+  randomness: number;
+  /** Période (en mois) sur laquelle sont calculés les goûts ; 0 : tout l'historique. */
+  months: number;
+  onMonthsChange: (months: number) => void;
   onPick: (name: string) => void;
 }
 
 /** Propose un plat absent de l'historique, choisi d'après les goûts de la période réglée. */
-function SurpriseMe({ date, dishes, today, onPick }: SurpriseProps) {
-  const [months, setMonths] = useState(loadPeriod);
+function SurpriseMe({ date, dishes, today, randomness, months, onMonthsChange, onPick }: SurpriseProps) {
   const [idea, setIdea] = useState<Surprise | null>(null);
   const [opened, setOpened] = useState(false);
   const shown = useRef(new Set<string>());
 
   function draw(period: number) {
     const ideas = surpriseIdeas(dishes, date, period, today);
-    let pick = pickSurprise(ideas, shown.current);
+    let pick = pickSurprise(ideas, shown.current, randomness);
     if (!pick && ideas.length > 0) {
       // Toutes les idées ont été vues : on repart du début.
       shown.current.clear();
-      pick = pickSurprise(ideas, shown.current);
+      pick = pickSurprise(ideas, shown.current, randomness);
     }
     if (pick) shown.current.add(pick.name);
     setIdea(pick);
@@ -716,12 +795,7 @@ function SurpriseMe({ date, dishes, today, onPick }: SurpriseProps) {
           value={months}
           onChange={(e) => {
             const period = Number(e.target.value);
-            setMonths(period);
-            try {
-              localStorage.setItem(PERIOD_KEY, String(period));
-            } catch {
-              // le réglage vaudra pour cette session
-            }
+            onMonthsChange(period);
             shown.current.clear();
             draw(period);
           }}

@@ -51,11 +51,20 @@ Il est moins bien classé :
 - s'il n'a plus été mangé depuis plus d'un an ;
 - si la semaine contient déjà un plat avec le même ingrédient.
 
-Le réglage « Hasard des propositions » décide comment ce classement est utilisé :
-sans hasard, la proposition est toujours la mieux classée ; sinon elle est tirée
-au sort parmi les 10, 30 ou 80 premières, les mieux classées gardant plus de
-chances. Le bouton ↻ écarte la proposition et en tire une autre, sans jamais
-reproposer un plat déjà écarté pour ce créneau.
+Le bloc « Réglages des propositions » (sous le sélecteur de semaine) comporte trois réglages,
+mémorisés sur l'appareil :
+
+- **Hasard** (Aucun, Faible, Moyen, Fort, Très fort, Total ; Fort par défaut) : sans hasard,
+  la proposition est toujours la mieux classée ; sinon elle est tirée au sort parmi les 10, 30,
+  80, 200 ou toutes les premières, les mieux classées gardant plus de chances (à égalité au niveau
+  Total). Un plat mangé ou prévu à moins d'une semaine n'est proposé que s'il n'y a rien d'autre.
+  Chaque appui sur ↻ fait un nouveau tirage et ne reproposera jamais un plat déjà écarté pour ce
+  créneau. Le même niveau règle le nombre d'idées en lice pour « Surprise Me ».
+- **Historique pris en compte** (6 mois, 1 an, 2 ans, 5 ans, 10 ans, toute la période ; 5 ans par
+  défaut) : les repas plus anciens sont ignorés, et plus la période est longue, plus les vieux repas
+  pèsent dans le classement (la demi-vie suit la période, et l'oubli d'un plat abandonné commence plus tard).
+- **Goûts pour « Surprise Me »** (6 mois à 10 ans, ou tout l'historique ; 5 ans par défaut) : période
+  sur laquelle sont calculées les familles de plats préférées. Le même réglage se trouve dans la fenêtre de « Surprise Me ».
 
 Les créneaux rarement remplis sur les 12 derniers mois (par exemple le midi en
 semaine) ne reçoivent pas de proposition.

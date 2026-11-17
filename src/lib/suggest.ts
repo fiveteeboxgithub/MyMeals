@@ -39,6 +39,8 @@ export interface Suggestion {
   search: string;
   score: number;
   count: number;
+  /** Mangé ou prévu à moins d'une semaine de la date visée. */
+  recent?: boolean;
   reason: string;
 }
 
@@ -236,8 +238,21 @@ export function buildIndex(meals: Meal[]): DishIndex {
   return { dishes, byKey };
 }
 
-/** Un repas d'il y a deux ans compte moitié moins qu'un repas d'aujourd'hui. */
+/** Sans période choisie, un repas d'il y a deux ans compte moitié moins qu'un repas d'aujourd'hui. */
 const HALF_LIFE_DAYS = 2 * 365;
+/** Demi-vie quand tout l'historique est pris en compte. */
+const ALL_HISTORY_HALF_LIFE_DAYS = 10 * 365;
+
+/** Périodes d'historique proposées pour classer les plats (0 : toute la période). */
+export const HISTORY_WINDOWS: { months: number; label: string }[] = [
+  { months: 6, label: '6 derniers mois' },
+  { months: 12, label: '1 an' },
+  { months: 24, label: '2 ans' },
+  { months: 60, label: '5 ans' },
+  { months: 120, label: '10 ans' },
+  { months: 0, label: 'Toute la période' },
+];
+export const DEFAULT_HISTORY_MONTHS = 60;
 
 function seasonWeight(a: number, b: number): number {
   const diff = Math.abs(a - b);
@@ -260,10 +275,9 @@ function cooldown(gapDays: number, interval: number | undefined): number {
   return 0.05 + 0.95 * (gapDays / rest) ** 2;
 }
 
-/** Un plat plus mangé depuis plus d'un an s'efface : moitié moins par année supplémentaire. */
-function staleness(daysSinceLast: number): number {
-  const years = daysSinceLast / 365;
-  return years <= 1 ? 1 : Math.pow(0.5, years - 1);
+/** Un plat plus mangé depuis un certain temps s'efface : moitié moins par année supplémentaire. */
+function staleness(daysSinceLast: number, staleAfterDays: number): number {
+  return Math.pow(0.5, Math.max(0, daysSinceLast - staleAfterDays) / 365);
 }
 
 /** Chaque mot déjà présent dans la semaine (« pate », « poisson ») réduit le score. */
@@ -275,6 +289,12 @@ export interface SuggestOptions {
   /** Nombre de fois où chaque mot apparaît déjà dans la semaine. */
   weekWords?: ReadonlyMap<string, number>;
   today?: string;
+  /**
+   * Période d'historique prise en compte, en mois (0 : toute la période). Les repas plus
+   * anciens sont ignorés ; plus la période est longue, plus les vieux repas pèsent
+   * (la demi-vie suit la période). Sans cette option : demi-vie de deux ans, rien d'ignoré.
+   */
+  historyMonths?: number;
 }
 
 /**
@@ -286,9 +306,13 @@ export interface SuggestOptions {
  * semaine contient déjà un plat proche.
  */
 export function suggest(index: DishIndex, date: string, slot: Slot, options: SuggestOptions = {}): Suggestion[] {
-  const { exclude, weekWords } = options;
+  const { exclude, weekWords, historyMonths } = options;
   const target = dayNumber(date);
   const now = dayNumber(options.today ?? todayIso());
+  const windowDays = historyMonths ? Math.round(historyMonths * 30.44) : undefined;
+  const cutoff = windowDays === undefined ? -Infinity : now - windowDays;
+  const halfLife = historyMonths === undefined ? HALF_LIFE_DAYS : (windowDays ?? ALL_HISTORY_HALF_LIFE_DAYS);
+  const staleAfter = Math.max(365, halfLife / 2);
   const targetWeekday = weekday(date);
   const targetMonth = monthOf(date);
   const out: Suggestion[] = [];
@@ -302,12 +326,12 @@ export function suggest(index: DishIndex, date: string, slot: Slot, options: Sug
 
     for (const occ of dish.occurrences) {
       nearestGap = Math.min(nearestGap, Math.abs(occ.day - target));
-      if (occ.day >= target) continue;
+      if (occ.day >= target || occ.day < cutoff) continue;
       count++;
       if (occ.day <= now) lastEaten = Math.max(lastEaten, occ.day);
       if (dish.generic && (occ.weekday !== targetWeekday || occ.slot !== slot)) continue;
       base +=
-        Math.pow(0.5, (target - occ.day) / HALF_LIFE_DAYS) *
+        Math.pow(0.5, (target - occ.day) / halfLife) *
         seasonWeight(occ.month, targetMonth) *
         (occ.slot === slot ? 1 : 0.3) *
         (occ.weekday === targetWeekday ? 1.5 : 1);
@@ -316,7 +340,7 @@ export function suggest(index: DishIndex, date: string, slot: Slot, options: Sug
 
     let score = base;
     const eaten = Number.isFinite(lastEaten);
-    if (eaten) score *= staleness(now - lastEaten);
+    if (eaten) score *= staleness(now - lastEaten, staleAfter);
     if (!dish.generic) {
       score *= cooldown(nearestGap, dish.interval);
       const repeats = Math.max(0, ...dish.words.map((w) => weekWords?.get(w) ?? 0));
@@ -329,6 +353,7 @@ export function suggest(index: DishIndex, date: string, slot: Slot, options: Sug
       search: [dish.label, ...dish.variants].map(fold).join(' | '),
       score,
       count,
+      recent: !dish.generic && nearestGap < 7,
       reason: eaten ? `${count} fois · ${ago(now - lastEaten)}` : `${count} fois`,
     });
   }
@@ -369,14 +394,22 @@ export function usualSlots(meals: Meal[], today: string): Set<string> {
   return usual;
 }
 
-/** Niveaux de hasard pour le choix des propositions. */
+/**
+ * Niveaux de hasard. `pool` et `power` règlent les propositions du planning, `surprisePool`
+ * et `surprisePower` les idées de « Surprise Me » : on tire au sort parmi les `pool`
+ * premiers, chacun avec un poids égal à (score / meilleur score) puissance `power`.
+ * Une puissance de 0 donne à tous la même chance. Les niveaux ne doivent être qu'ajoutés
+ * à la fin : le niveau choisi est mémorisé par son rang.
+ */
 export const RANDOMNESS_LEVELS = [
-  { label: 'Aucun', pool: 1, power: 1 },
-  { label: 'Faible', pool: 10, power: 2 },
-  { label: 'Moyen', pool: 30, power: 1 },
-  { label: 'Fort', pool: 80, power: 0.4 },
+  { label: 'Aucun', pool: 1, power: 1, surprisePool: 1, surprisePower: 1 },
+  { label: 'Faible', pool: 10, power: 2, surprisePool: 10, surprisePower: 1 },
+  { label: 'Moyen', pool: 30, power: 1, surprisePool: 40, surprisePower: 1 },
+  { label: 'Fort', pool: 80, power: 0.4, surprisePool: 150, surprisePower: 0.4 },
+  { label: 'Très fort', pool: 200, power: 0.15, surprisePool: 400, surprisePower: 0.15 },
+  { label: 'Total', pool: Infinity, power: 0, surprisePool: Infinity, surprisePower: 0 },
 ] as const;
-export const DEFAULT_RANDOMNESS = 2;
+export const DEFAULT_RANDOMNESS = 3;
 
 /** Nombre pseudo-aléatoire entre 0 et 1, toujours le même pour un texte donné. */
 function hashToUnit(text: string): number {
@@ -397,13 +430,15 @@ function hashToUnit(text: string): number {
  * Choisit une proposition dans un classement, avec plus ou moins de hasard.
  *
  * Au niveau 0, c'est toujours la mieux classée. Aux niveaux suivants, on tire au sort
- * parmi les premières (10, 30 ou 80), les mieux classées gardant plus de chances ;
+ * parmi les premières (10, 30, 80, 200, toutes), les mieux classées gardant plus de chances ;
  * plus le niveau est élevé, plus les chances s'égalisent. Le tirage dépend de `seed` :
  * à seed égal le choix ne change pas, ce qui évite que l'écran bouge tout seul.
  */
 export function pickProposal(ranked: Suggestion[], level: number, seed: string): Suggestion | undefined {
   const { pool, power } = RANDOMNESS_LEVELS[level] ?? RANDOMNESS_LEVELS[DEFAULT_RANDOMNESS];
-  const candidates = ranked.slice(0, pool);
+  // Un plat mangé la semaine dernière n'est proposé que s'il n'y a rien d'autre.
+  const notRecent = ranked.filter((s) => !s.recent);
+  const candidates = (notRecent.length > 0 ? notRecent : ranked).slice(0, pool);
   if (candidates.length <= 1 || !(candidates[0].score > 0)) return candidates[0];
   const top = candidates[0].score;
   let best: Suggestion | undefined;

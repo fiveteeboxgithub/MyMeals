@@ -1,16 +1,18 @@
 import { CATALOG, CONCEPTS, type CatalogDish, type Concept } from './catalog';
 import { dayNumber, monthOf } from './dates';
-import { fold, normalize, type DishIndex } from './suggest';
+import { DEFAULT_RANDOMNESS, RANDOMNESS_LEVELS, fold, normalize, type DishIndex } from './suggest';
 
-/** Périodes proposées pour calculer les préférences, en mois. */
+/** Périodes proposées pour calculer les préférences, en mois (0 : tout l'historique). */
 export const PERIODS: { months: number; label: string }[] = [
   { months: 6, label: '6 derniers mois' },
   { months: 12, label: '12 derniers mois' },
   { months: 24, label: '2 dernières années' },
   { months: 36, label: '3 dernières années' },
   { months: 60, label: '5 dernières années' },
+  { months: 120, label: '10 dernières années' },
+  { months: 0, label: "Tout l'historique" },
 ];
-export const DEFAULT_PERIOD_MONTHS = 24;
+export const DEFAULT_PERIOD_MONTHS = 60;
 
 export interface Surprise {
   name: string;
@@ -38,7 +40,7 @@ export function conceptsOf(key: string): Concept[] {
  */
 export function tasteProfile(index: DishIndex, months: number, today: string): Map<Concept, number> {
   const now = dayNumber(today);
-  const from = now - Math.round(months * 30.44);
+  const from = months > 0 ? now - Math.round(months * 30.44) : -Infinity;
   const counts = new Map<Concept, number>();
   let total = 0;
   for (const dish of index.dishes) {
@@ -91,16 +93,25 @@ export function surpriseIdeas(index: DishIndex, date: string, months: number, to
 }
 
 /**
- * Tire une idée au hasard parmi les mieux classées qui n'ont pas encore été montrées,
- * les meilleures ayant plus de chances. Renvoie null quand tout a été montré.
+ * Tire une idée au hasard parmi les mieux classées qui n'ont pas encore été montrées.
+ * Le niveau de hasard (voir RANDOMNESS_LEVELS) règle le nombre d'idées en lice et l'écart
+ * de chances entre la première et les suivantes. Renvoie null quand tout a été montré.
  */
-export function pickSurprise(ideas: Surprise[], shown: ReadonlySet<string>, random: () => number = Math.random): Surprise | null {
-  const pool = ideas.filter((idea) => !shown.has(idea.name)).slice(0, 10);
+export function pickSurprise(
+  ideas: Surprise[],
+  shown: ReadonlySet<string>,
+  level: number = DEFAULT_RANDOMNESS,
+  random: () => number = Math.random,
+): Surprise | null {
+  const { surprisePool, surprisePower } = RANDOMNESS_LEVELS[level] ?? RANDOMNESS_LEVELS[DEFAULT_RANDOMNESS];
+  const pool = ideas.filter((idea) => !shown.has(idea.name)).slice(0, surprisePool);
   if (pool.length === 0) return null;
-  let roll = random() * pool.reduce((sum, idea) => sum + idea.score, 0);
-  for (const idea of pool) {
-    roll -= idea.score;
-    if (roll <= 0) return idea;
+  const top = pool[0].score;
+  const weights = pool.map((idea) => (top > 0 ? Math.pow(idea.score / top, surprisePower) : 1));
+  let roll = random() * weights.reduce((sum, w) => sum + w, 0);
+  for (let i = 0; i < pool.length; i++) {
+    roll -= weights[i];
+    if (roll <= 0) return pool[i];
   }
   return pool[pool.length - 1];
 }
