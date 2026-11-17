@@ -1,4 +1,4 @@
-import { fold, normalize } from './suggest';
+import { fold, normalize, singular, type DishIndex } from './suggest';
 import type { Meal } from './types';
 
 /** Un libellé exact de repas, avec tous les repas du calendrier qui le portent. */
@@ -99,13 +99,112 @@ export function findOccurrences(meals: Meal[], query: string, mode: SearchMode =
   });
 }
 
+/** Première lettre du libellé en minuscule ? (undefined s'il n'y a aucune lettre) */
+function startsLowercase(label: string): boolean | undefined {
+  const letter = label.match(/\p{L}/u)?.[0];
+  if (letter === undefined) return undefined;
+  return letter === letter.toLowerCase() && letter !== letter.toUpperCase();
+}
+
+/** Vrai si la majorité des repas du calendrier commencent par une minuscule (c'est ton style d'écriture). */
+export function prefersLowercase(meals: Meal[]): boolean {
+  let lower = 0;
+  let upper = 0;
+  for (const meal of meals) {
+    const isLower = startsLowercase(meal.name);
+    if (isLower === true) lower++;
+    else if (isLower === false) upper++;
+  }
+  return lower >= upper;
+}
+
+/** Met la première lettre dans le style voulu, sauf pour un sigle (« PDT », « KFC »). */
+export function applyInitialStyle(label: string, lowercase: boolean): string {
+  const index = label.search(/\p{L}/u);
+  if (index < 0) return label;
+  const letter = label[index];
+  const next = label[index + 1] ?? '';
+  const isAcronym = next !== '' && next === next.toUpperCase() && next !== next.toLowerCase();
+  if (isAcronym) return label;
+  const styled = lowercase ? letter.toLowerCase() : letter.toUpperCase();
+  return label.slice(0, index) + styled + label.slice(index + 1);
+}
+
 /**
  * Libellé proposé pour fusionner des repas : le plus utilisé des libellés cochés ;
- * à égalité, le plus court, puis l'ordre alphabétique.
+ * à égalité, celui qui commence comme le reste du calendrier (minuscule ou majuscule, si
+ * `lowercase` est précisé), puis le plus court, puis l'ordre alphabétique.
  */
-export function proposeLabel(selected: Occurrence[]): string {
+export function proposeLabel(selected: Occurrence[], lowercase?: boolean): string {
+  const styleRank = (label: string) => (lowercase === undefined || startsLowercase(label) === lowercase ? 0 : 1);
   const best = [...selected].sort(
-    (a, b) => b.count - a.count || a.label.length - b.label.length || a.label.localeCompare(b.label),
+    (a, b) =>
+      b.count - a.count ||
+      styleRank(a.label) - styleRank(b.label) ||
+      a.label.length - b.label.length ||
+      a.label.localeCompare(b.label),
   )[0];
   return best?.label ?? '';
+}
+
+/** Une façon de nommer un même plat qui revient plusieurs fois sous des écritures différentes. */
+export interface SuspectedGroup {
+  /** Identifie le groupe (pour se souvenir qu'on l'a écarté) : les libellés triés. */
+  signature: string;
+  occurrences: Occurrence[];
+  mealCount: number;
+  /** Libellé retenu par défaut. */
+  proposal: string;
+  /** Ce qui distingue les libellés : « majuscules ou accents », « singulier ou pluriel »… */
+  reasons: string[];
+}
+
+function words(text: string, plural: boolean): string[] {
+  const list = fold(text).split(/[^a-z0-9]+/).filter(Boolean);
+  return plural ? list : list.map(singular);
+}
+
+/** Pourquoi `label` est pris pour un doublon de `reference` (du plus évident au plus incertain). */
+export function reasonFor(label: string, reference: string): string {
+  if (fold(label) === fold(reference)) return 'majuscules ou accents';
+  if (words(label, true).join(' ') === words(reference, true).join(' ')) return 'ponctuation ou espaces';
+  if (words(label, false).join(' ') === words(reference, false).join(' ')) return 'singulier ou pluriel';
+  if (words(label, false).sort().join(' ') === words(reference, false).sort().join(' ')) return 'ordre des mots';
+  if (normalize(label) === normalize(reference)) return 'autre écriture du même plat';
+  return 'faute de frappe probable';
+}
+
+/**
+ * Groupes de libellés que l'on soupçonne de désigner le même plat : mêmes mots à la
+ * majuscule, aux accents, au pluriel, à l'ordre ou à une faute de frappe près (le même
+ * regroupement que pour les propositions de repas). Les plus lourds (le plus de repas
+ * concernés) viennent en premier. `ignored` contient les signatures déjà écartées.
+ */
+export function suspectedGroups(meals: Meal[], index: DishIndex, ignored: ReadonlySet<string> = new Set()): SuspectedGroup[] {
+  const byDish = new Map<unknown, Occurrence[]>();
+  for (const occurrence of groupByLabel(meals)) {
+    const dish = index.byKey.get(normalize(occurrence.label));
+    if (!dish) continue;
+    const list = byDish.get(dish);
+    if (list) list.push(occurrence);
+    else byDish.set(dish, [occurrence]);
+  }
+  const lowercase = prefersLowercase(meals);
+  const groups: SuspectedGroup[] = [];
+  for (const occurrences of byDish.values()) {
+    if (occurrences.length < 2) continue;
+    const signature = occurrences.map((o) => o.label).sort().join('\u001f');
+    if (ignored.has(signature)) continue;
+    const chosen = proposeLabel(occurrences, lowercase);
+    const proposal = applyInitialStyle(chosen, lowercase);
+    const reasons = [...new Set(occurrences.filter((o) => o.label !== chosen).map((o) => reasonFor(o.label, chosen)))];
+    groups.push({
+      signature,
+      occurrences,
+      mealCount: occurrences.reduce((sum, o) => sum + o.count, 0),
+      proposal,
+      reasons,
+    });
+  }
+  return groups.sort((a, b) => b.mealCount - a.mealCount || a.proposal.localeCompare(b.proposal));
 }

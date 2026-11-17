@@ -81,7 +81,18 @@ sont en lice (voir « Réglages des propositions »).
 
 ## Page « Doublons »
 
-L'onglet « Doublons » cherche dans tout le calendrier les repas dont le libellé
+**Doublons suspectés (affichés en premier).** L'application repère elle-même les libellés qui
+désignent probablement le même plat : mêmes mots à une majuscule, un accent, un pluriel, l'ordre
+des mots ou une faute d'une lettre près (le regroupement est celui des propositions de repas,
+voir plus haut). Chaque groupe est une carte avec ses libellés (nombre de repas, dernier repas),
+ce qui les distingue (« majuscules ou accents », « singulier ou pluriel », « ordre des mots »,
+« faute de frappe probable »), le nom retenu (le libellé le plus utilisé, écrit avec la même
+première lettre que le reste du calendrier ; modifiable) et deux boutons : « Confirmer » renomme
+tous les repas du groupe, « Pas des doublons » écarte le groupe (mémorisé sur l'appareil, avec un
+lien pour réafficher les écartés). « Tout confirmer » fusionne tous les groupes après une
+confirmation. Les groupes les plus lourds viennent en premier, vingt à la fois.
+
+**Recherche manuelle.** L'onglet « Doublons » cherche dans tout le calendrier les repas dont le libellé
 contient **tous** les mots saisis, chacun pouvant n'être que le début d'un mot :
 « pat jacqu » trouve « st jacques aux pâtes » et « pâte à la saint jacques », mais
 ni « pâtes au pesto » ni « pat carbo ». L'ordre des mots, les accents et les

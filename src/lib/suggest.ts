@@ -55,7 +55,7 @@ export function fold(text: string): string {
     .trim();
 }
 
-function singular(word: string): string {
+export function singular(word: string): string {
   return word.length > 3 && /[sx]$/.test(word) ? word.slice(0, -1) : word;
 }
 

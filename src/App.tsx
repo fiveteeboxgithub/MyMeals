@@ -374,7 +374,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
       </nav>
 
       {view === 'doublons' ? (
-        <DuplicatesPage store={store} />
+        <DuplicatesPage store={store} dishes={dishes} />
       ) : (
         <>
       <nav className="week-nav" aria-label="Semaine affichée">

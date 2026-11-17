@@ -835,3 +835,61 @@ small {
 .advanced:not([open]) summary::after {
   transform: rotate(-90deg);
 }
+
+.dup-empty {
+  color: var(--muted);
+  padding: 16px 0;
+}
+
+.suspect-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.suspect {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.suspect-labels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.suspect-labels li + li {
+  margin-top: 8px;
+}
+
+.suspect-reason {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.suspect-name {
+  display: block;
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.suspect-name input {
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.suspect .dup-actions {
+  margin: 12px 0 0;
+}

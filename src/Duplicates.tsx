@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { longDate } from './lib/dates';
 import { compileRegex, findOccurrences, hasQuery, proposeLabel } from './lib/duplicates';
+import type { DishIndex } from './lib/suggest';
 import type { MealStore } from './lib/types';
+import { SuspectedDuplicates } from './SuspectedDuplicates';
 
 const REGEX_KEY = 'mymeals.duplicates.regex';
 
@@ -28,8 +30,28 @@ const REGEX_EXAMPLES: [string, string][] = [
 /** Au-delà, la liste devient illisible : on demande de préciser la recherche. */
 const MAX_ROWS = 300;
 
-/** Page de recherche des libellés proches dans le calendrier, pour les fusionner en un seul. */
-export function DuplicatesPage({ store }: { store: MealStore }) {
+type Mode = 'suspects' | 'search';
+
+/** Page des doublons : propositions toutes prêtes à confirmer, ou recherche à la main. */
+export function DuplicatesPage({ store, dishes }: { store: MealStore; dishes: DishIndex }) {
+  const [mode, setMode] = useState<Mode>('suspects');
+  return (
+    <>
+      <div className="segmented" role="group" aria-label="Façon de trouver les doublons">
+        <button aria-pressed={mode === 'suspects'} onClick={() => setMode('suspects')}>
+          Doublons suspectés
+        </button>
+        <button aria-pressed={mode === 'search'} onClick={() => setMode('search')}>
+          Recherche manuelle
+        </button>
+      </div>
+      {mode === 'suspects' ? <SuspectedDuplicates store={store} dishes={dishes} /> : <ManualSearch store={store} />}
+    </>
+  );
+}
+
+/** Recherche des libellés proches dans le calendrier, pour les fusionner en un seul. */
+function ManualSearch({ store }: { store: MealStore }) {
   const [query, setQuery] = useState('');
   const [regex, setRegex] = useState(loadRegexMode);
   const [tipOpen, setTipOpen] = useState(false);
@@ -73,8 +95,8 @@ export function DuplicatesPage({ store }: { store: MealStore }) {
     setSelected(new Set());
     setResult(
       failed > 0
-        ? `${renamed} repas renommés en « ${name} », ${failed} en échec : ils ont gardé leur nom.`
-        : `${renamed} repas renommés en « ${name} ».`,
+        ? `${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'} en « ${name} », ${failed} en échec : ils ont gardé leur nom.`
+        : `${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'} en « ${name} ».`,
     );
   }
 

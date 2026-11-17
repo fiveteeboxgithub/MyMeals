@@ -426,7 +426,18 @@ describe('pickProposal', () => {
 });
 
 describe('doublons', async () => {
-  const { compileRegex, findOccurrences, groupByLabel, hasQuery, parseKeywords, proposeLabel } = await import('./duplicates');
+  const {
+    applyInitialStyle,
+    compileRegex,
+    findOccurrences,
+    groupByLabel,
+    hasQuery,
+    parseKeywords,
+    prefersLowercase,
+    proposeLabel,
+    reasonFor,
+    suspectedGroups,
+  } = await import('./duplicates');
 
   const history: Meal[] = [
     meal('2026-01-03', 'soir', 'pates/coquilles st jacques'),
@@ -524,6 +535,63 @@ describe('doublons', async () => {
     expect(hasQuery('  ', { regex: true })).toBe(false);
     expect(hasQuery('.*', { regex: true })).toBe(true);
     expect(hasQuery('de', {})).toBe(true);
+  });
+
+  it('repère les doublons probables : majuscules, accents, pluriels, ordre, fautes', () => {
+    const meals: Meal[] = [];
+    let n = 0;
+    const add = (name: string, times = 1) => {
+      for (let i = 0; i < times; i++) meals.push(meal(addDays('2026-01-01', n++), 'soir', name));
+    };
+    add('poisson/purée', 9);
+    add('Poisson/purée', 2); // majuscule
+    add('poisson/puree', 1); // accent
+    add('pizza', 5);
+    add('Pizzas', 2); // pluriel et majuscule
+    add('crevettes curry/riz', 4);
+    add('crevette curry/riz', 1); // singulier
+    add('riz/crevettes curry', 1); // ordre
+    add('kebab', 3);
+    add('kebbab', 1); // faute de frappe
+    add('pates carbonara', 6); // pas de doublon
+    add('pates saumon', 3); // différent de pates carbonara
+    add('Restes', 2);
+    add('restes', 7);
+    const groups = suspectedGroups(meals, buildIndex(meals));
+    const byProposal = new Map(groups.map((g) => [g.proposal, g]));
+    expect([...byProposal.keys()].sort()).toEqual(['crevettes curry/riz', 'kebab', 'pizza', 'poisson/purée', 'restes']);
+    // Les plus gros groupes d'abord.
+    expect(groups.map((g) => g.proposal)).toEqual(['poisson/purée', 'restes', 'pizza', 'crevettes curry/riz', 'kebab']);
+    const fish = byProposal.get('poisson/purée')!;
+    expect(fish.mealCount).toBe(12);
+    expect(fish.occurrences.map((o) => o.label).sort()).toEqual(['Poisson/purée', 'poisson/puree', 'poisson/purée']);
+    expect(fish.reasons).toEqual(['majuscules ou accents']);
+    expect(byProposal.get('crevettes curry/riz')!.reasons.sort()).toEqual(['ordre des mots', 'singulier ou pluriel']);
+    expect(byProposal.get('pizza')!.reasons).toEqual(['singulier ou pluriel']);
+    expect(byProposal.get('kebab')!.reasons).toEqual(['faute de frappe probable']);
+    // Ni « pates carbonara » ni « pates saumon » ne sont des doublons.
+    expect(groups.some((g) => g.occurrences.some((o) => o.label.startsWith('pates')))).toBe(false);
+    // Un groupe écarté ne revient pas.
+    const ignored = new Set([fish.signature]);
+    expect(suspectedGroups(meals, buildIndex(meals), ignored).map((g) => g.proposal)).not.toContain('poisson/purée');
+  });
+
+  it('propose le style d’écriture majoritaire pour la première lettre', () => {
+    const lowerStyle: Meal[] = [meal('2026-01-01', 'soir', 'pizza'), meal('2026-01-02', 'soir', 'quiche'), meal('2026-01-03', 'soir', 'Soupe')];
+    expect(prefersLowercase(lowerStyle)).toBe(true);
+    expect(prefersLowercase([meal('2026-01-01', 'soir', 'Pizza'), meal('2026-01-02', 'soir', 'Quiche'), meal('2026-01-03', 'soir', 'soupe')])).toBe(false);
+    expect(applyInitialStyle('Pâtes au pesto', true)).toBe('pâtes au pesto');
+    expect(applyInitialStyle('pâtes au pesto', false)).toBe('Pâtes au pesto');
+    expect(applyInitialStyle('PDT rissolées', true)).toBe('PDT rissolées');
+    expect(applyInitialStyle('« Riz »', true)).toBe('« riz »');
+    // À égalité de repas, on garde l'écriture du reste du calendrier ; si tout est en majuscule, on la met en minuscule.
+    const tie = groupByLabel([meal('2026-02-01', 'soir', 'Pizza'), meal('2026-02-02', 'soir', 'pizza')]);
+    expect(proposeLabel(tie, true)).toBe('pizza');
+    expect(proposeLabel(tie, false)).toBe('Pizza');
+    const allUpper = ['Pizza', 'Pizzas', 'quiche', 'soupe', 'tarte'].map((name, i) => meal(addDays('2026-02-01', i), 'soir', name));
+    expect(suspectedGroups(allUpper, buildIndex(allUpper))[0].proposal).toBe('pizza');
+    expect(reasonFor('Pizzas', 'pizza')).toBe('singulier ou pluriel');
+    expect(reasonFor('poisson / purée', 'poisson/purée')).toBe('ponctuation ou espaces');
   });
 
   it('propose le libellé le plus utilisé, puis le plus court', () => {
