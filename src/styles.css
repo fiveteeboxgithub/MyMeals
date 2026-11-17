@@ -160,6 +160,17 @@ h1 {
   display: none;
 }
 
+/* Choix colonnes / liste : seulement sur un écran assez large pour les colonnes. */
+.layout-chip {
+  display: none;
+}
+
+@media (min-width: 1000px) {
+  .layout-chip {
+    display: inline-flex;
+  }
+}
+
 .slot {
   display: flex;
   align-items: center;
@@ -1311,7 +1322,8 @@ small {
   .app.wide .week {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    grid-template-rows: auto auto auto;
+    /* en-tête ; midi : libellé, plat, autres agendas ; soir : idem */
+    grid-template-rows: repeat(7, auto);
     column-gap: 10px;
     row-gap: 0;
   }
@@ -1320,7 +1332,7 @@ small {
     margin-bottom: 0;
     padding: 10px;
     display: grid;
-    grid-row: span 3;
+    grid-row: span 7;
     grid-template-rows: subgrid;
     grid-template-columns: minmax(0, 1fr);
     row-gap: 0;
@@ -1359,16 +1371,41 @@ small {
     height: 72px;
   }
 
+  /* Chaque créneau partage aussi ses rangées (libellé, plat, autres agendas) avec les autres jours :
+     images, noms et événements commencent à la même hauteur d'un jour à l'autre. */
+  .app.wide .slot {
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+  }
+
   .app.wide .slot-midi {
-    grid-row: 2;
+    grid-row: 2 / span 3;
   }
 
   .app.wide .slot-soir {
-    grid-row: 3;
+    grid-row: 5 / span 3;
   }
 
-  .app.wide .slot {
+  .app.wide .slot-body {
+    display: contents;
+  }
+
+  .app.wide .slot > *,
+  .app.wide .slot-body > * {
+    min-width: 0;
     align-self: start;
+  }
+
+  .app.wide .meal,
+  .app.wide .add,
+  .app.wide .proposal-name {
+    padding: 6px 0;
+  }
+
+  .app.wide .others {
+    margin-top: 4px;
   }
 
   .app.wide .all-done {
@@ -1376,9 +1413,6 @@ small {
   }
 
   .app.wide .slot {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 2px;
     padding-top: 6px;
   }
 

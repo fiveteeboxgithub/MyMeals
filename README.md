@@ -230,7 +230,9 @@ ceux qui échouent gardent leur nom.
 
 Quatre onglets : **Planning**, **Doublons**, **Stats** et **Réglages**. L'en-tête n'affiche un bouton que
 lorsqu'il faut agir (se connecter, importer un fichier). Sur un écran large, la semaine s'affiche en sept
-colonnes.
+colonnes, dont les rangées sont alignées (tous les midis, puis tous les soirs, à la même hauteur ; images,
+noms et événements des autres agendas aussi). Le bouton « ☰ Vue liste » (ou Réglages → Planning) affiche
+à la place la semaine en liste verticale, comme sur téléphone ; ce choix est propre à chaque appareil.
 
 ### Planning
 

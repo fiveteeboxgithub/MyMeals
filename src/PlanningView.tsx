@@ -28,6 +28,8 @@ import { DishThumb } from './DishThumb';
 import { OtherEvents, SLOT_LABEL, SlotSheet, type ShownProposal } from './SlotSheet';
 
 export type SlotMode = Slot | 'both';
+/** Semaine sur ordinateur : sept colonnes, ou liste verticale comme sur téléphone. */
+export type WeekLayout = 'columns' | 'list';
 
 /** Ce qui remplace la proposition d'un créneau : une idée « Surprise Me », un plat oublié ou de la liste noire. */
 interface Override {
@@ -56,6 +58,8 @@ interface PlanningProps {
   slotMode: SlotMode;
   pendingOnly: boolean;
   showImages: boolean;
+  weekLayout: WeekLayout;
+  setWeekLayout: (layout: WeekLayout) => void;
   blacklistKeys: ReadonlySet<string>;
   blacklistFilter: BlacklistFilter;
   /** Change quand les réglages changent : les tirages en cours sont alors oubliés. */
@@ -427,6 +431,13 @@ export function PlanningView(props: PlanningProps) {
         )}
         <button className="chip" onClick={() => void shareWeek()}>
           Partager la semaine
+        </button>
+        <button
+          className="chip layout-chip"
+          onClick={() => props.setWeekLayout(props.weekLayout === 'columns' ? 'list' : 'columns')}
+          title="Disposition de la semaine sur ordinateur"
+        >
+          {props.weekLayout === 'columns' ? '☰ Vue liste' : '▥ Vue colonnes'}
         </button>
       </div>
 

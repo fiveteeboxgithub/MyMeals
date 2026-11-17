@@ -12,7 +12,7 @@ import { parseIdeas } from './lib/surprise';
 import type { MealStore, SettingsSync } from './lib/types';
 import { useAppSettings } from './lib/useAppSettings';
 import { Notice } from './Notice';
-import { PlanningView, type SlotMode } from './PlanningView';
+import { PlanningView, type SlotMode, type WeekLayout } from './PlanningView';
 import { SettingsPage } from './SettingsPage';
 import { StatsPage } from './StatsPage';
 
@@ -88,6 +88,12 @@ export function Planner(props: PlannerProps) {
   const [slotMode, setSlotMode] = useState<SlotMode>(loadSlotMode);
   const [pendingOnly, setPendingOnly] = useState(() => readPref(KEYS.pendingOnly) === '1');
   // Images des plats (Wikipédia) : affichées sauf si on les a désactivées sur cet appareil.
+  // Sur ordinateur : la semaine en sept colonnes, ou en liste verticale comme sur téléphone.
+  const [weekLayout, setWeekLayoutState] = useState<WeekLayout>(() => (readPref(KEYS.weekLayout) === 'list' ? 'list' : 'columns'));
+  const setWeekLayout = useCallback((layout: WeekLayout) => {
+    setWeekLayoutState(layout);
+    writePref(KEYS.weekLayout, layout);
+  }, []);
   const [showImages, setShowImages] = useState(() => readPref(KEYS.images) !== '0');
   const [flash, setFlash] = useState<{ text: string; undo?: () => void } | null>(null);
   const showFlash = useCallback((text: string, undo?: () => void) => setFlash({ text, undo }), []);
@@ -184,7 +190,7 @@ export function Planner(props: PlannerProps) {
   const eventsApi = useMemo(() => (eventsOf ? { events: eventsOf } : undefined), [eventsOf]);
 
   return (
-    <div className={`app${view === 'planning' ? ' wide' : ''}`}>
+    <div className={`app${view === 'planning' && weekLayout === 'columns' ? ' wide' : ''}`}>
       <header className="top">
         <h1>MyMeals</h1>
         {props.headerAction && <div className="top-actions">{props.headerAction}</div>}
@@ -228,6 +234,8 @@ export function Planner(props: PlannerProps) {
           slotMode={slotMode}
           pendingOnly={pendingOnly}
           showImages={showImages}
+          weekLayout={weekLayout}
+          setWeekLayout={setWeekLayout}
           blacklistKeys={blacklistKeys}
           blacklistFilter={blacklistFilter}
           resetToken={resetToken}
@@ -259,6 +267,8 @@ export function Planner(props: PlannerProps) {
             setPendingOnly(value);
             writePref(KEYS.pendingOnly, value ? '1' : '0');
           }}
+          weekLayout={weekLayout}
+          setWeekLayout={setWeekLayout}
           showImages={showImages}
           setShowImages={(value) => {
             setShowImages(value);

@@ -5,7 +5,7 @@ import type { CalendarInfo } from './lib/google';
 import { MAX_BLACKLIST_CHARS, MAX_FAVORITES_CHARS, MAX_IDEAS_CHARS, type SharedSettings } from './lib/settings';
 import { HISTORY_WINDOWS, RANDOMNESS_LEVELS, type DishIndex } from './lib/suggest';
 import { PERIODS } from './lib/surprise';
-import type { SlotMode } from './PlanningView';
+import type { SlotMode, WeekLayout } from './PlanningView';
 import { ThemeSettings } from './ThemePicker';
 
 const SLOT_MODES: { value: SlotMode; label: string }[] = [
@@ -42,6 +42,8 @@ interface SettingsProps {
   setSlotMode: (mode: SlotMode) => void;
   pendingOnly: boolean;
   setPendingOnly: (value: boolean) => void;
+  weekLayout: WeekLayout;
+  setWeekLayout: (layout: WeekLayout) => void;
   showImages: boolean;
   setShowImages: (value: boolean) => void;
   blacklist: Blacklist;
@@ -88,6 +90,19 @@ export function SettingsPage(props: SettingsProps) {
         <Switch checked={props.pendingOnly} onChange={props.setPendingOnly}>
           À décider seulement (masque les créneaux déjà décidés)
         </Switch>
+        <div className="segmented" role="group" aria-label="Semaine sur ordinateur">
+          {(
+            [
+              ['columns', 'Colonnes'],
+              ['list', 'Liste'],
+            ] as const
+          ).map(([value, label]) => (
+            <button key={value} aria-pressed={props.weekLayout === value} onClick={() => props.setWeekLayout(value)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="blacklist-help">Sur ordinateur : la semaine en sept colonnes, ou en liste verticale comme sur téléphone.</p>
         <Switch checked={props.showImages} onChange={props.setShowImages}>
           Images des plats (Wikipédia)
         </Switch>

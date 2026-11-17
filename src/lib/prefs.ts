@@ -13,6 +13,7 @@ export const KEYS = {
   pendingOnly: 'mymeals.pendingOnly',
   calendars: 'mymeals.calendars.shown',
   images: 'mymeals.images.show',
+  weekLayout: 'mymeals.weekLayout',
 } as const;
 
 export function readPref(key: string): string | null {
