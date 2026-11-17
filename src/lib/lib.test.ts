@@ -741,3 +741,73 @@ describe('liste noire', async () => {
     expect(without.get('poisson')).toBeCloseTo(1);
   });
 });
+
+describe('réglages partagés et connexion', async () => {
+  const { DEFAULT_SETTINGS, decideSync, parseSettingsRecord } = await import('./settings');
+  const google = await import('./google');
+
+  const record = (updatedAt: number, patch: Record<string, unknown> = {}) => ({
+    updatedAt,
+    settings: { ...DEFAULT_SETTINGS, ...patch },
+  });
+
+  it('décide qui l’emporte : le plus récent', () => {
+    expect(decideSync(0, undefined)).toBe('none'); // pas encore lus
+    expect(decideSync(0, null)).toBe('none'); // rien nulle part
+    expect(decideSync(5, null)).toBe('push-local'); // réglé ici, pas encore dans l'agenda
+    expect(decideSync(1, null)).toBe('push-local'); // anciens réglages d'avant la synchronisation
+    expect(decideSync(0, record(10))).toBe('adopt-remote'); // appareil neuf
+    expect(decideSync(1, record(10))).toBe('adopt-remote');
+    expect(decideSync(10, record(10))).toBe('none');
+    expect(decideSync(20, record(10))).toBe('push-local');
+    expect(decideSync(5, record(10))).toBe('adopt-remote');
+  });
+
+  it('valide les réglages venus de l’agenda', () => {
+    const ok = parseSettingsRecord({ updatedAt: 12, settings: { blacklistText: 'kebab\nwafu', includeBlacklist: true, randomness: 4, historyMonths: 120, surprisePeriod: 0 } });
+    expect(ok).toEqual({ updatedAt: 12, settings: { blacklistText: 'kebab\nwafu', includeBlacklist: true, randomness: 4, historyMonths: 120, surprisePeriod: 0 } });
+    // Valeurs absurdes : retour au défaut, champ par champ.
+    const bad = parseSettingsRecord({ updatedAt: 3, settings: { blacklistText: 42, includeBlacklist: 'oui', randomness: 99, historyMonths: 7, surprisePeriod: -1 } });
+    expect(bad).toEqual({ updatedAt: 3, settings: DEFAULT_SETTINGS });
+    expect(parseSettingsRecord(null)).toBeNull();
+    expect(parseSettingsRecord({ settings: {} })).toBeNull();
+    expect(parseSettingsRecord({ updatedAt: 'x', settings: {} })).toBeNull();
+    expect(parseSettingsRecord({ updatedAt: 1, settings: { blacklistText: 'x'.repeat(10000) } })!.settings.blacklistText).toHaveLength(4000);
+  });
+
+  it('écrit et relit les réglages dans le texte de l’événement', () => {
+    const payload = record(99, { blacklistText: 'kebab\n/\\bpho\\b/\n« été » & co', includeBlacklist: true });
+    const text = google.encodeSettings(payload);
+    expect(text).toContain('Ne pas supprimer');
+    expect(text.split('\n')).toHaveLength(2); // le JSON tient sur une seule ligne
+    expect(google.decodeSettings(text)).toEqual(payload);
+    // Même si Google (ou quelqu'un) a reformaté le texte en HTML.
+    const html = `<p>${text.replace('\n', '<br>')}</p>`.replace(/"/g, '&quot;');
+    expect(google.decodeSettings(html)).toEqual(payload);
+    expect(google.decodeSettings('texte sans réglages')).toBeNull();
+    expect(google.decodeSettings(undefined)).toBeNull();
+    expect(google.decodeSettings('MYMEALS-REGLAGES {pas du json')).toBeNull();
+  });
+
+  it('ne prend pas l’événement des réglages pour un repas', () => {
+    const settingsEvent = { id: google.SETTINGS_EVENT_ID, status: 'confirmed', summary: '⚙ MyMeals : réglages', start: { date: '2100-01-01' } };
+    expect(google.eventToMeal(settingsEvent)).toBeNull();
+    expect(google.eventToMeal({ id: 'abc', status: 'confirmed', summary: 'pizza', start: { date: '2100-01-01' } })).not.toBeNull();
+    // L'identifiant n'utilise que les caractères permis par Google : a-v et 0-9.
+    expect(google.SETTINGS_EVENT_ID).toMatch(/^[a-v0-9]{5,}$/);
+  });
+
+  it('garde le jeton en mémoire même si le navigateur refuse de le stocker', () => {
+    google.forgetToken();
+    expect(google.storedToken()).toBeNull();
+    // Ici localStorage n'existe pas (comme dans un navigateur qui bloque le stockage).
+    google.rememberToken('abc', 3600);
+    expect(google.storedToken()).toBe('abc');
+    expect(google.tokenRemainingMs()).toBeGreaterThan(3_000_000);
+    google.forgetToken();
+    expect(google.storedToken()).toBeNull();
+    expect(google.tokenRemainingMs()).toBe(0);
+    google.rememberToken('périmé', 30); // moins d'une minute : déjà jugé périmé
+    expect(google.storedToken()).toBeNull();
+  });
+});

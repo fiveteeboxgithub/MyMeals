@@ -103,10 +103,35 @@ repas ne comptent plus dans le calcul de tes goûts. Ils reviennent seulement si
 - tu ouvres la fenêtre d'un créneau et choisis « Afficher aussi les plats de la liste noire », ou tu
   cherches un nom précis (ils portent alors l'étiquette « liste noire »).
 
-La liste et l'option sont enregistrées dans ce navigateur (`localStorage`) : elles survivent à la fermeture
-de l'application, mais elles sont propres à chaque appareil, et un navigateur peut les effacer s'il manque
-de place ou si le site n'est pas ouvert pendant longtemps (Safari sur iPhone, après environ une semaine). Le
-texte de la liste se copie-colle d'un appareil à l'autre.
+La liste et l'option font partie des **réglages partagés** (section suivante).
+
+## Réglages partagés
+
+Avec Google Agenda, les réglages qui décrivent tes goûts sont enregistrés dans l'agenda lui-même, pour être
+retrouvés sur tous les appareils et par le foyer : la liste noire et son option, le niveau de hasard,
+l'historique pris en compte et la période des goûts de « Surprise Me ». Ils vivent dans un **événement
+spécial** de l'agenda « Repas » : « ⚙ MyMeals : réglages (ne pas supprimer) », une journée entière le
+1er janvier 2100, privée et sans rappel, d'identifiant fixe (`mmealsreglages00`). Son texte contient une phrase
+d'explication puis les réglages en JSON. L'application ne le compte jamais comme un repas.
+
+- Un réglage modifié est envoyé à l'agenda environ une seconde après la dernière frappe.
+- Chaque appareil garde aussi une copie locale (`localStorage`) : l'application marche hors connexion.
+- Quand deux appareils diffèrent, **le plus récent l'emporte** (date de dernière modification) : un appareil neuf
+  reprend les réglages de l'agenda ; des réglages faits avant la synchronisation sont envoyés s'il n'y en a pas
+  encore dans l'agenda.
+- Les réglages d'affichage restent propres à chaque appareil : couleur de fond, Midi/Soir/Les deux, « À décider
+  seulement », créneaux « Pas de repas », groupes de doublons écartés.
+- Sans connexion Google (mode import de fichier), tout reste local ; le texte de la liste noire se copie-colle.
+
+Supprimer l'événement dans Google Agenda remet les réglages de l'agenda à zéro : le premier appareil qui se
+connecte ensuite le recrée avec ses propres réglages.
+
+## Plusieurs repas sur un même créneau
+
+Deux événements le même jour à la même heure (ou, plus généralement, du même côté de 16 h) tombent dans le
+même créneau, affiché « pizza + salade ». Le créneau compte comme décidé. Dans sa fenêtre, chaque repas a
+son propre bouton « Retirer » (et « Tout retirer »). Choisir un plat renomme **le premier** repas du créneau
+et laisse les autres ; c'est la même règle avec Google Agenda et avec l'import de fichier.
 
 ## Page « Doublons »
 
@@ -154,7 +179,10 @@ Une connexion Google dans un navigateur dure une heure. À l'expiration, le prem
 sur l'écran la renouvelle (la fenêtre Google s'ouvre et se referme seule quand le compte est
 connu) ; une action d'écriture (✓, renommage) renouvelle aussi la connexion avant de s'exécuter.
 Un refus 403 « trop de requêtes » est réessayé avec une attente progressive au lieu de
-déconnecter ; seul un refus 401 ou des autorisations insuffisantes déconnecte. « Se déconnecter »
+déconnecter ; seul un refus 401 ou des autorisations insuffisantes déconnecte, et un appel facultatif
+qui échoue (par exemple la recherche de l'adresse du compte) ne fait jamais perdre la connexion. Le jeton est
+aussi gardé en mémoire : un navigateur qui refuse d'écrire dans `localStorage` ne provoque plus de fenêtre
+de reconnexion à chaque action. Au plus une fenêtre de reconnexion automatique toutes les deux minutes. « Se déconnecter »
 arrête la reconnexion automatique.
 
 ## Développement

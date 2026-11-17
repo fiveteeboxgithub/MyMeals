@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DuplicatesPage } from './Duplicates';
 import { blacklistedKeys, parseBlacklist, type BlacklistFilter } from './lib/blacklist';
+import {
+  DEFAULT_SETTINGS,
+  decideSync,
+  loadSettingsStamp,
+  saveSettingsStamp,
+  type SharedSettings,
+} from './lib/settings';
 import { ThemePicker } from './ThemePicker';
 import { addDays, dayName, longDate, mondayOf, shortDate, todayIso, weekday } from './lib/dates';
 import { useGoogleMeals } from './lib/googleStore';
@@ -23,7 +30,7 @@ import {
   type Suggestion,
 } from './lib/suggest';
 import { DEFAULT_PERIOD_MONTHS, PERIODS, pickSurprise, surpriseIdeas, type Surprise } from './lib/surprise';
-import { SLOTS, type Meal, type MealStore, type Slot } from './lib/types';
+import { SLOTS, type Meal, type MealStore, type SettingsSync, type Slot } from './lib/types';
 
 const SLOT_LABEL: Record<Slot, string> = { midi: 'Midi', soir: 'Soir' };
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? '';
@@ -51,6 +58,7 @@ function GoogleApp() {
   return (
     <Planner
       store={store}
+      settingsSync={{ remote: store.settings, save: store.saveSettings }}
       action={
         connected ? (
           <button className="ghost-btn" onClick={store.disconnect}>
@@ -82,7 +90,7 @@ function GoogleApp() {
 }
 
 function LocalApp() {
-  const { meals, importMeals, setSlot, clearSlot, clearAll, renameMeals } = useMeals();
+  const { meals, importMeals, setSlot, clearSlot, removeMeal, clearAll, renameMeals } = useMeals();
   const [notice, setNotice] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -104,7 +112,7 @@ function LocalApp() {
 
   return (
     <Planner
-      store={{ meals, setSlot, clearSlot, renameMeals }}
+      store={{ meals, setSlot, clearSlot, removeMeal, renameMeals }}
       action={
         <>
           <button className="ghost-btn" onClick={() => fileInput.current?.click()}>
@@ -266,6 +274,8 @@ interface PlannerProps {
   banner: ReactNode;
   /** Complément de la ligne de bas de page. */
   footer: ReactNode;
+  /** Réglages partagés via l'agenda (mode Google seulement). */
+  settingsSync?: SettingsSync;
 }
 
 type View = 'planning' | 'doublons';
@@ -282,8 +292,8 @@ function useView(): [View, (view: View) => void] {
   return [view, (next) => { window.location.hash = next === 'doublons' ? 'doublons' : ''; }];
 }
 
-function Planner({ store, action, banner, footer }: PlannerProps) {
-  const { meals, setSlot, clearSlot } = store;
+function Planner({ store, action, banner, footer, settingsSync }: PlannerProps) {
+  const { meals, setSlot, clearSlot, removeMeal } = store;
   const [view, setView] = useView();
   const today = todayIso();
   const [monday, setMonday] = useState(() => mondayOf(today));
@@ -305,9 +315,55 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
   const [flash, setFlash] = useState('');
   const [blacklistText, setBlacklistText] = useState(() => loadText(BLACKLIST_TEXT_KEY));
   const [includeBlacklist, setIncludeBlacklist] = useState(() => loadText(BLACKLIST_INCLUDE_KEY) === '1');
+  // Date de la dernière modification des réglages partagés : la plus récente (ici ou dans l'agenda) l'emporte.
+  const [stamp, setStamp] = useState(() =>
+    loadSettingsStamp(
+      loadText(BLACKLIST_TEXT_KEY) !== DEFAULT_SETTINGS.blacklistText ||
+        loadText(BLACKLIST_INCLUDE_KEY) === '1' ||
+        loadRandomness() !== DEFAULT_SETTINGS.randomness ||
+        loadHistoryMonths() !== DEFAULT_SETTINGS.historyMonths ||
+        loadPeriod() !== DEFAULT_SETTINGS.surprisePeriod,
+    ),
+  );
+  const touchSettings = () => {
+    const now = Date.now();
+    setStamp(now);
+    saveSettingsStamp(now);
+  };
   const { skipped, setSkip } = useSkippedSlots(today);
 
   const dishes = useMemo(() => buildIndex(meals), [meals]);
+  // Réglages partagés : envoyés dans l'agenda quand ils changent ici, repris quand ils sont plus récents là-bas.
+  const sharedNow: SharedSettings = { blacklistText, includeBlacklist, randomness, historyMonths, surprisePeriod };
+  const sharedRef = useRef(sharedNow);
+  sharedRef.current = sharedNow;
+  const remoteSettings = settingsSync?.remote;
+  const saveRemoteSettings = settingsSync?.save;
+  useEffect(() => {
+    if (!saveRemoteSettings) return;
+    const decision = decideSync(stamp, remoteSettings);
+    if (decision === 'adopt-remote' && remoteSettings) {
+      const { settings, updatedAt } = remoteSettings;
+      setBlacklistText(settings.blacklistText);
+      remember(BLACKLIST_TEXT_KEY, settings.blacklistText);
+      setIncludeBlacklist(settings.includeBlacklist);
+      remember(BLACKLIST_INCLUDE_KEY, settings.includeBlacklist ? '1' : '0');
+      setRandomness(settings.randomness);
+      remember(RANDOMNESS_KEY, settings.randomness);
+      setHistoryMonths(settings.historyMonths);
+      remember(HISTORY_KEY, settings.historyMonths);
+      setSurprisePeriod(settings.surprisePeriod);
+      remember(PERIOD_KEY, settings.surprisePeriod);
+      setStamp(updatedAt);
+      saveSettingsStamp(updatedAt);
+      setRejected({});
+      setOverrides({});
+      surprisesShown.current.clear();
+    } else if (decision === 'push-local') {
+      saveRemoteSettings({ updatedAt: stamp, settings: sharedRef.current });
+    }
+  }, [remoteSettings, saveRemoteSettings, stamp]);
+
   const blacklist = useMemo(() => parseBlacklist(blacklistText), [blacklistText]);
   const blacklistKeys = useMemo(() => blacklistedKeys(dishes, blacklist), [dishes, blacklist]);
   const blacklistFilter = useMemo<BlacklistFilter>(
@@ -519,6 +575,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                 setOverrides({});
                 surprisesShown.current.clear();
                 remember(RANDOMNESS_KEY, level);
+                touchSettings();
               }}
             >
               {RANDOMNESS_LEVELS.map((level, i) => (
@@ -537,6 +594,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                 setHistoryMonths(months);
                 setRejected({});
                 remember(HISTORY_KEY, months);
+                touchSettings();
               }}
             >
               {HISTORY_WINDOWS.map((w) => (
@@ -556,6 +614,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                 setOverrides({});
                 surprisesShown.current.clear();
                 remember(PERIOD_KEY, months);
+                touchSettings();
               }}
             >
               {PERIODS.map((p) => (
@@ -575,6 +634,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                 setOverrides({});
                 surprisesShown.current.clear();
                 remember(BLACKLIST_INCLUDE_KEY, e.target.checked ? '1' : '0');
+                touchSettings();
               }}
             />
             <span className="switch-track" aria-hidden="true" />
@@ -594,6 +654,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                 setOverrides({});
                 remember(BLACKLIST_TEXT_KEY, e.target.value);
                 requestPersistentStorage();
+                touchSettings();
               }}
             />
           </label>
@@ -739,7 +800,9 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
             setOverrides({});
             surprisesShown.current.clear();
             remember(PERIOD_KEY, months);
+            touchSettings();
           }}
+          onRemoveMeal={removeMeal}
           skipped={skipped.has(`${editing.date}|${editing.slot}`)}
           onSkip={(skip) => {
             setSkip(`${editing.date}|${editing.slot}`, skip);
@@ -768,6 +831,7 @@ interface SheetProps {
   suggestions: Suggestion[];
   includeBlacklist: boolean;
   blacklistFilter: BlacklistFilter;
+  onRemoveMeal: (id: string) => void;
   dishes: DishIndex;
   today: string;
   randomness: number;
@@ -780,7 +844,7 @@ interface SheetProps {
   onClose: () => void;
 }
 
-function SlotSheet({ date, slot, current, suggestions, includeBlacklist, blacklistFilter, dishes, today, randomness, period, onPeriodChange, skipped, onSkip, onPick, onClear, onClose }: SheetProps) {
+function SlotSheet({ date, slot, current, suggestions, includeBlacklist, blacklistFilter, onRemoveMeal, dishes, today, randomness, period, onPeriodChange, skipped, onSkip, onPick, onClear, onClose }: SheetProps) {
   const [query, setQuery] = useState('');
   const [revealed, setRevealed] = useState(false);
   // Chaque mot saisi doit se retrouver dans une des écritures du plat, dans n'importe quel ordre.
@@ -811,13 +875,34 @@ function SlotSheet({ date, slot, current, suggestions, includeBlacklist, blackli
             ✕
           </button>
         </div>
-        {current && (
+        {current && current.length === 1 && (
           <p className="current">
-            Prévu : <strong>{current.map((m) => m.name).join(' + ')}</strong>
+            Prévu : <strong>{current[0].name}</strong>
             <button className="link danger" onClick={onClear}>
               Retirer
             </button>
           </p>
+        )}
+        {current && current.length > 1 && (
+          <div className="current">
+            <p>
+              {current.length} repas sont prévus sur ce créneau. Choisir un plat ci-dessous remplace seulement le premier
+              (« {current[0].name} »).
+            </p>
+            <ul className="current-list">
+              {current.map((meal) => (
+                <li key={meal.id}>
+                  <strong>{meal.name}</strong>
+                  <button className="link danger" onClick={() => onRemoveMeal(meal.id)}>
+                    Retirer
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button className="link danger" onClick={onClear}>
+              Tout retirer
+            </button>
+          </div>
         )}
         {!current && (
           <p className="current">

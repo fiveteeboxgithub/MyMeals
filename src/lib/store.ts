@@ -44,16 +44,24 @@ export function useMeals() {
     [update],
   );
 
-  /** Remplace le contenu d'un créneau par un seul plat. */
+  /**
+   * Donne un plat au créneau : le premier repas du créneau est renommé (les autres, s'il y en a,
+   * restent), ou un repas est créé si le créneau est vide. Même règle qu'avec Google Agenda.
+   */
   const setSlot = useCallback(
-    (date: string, slot: Slot, name: string) => {
-      update((current) => [
-        ...current.filter((m) => !(m.date === date && m.slot === slot)),
-        { id: `app-${date}-${slot}-${Date.now()}`, date, slot, name: name.trim(), source: 'app' },
-      ]);
+    (date: string, slot: Slot, rawName: string) => {
+      const name = rawName.trim();
+      if (!name) return;
+      update((current) => {
+        const first = current.find((m) => m.date === date && m.slot === slot);
+        if (first) return current.map((m) => (m === first ? { ...m, name } : m));
+        return [...current, { id: `app-${date}-${slot}-${Date.now()}`, date, slot, name, source: 'app' }];
+      });
     },
     [update],
   );
+
+  const removeMeal = useCallback((id: string) => update((current) => current.filter((m) => m.id !== id)), [update]);
 
   const clearSlot = useCallback(
     (date: string, slot: Slot) => {
@@ -75,7 +83,7 @@ export function useMeals() {
     [meals, update],
   );
 
-  return { meals, importMeals, setSlot, clearSlot, clearAll, renameMeals };
+  return { meals, importMeals, setSlot, clearSlot, removeMeal, clearAll, renameMeals };
 }
 
 const SKIPPED_KEY = 'mymeals.skipped.v1';

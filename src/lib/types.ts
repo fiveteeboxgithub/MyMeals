@@ -1,3 +1,5 @@
+import type { SettingsRecord } from './settings';
+
 export type Slot = 'midi' | 'soir';
 
 export const SLOTS: Slot[] = ['midi', 'soir'];
@@ -15,10 +17,19 @@ export interface Meal {
 }
 
 /** Ce dont le planning a besoin, que les repas viennent du navigateur ou de Google Agenda. */
+/** Réglages partagés via l'agenda (mode Google) : ceux lus dans l'agenda, et de quoi les y enregistrer. */
+export interface SettingsSync {
+  /** undefined tant qu'ils n'ont pas été lus, null s'ils n'existent pas encore. */
+  remote: SettingsRecord | null | undefined;
+  save: (record: SettingsRecord) => void;
+}
+
 export interface MealStore {
   meals: Meal[];
   setSlot: (date: string, slot: Slot, name: string) => void;
   clearSlot: (date: string, slot: Slot) => void;
+  /** Retire un seul repas (utile quand un créneau en contient plusieurs). */
+  removeMeal: (id: string) => void;
   /** Donne le même nom à tous les repas indiqués. Renvoie le nombre de repas renommés ou en échec. */
   renameMeals: (ids: string[], name: string) => Promise<{ renamed: number; failed: number }>;
 }

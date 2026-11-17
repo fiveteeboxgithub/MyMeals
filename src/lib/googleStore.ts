@@ -7,16 +7,20 @@ import {
   findCalendar,
   forgetToken,
   getAccount,
+  SETTINGS_EVENT_ID,
   insertEvent,
   listChanges,
   loadGoogleSignIn,
+  readSettingsEvent,
   renameEvent,
   signIn,
   storedToken,
   tokenRemainingMs,
+  writeSettingsEvent,
   type GoogleCalendar,
   type GoogleEvent,
 } from './google';
+import { parseSettingsRecord, type SettingsRecord } from './settings';
 import type { Meal, MealStore, Slot } from './types';
 
 const CACHE_KEY = 'mymeals.google.v1';
@@ -50,6 +54,9 @@ function applyEvents(meals: Meal[], events: GoogleEvent[]): Meal[] {
 
 export interface GoogleMealStore extends MealStore {
   connected: boolean;
+  /** Réglages lus dans l'événement spécial de l'agenda : undefined avant lecture, null s'il n'existe pas. */
+  settings: SettingsRecord | null | undefined;
+  saveSettings: (record: SettingsRecord) => void;
   /** Une connexion a déjà eu lieu : la reconnexion peut se faire d'un simple toucher. */
   canRenew: boolean;
   syncing: boolean;
@@ -72,6 +79,11 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   const busy = useRef(false);
   const renewing = useRef<Promise<string | null> | null>(null);
   const lastRenewFailure = useRef(0);
+  const lastRenewSuccess = useRef(0);
+  const [settings, setSettings] = useState<SettingsRecord | null | undefined>(undefined);
+  const settingsLoaded = useRef(false);
+  const pendingSettings = useRef<SettingsRecord | null>(null);
+  const settingsTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const commit = useCallback((fn: (current: Cache) => Cache) => {
     const next = fn(cacheRef.current);
@@ -85,7 +97,11 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   }, []);
 
   const fail = useCallback((e: unknown) => {
-    if (e instanceof AuthError) setToken(null);
+    if (e instanceof AuthError) {
+      // C'est ici, et seulement ici, qu'un refus de Google fait perdre la connexion.
+      forgetToken();
+      setToken(null);
+    }
     setError(e instanceof Error ? e.message : 'Erreur inattendue.');
   }, []);
 
@@ -118,6 +134,17 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
         }
         const { events, syncToken } = changes;
         commit((c) => ({ ...c, syncToken, meals: applyEvents(full ? [] : c.meals, events) }));
+        // Les réglages se relisent une fois par session, et quand l'événement spécial a changé.
+        if (!settingsLoaded.current || events.some((event) => event.id === SETTINGS_EVENT_ID)) {
+          try {
+            const found = await readSettingsEvent(accessToken, calendar);
+            setSettings(found ? parseSettingsRecord(found.payload) : null);
+            settingsLoaded.current = true;
+          } catch (e) {
+            if (e instanceof AuthError) throw e;
+            // lecture impossible : les réglages de cet appareil restent seuls en vigueur
+          }
+        }
       } catch (e) {
         fail(e);
       } finally {
@@ -153,6 +180,8 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     setToken(null);
     // Déconnexion voulue : on ne se reconnecte plus tout seul au prochain toucher.
     commit((c) => ({ ...c, calendar: undefined, account: undefined, syncToken: undefined }));
+    setSettings(undefined);
+    settingsLoaded.current = false;
   }, [commit]);
 
   /**
@@ -165,6 +194,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
       renewing.current = signIn(clientId, { hint: cacheRef.current.account })
         .then(
           (fresh) => {
+            lastRenewSuccess.current = Date.now();
             setToken(fresh);
             return fresh;
           },
@@ -187,7 +217,9 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   useEffect(() => {
     if (!canRenew) return;
     const onGesture = () => {
+      // Jamais plus d'une fenêtre de reconnexion toutes les deux minutes, quoi qu'il arrive.
       if (renewing.current || Date.now() - lastRenewFailure.current < 60_000) return;
+      if (Date.now() - lastRenewSuccess.current < 120_000) return;
       if (tokenRemainingMs() > 5 * 60_000) return;
       void renew();
     };
@@ -276,6 +308,55 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     [commit, fail, withAccess],
   );
 
+  /** Retire un seul repas de l'agenda. */
+  const removeMeal = useCallback(
+    (id: string) => {
+      // Un repas encore en cours de création n'a pas d'identifiant Google : on ne peut pas le supprimer tout de suite.
+      if (id.startsWith('tmp-')) return;
+      withAccess((a) => {
+        const meal = cacheRef.current.meals.find((m) => m.id === id);
+        if (!meal) return;
+        commit((c) => ({ ...c, meals: c.meals.filter((m) => m.id !== id) }));
+        deleteEvent(a.token, a.calendar, id).catch((e) => {
+          commit((c) => ({ ...c, meals: [...c.meals, meal] }));
+          fail(e);
+        });
+      });
+    },
+    [commit, fail, withAccess],
+  );
+
+  /** Envoie les réglages en attente, si la connexion est valable (sinon ils attendent la prochaine). */
+  const flushSettings = useCallback(() => {
+    const record = pendingSettings.current;
+    const fresh = storedToken();
+    const calendar = cacheRef.current.calendar;
+    if (!record || !fresh || !calendar) return;
+    pendingSettings.current = null;
+    writeSettingsEvent(fresh, calendar, record).then(
+      () => setSettings(record),
+      (e) => {
+        pendingSettings.current ??= record;
+        fail(e);
+      },
+    );
+  }, [fail]);
+
+  /** Enregistre les réglages dans l'événement spécial, un instant après la dernière modification. */
+  const saveSettings = useCallback(
+    (record: SettingsRecord) => {
+      pendingSettings.current = record;
+      clearTimeout(settingsTimer.current);
+      settingsTimer.current = setTimeout(flushSettings, 1200);
+    },
+    [flushSettings],
+  );
+
+  // Une connexion toute neuve (ou renouvelée) envoie ce qui attendait.
+  useEffect(() => {
+    if (token) flushSettings();
+  }, [token, flushSettings]);
+
   /** Renomme des événements de l'agenda, quelques-uns à la fois ; ceux qui échouent reprennent leur nom. */
   const renameMeals = useCallback(
     async (ids: string[], rawName: string) => {
@@ -327,7 +408,10 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     meals: cache.meals,
     setSlot,
     clearSlot,
+    removeMeal,
     renameMeals,
+    settings,
+    saveSettings,
     connected: token !== null,
     canRenew,
     syncing,

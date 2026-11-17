@@ -13,6 +13,8 @@ const SLOT_START: Record<Slot, number> = { midi: 13, soir: 20 };
 
 /** La connexion Google a expiré ou a été refusée : il faut se reconnecter. */
 export class AuthError extends Error {}
+/** L'élément demandé n'existe pas (ou plus). */
+export class NotFoundError extends Error {}
 /** Le jeton de synchronisation n'est plus valable : il faut tout relire. */
 export class SyncExpiredError extends Error {}
 
@@ -76,34 +78,56 @@ export function loadGoogleSignIn(): Promise<void> {
   return gisLoading;
 }
 
-export function storedToken(): string | null {
+interface StoredToken {
+  token: string;
+  expires: number;
+}
+
+/** Copie en mémoire : le jeton reste utilisable même si le navigateur refuse d'écrire dans localStorage. */
+let memoryToken: StoredToken | null = null;
+
+function readStoredToken(): StoredToken | null {
+  if (memoryToken && Date.now() < memoryToken.expires) return memoryToken;
   try {
     const raw = localStorage.getItem(TOKEN_KEY);
     if (!raw) return null;
-    const { token, expires } = JSON.parse(raw) as { token: string; expires: number };
-    return Date.now() < expires ? token : null;
+    const parsed = JSON.parse(raw) as StoredToken;
+    if (typeof parsed.token !== 'string' || typeof parsed.expires !== 'number' || Date.now() >= parsed.expires) return null;
+    memoryToken = parsed;
+    return parsed;
   } catch {
     return null;
   }
 }
 
-/** Durée de validité restante du jeton enregistré, en millisecondes (0 s'il n'y en a pas ou s'il a expiré). */
-export function tokenRemainingMs(): number {
-  try {
-    const raw = localStorage.getItem(TOKEN_KEY);
-    if (!raw) return 0;
-    const { expires } = JSON.parse(raw) as { expires: number };
-    return Math.max(0, expires - Date.now());
-  } catch {
-    return 0;
-  }
+/** Jeton d'accès encore valable, ou null. */
+export function storedToken(): string | null {
+  return readStoredToken()?.token ?? null;
 }
 
+/** Durée de validité restante du jeton, en millisecondes (0 s'il n'y en a pas ou s'il a expiré). */
+export function tokenRemainingMs(): number {
+  const stored = readStoredToken();
+  return stored ? Math.max(0, stored.expires - Date.now()) : 0;
+}
+
+/** Oublie le jeton (déconnexion voulue, ou refus de Google). */
 export function forgetToken(): void {
+  memoryToken = null;
   try {
     localStorage.removeItem(TOKEN_KEY);
   } catch {
     // rien à faire
+  }
+}
+
+export function rememberToken(token: string, expiresInSeconds: number): void {
+  // Une minute de marge : on ne s'appuie pas sur un jeton qui expire dans la seconde.
+  memoryToken = { token, expires: Date.now() + (expiresInSeconds - 60) * 1000 };
+  try {
+    localStorage.setItem(TOKEN_KEY, JSON.stringify(memoryToken));
+  } catch {
+    // le jeton reste en mémoire pour cette session
   }
 }
 
@@ -127,12 +151,7 @@ export async function signIn(clientId: string, options: { hint?: string } = {}):
         } else if (!oauth2.hasGrantedAllScopes(response, ...SCOPES)) {
           reject(new AuthError("Il faut cocher toutes les autorisations demandées pour lire et modifier l'agenda."));
         } else {
-          const expires = Date.now() + ((response.expires_in ?? 3600) - 60) * 1000;
-          try {
-            localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: response.access_token, expires }));
-          } catch {
-            // le jeton restera en mémoire pour cette session
-          }
+          rememberToken(response.access_token, response.expires_in ?? 3600);
           resolve(response.access_token);
         }
       },
@@ -165,10 +184,10 @@ async function call<T>(token: string, path: string, init: RequestInit = {}, atte
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers },
   });
   // Seul 401 veut dire « jeton expiré » : un 403 est souvent une simple limite de débit.
-  if (response.status === 401) {
-    forgetToken();
-    throw new AuthError('La connexion Google a expiré.');
-  }
+  // Ce n'est pas à cette fonction de jeter le jeton : l'appelant décide si l'échec est grave
+  // (un appel facultatif qui échoue ne doit pas déconnecter).
+  if (response.status === 401) throw new AuthError('La connexion Google a expiré.');
+  if (response.status === 404) throw new NotFoundError('Élément introuvable dans Google Agenda.');
   if (response.status === 410) throw new SyncExpiredError();
   if (!response.ok) {
     const reason = await errorReason(response);
@@ -180,7 +199,6 @@ async function call<T>(token: string, path: string, init: RequestInit = {}, atte
       return call<T>(token, path, init, attempt + 1);
     }
     if (response.status === 403 && PERMISSION_REASONS.has(reason)) {
-      forgetToken();
       throw new AuthError("Autorisations insuffisantes : reconnecte-toi en cochant toutes les cases demandées.");
     }
     if (limited) throw new Error('Google limite temporairement les requêtes : réessaie dans une minute.');
@@ -190,10 +208,24 @@ async function call<T>(token: string, path: string, init: RequestInit = {}, atte
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
 }
 
-/** Adresse du compte connecté (l'identifiant de son agenda principal), pour renouveler la connexion sans la redemander. */
+/**
+ * Adresse du compte connecté : l'identifiant de son agenda principal, lu dans la liste des agendas
+ * (déjà autorisée ; l'appel direct à « calendars/primary » demande une autorisation de plus).
+ */
 export async function getAccount(token: string): Promise<string | undefined> {
-  const calendar = await call<{ id?: string }>(token, '/calendars/primary?fields=id');
-  return calendar.id;
+  let pageToken: string | undefined;
+  do {
+    const query = new URLSearchParams({ maxResults: '250', fields: 'items(id,primary),nextPageToken' });
+    if (pageToken) query.set('pageToken', pageToken);
+    const page = await call<{ items?: { id: string; primary?: boolean }[]; nextPageToken?: string }>(
+      token,
+      `/users/me/calendarList?${query}`,
+    );
+    const primary = page.items?.find((c) => c.primary);
+    if (primary) return primary.id;
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+  return undefined;
 }
 
 export async function findCalendar(token: string, name: string): Promise<GoogleCalendar | null> {
@@ -278,6 +310,7 @@ export function deleteEvent(token: string, calendar: GoogleCalendar, eventId: st
 
 /** Un événement devient un repas ; renvoie null s'il est annulé, sans titre ou sans date. */
 export function eventToMeal(event: GoogleEvent): Meal | null {
+  if (event.id === SETTINGS_EVENT_ID) return null;
   const name = event.summary?.trim();
   if (event.status === 'cancelled' || !name || !event.start) return null;
   // Google renvoie l'heure dans le fuseau de l'agenda : on lit la date et l'heure telles quelles.
@@ -288,4 +321,70 @@ export function eventToMeal(event: GoogleEvent): Meal | null {
   }
   if (date) return { id: event.id, date, slot: 'soir', name, source: 'google' };
   return null;
+}
+
+/**
+ * Événement spécial qui garde les réglages partagés dans l'agenda : un événement « journée entière »
+ * en 2100, masqué des repas. Son identifiant est fixe (lettres a-v et chiffres, comme l'exige Google).
+ */
+export const SETTINGS_EVENT_ID = 'mmealsreglages00';
+const SETTINGS_TITLE = '⚙ MyMeals : réglages (ne pas supprimer)';
+const SETTINGS_MARKER = 'MYMEALS-REGLAGES';
+
+/** Texte de l'événement : une phrase d'explication puis les réglages en JSON sur une seule ligne. */
+export function encodeSettings(payload: unknown): string {
+  return `Réglages de l'application MyMeals, enregistrés ici pour être retrouvés sur tous vos appareils. Ne pas supprimer ni modifier à la main.\n${SETTINGS_MARKER} ${JSON.stringify(payload)}`;
+}
+
+/** Relit les réglages dans le texte d'un événement (qu'il ait été reformaté en HTML ou non). */
+export function decodeSettings(description: string | undefined): unknown {
+  if (!description) return null;
+  const at = description.indexOf(SETTINGS_MARKER);
+  if (at < 0) return null;
+  const text = description.slice(at + SETTINGS_MARKER.length).replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end < start) return null;
+  try {
+    return JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+/** Lit l'événement des réglages : null s'il n'existe pas (ou a été supprimé). */
+export async function readSettingsEvent(token: string, calendar: GoogleCalendar): Promise<{ payload: unknown } | null> {
+  try {
+    const event = await call<{ status?: string; description?: string }>(
+      token,
+      `/calendars/${encodeURIComponent(calendar.id)}/events/${SETTINGS_EVENT_ID}?fields=status,description`,
+    );
+    if (event.status === 'cancelled') return null;
+    return { payload: decodeSettings(event.description) };
+  } catch (e) {
+    if (e instanceof NotFoundError) return null;
+    throw e;
+  }
+}
+
+/** Écrit l'événement des réglages : le met à jour, le recrée s'il a été supprimé, ou le crée la première fois. */
+export async function writeSettingsEvent(token: string, calendar: GoogleCalendar, payload: unknown): Promise<void> {
+  const base = `/calendars/${encodeURIComponent(calendar.id)}/events`;
+  const body = {
+    summary: SETTINGS_TITLE,
+    description: encodeSettings(payload),
+    start: { date: '2100-01-01' },
+    end: { date: '2100-01-02' },
+    transparency: 'transparent',
+    visibility: 'private',
+    reminders: { useDefault: false },
+    extendedProperties: { private: { mymeals: 'settings' } },
+    status: 'confirmed',
+  };
+  try {
+    await call<unknown>(token, `${base}/${SETTINGS_EVENT_ID}?fields=id`, { method: 'PATCH', body: JSON.stringify(body) });
+  } catch (e) {
+    if (!(e instanceof NotFoundError)) throw e;
+    await call<unknown>(token, `${base}?fields=id`, { method: 'POST', body: JSON.stringify({ id: SETTINGS_EVENT_ID, ...body }) });
+  }
 }
