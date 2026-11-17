@@ -480,8 +480,10 @@ small {
     padding-bottom: 2px;
   }
 
+  /* Jusqu'à cinq boutons sur une ligne, même sur un petit écran : ils se partagent la place. */
   .proposal .icon {
-    flex: 0 0 56px;
+    flex: 1 1 40px;
+    max-width: 56px;
     height: 34px;
     border-radius: 999px;
   }
@@ -892,4 +894,54 @@ small {
 
 .suspect .dup-actions {
   margin: 12px 0 0;
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 0.7rem;
+}
+
+.reveal {
+  display: block;
+  margin: 10px 2px 0;
+}
+
+.advanced-switch {
+  margin: 4px 0;
+}
+
+.blacklist {
+  display: block;
+  margin-top: 8px;
+}
+
+.blacklist textarea {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 12px;
+  font: 0.9rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  resize: vertical;
+}
+
+.blacklist-help {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.blacklist-help code {
+  padding: 0 4px;
+  background: var(--accent-soft);
+  border-radius: 4px;
+  color: var(--text);
 }

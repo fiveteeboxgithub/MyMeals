@@ -648,3 +648,96 @@ describe('thème', async () => {
     expect(resolveTheme({ id: 'custom', custom: '#102030' })!.dark).toBe(true);
   });
 });
+
+describe('liste noire', async () => {
+  const { blacklistedKeys, parseBlacklist } = await import('./blacklist');
+  const { BLACKLIST_PENALTY } = await import('./suggest');
+  const { surpriseIdeas, tasteProfile } = await import('./surprise');
+
+  it('cache les plats dont le nom contient un mot, sans accents ni majuscules', () => {
+    const list = parseBlacklist('kebab\n  Wafu  \n\n# un commentaire\nChez Paul');
+    expect(list.entries).toBe(3);
+    expect(list.matches('Kebabs frites')).toBe(true);
+    expect(list.matches('menu KEBAB')).toBe(true);
+    expect(list.matches('wafu/riz')).toBe(true);
+    expect(list.matches('chez paul : pizzas')).toBe(true);
+    expect(list.matches('pâtes carbonara')).toBe(false);
+    expect(list.matches('# un commentaire')).toBe(false);
+    expect(parseBlacklist('café').matches('Cafe gourmand')).toBe(true);
+    expect(parseBlacklist('').matches('kebab')).toBe(false);
+  });
+
+  it('accepte des expressions régulières entre barres obliques', () => {
+    const list = parseBlacklist('/\\bpho\\b/\n/^(sushi|maki)/\n/café|THÉ/');
+    expect(list.entries).toBe(3);
+    expect(list.matches('pho')).toBe(true);
+    expect(list.matches('Pho bo')).toBe(true);
+    expect(list.matches('photo de famille')).toBe(false);
+    expect(list.matches('Sushis maison')).toBe(true);
+    expect(list.matches('poke sushi')).toBe(false);
+    expect(list.matches('cafe et the')).toBe(true);
+    // Sans barres, c'est du texte : les caractères spéciaux ne sont pas interprétés.
+    expect(parseBlacklist('pho.*bo').matches('pho bo')).toBe(false);
+    expect(parseBlacklist('pho.*bo').matches('pho.*bo à emporter')).toBe(true);
+  });
+
+  it('signale les motifs mal formés sans planter', () => {
+    const list = parseBlacklist('kebab\n/(pho/\n/[a-/');
+    expect(list.entries).toBe(1);
+    expect(list.invalid.map((i) => i.line)).toEqual(['/(pho/', '/[a-/']);
+    expect(list.invalid[0].error).toBeTruthy();
+    expect(list.matches('kebab')).toBe(true);
+  });
+
+  const history: Meal[] = [];
+  for (let i = 0; i < 12; i++) history.push(meal(addDays('2026-01-05', i * 14), 'soir', 'poisson/riz'));
+  for (let i = 0; i < 12; i++) history.push(meal(addDays('2026-01-06', i * 14), 'soir', i === 3 ? 'kebbab' : 'kebab'));
+  for (let i = 0; i < 6; i++) history.push(meal(addDays('2026-01-07', i * 28), 'soir', 'wafu'));
+  const index = buildIndex(history);
+
+  it('repère les plats de l’historique, quelle que soit leur écriture', () => {
+    expect(index.dishes.map((d) => d.label).sort()).toEqual(['kebab', 'poisson/riz', 'wafu']);
+    // « kebbab » est une variante de « kebab » : l'une ou l'autre suffit.
+    expect([...blacklistedKeys(index, parseBlacklist('kebbab'))]).toEqual(['kebab']);
+    expect([...blacklistedKeys(index, parseBlacklist('keba\nwa'))].sort()).toEqual(['kebab', 'wafu']);
+    expect(blacklistedKeys(index, parseBlacklist('')).size).toBe(0);
+    expect(blacklistedKeys(index, parseBlacklist('/^w/')).size).toBe(1);
+  });
+
+  it('ne propose pas la liste noire, sauf si on l’inclut, et alors rarement', () => {
+    const keys = blacklistedKeys(index, parseBlacklist('kebab\nwafu'));
+    const options = { today: '2026-11-16', blacklist: keys };
+    expect(suggest(index, '2026-11-24', 'soir', options).map((s) => s.label)).toEqual(['poisson/riz']);
+    const included = suggest(index, '2026-11-24', 'soir', { ...options, includeBlacklist: true });
+    expect(included.map((s) => s.label).sort()).toEqual(['kebab', 'poisson/riz', 'wafu']);
+    expect(included.filter((s) => s.blacklisted).map((s) => s.label).sort()).toEqual(['kebab', 'wafu']);
+    expect(included[0].label).toBe('poisson/riz');
+    // Leur score est réduit au dixième : à poids égal, un plat normal passe toujours devant.
+    const plain = suggest(index, '2026-11-24', 'soir', { today: '2026-11-16' });
+    const scoreOf = (list: typeof plain, label: string) => list.find((s) => s.label === label)!.score;
+    expect(scoreOf(included, 'kebab')).toBeCloseTo(scoreOf(plain, 'kebab') * BLACKLIST_PENALTY, 6);
+    // Sans liste noire, rien ne change.
+    expect(plain.some((s) => s.blacklisted)).toBe(false);
+  });
+
+  it('retire les idées « Surprise Me » de la liste noire, et ses plats des goûts', () => {
+    const baseline = surpriseIdeas(buildIndex([]), '2026-11-20', 24, '2026-11-16').map((i) => i.name);
+    expect(baseline).toContain('Ramen');
+    expect(baseline).toContain('Soupe miso et gyozas');
+    const list = parseBlacklist('ramen\n/gyoza/');
+    const hidden = surpriseIdeas(buildIndex([]), '2026-11-20', 24, '2026-11-16', { matches: list.matches, keys: new Set(), include: false }).map((i) => i.name);
+    expect(hidden).not.toContain('Ramen');
+    expect(hidden).not.toContain('Soupe miso et gyozas');
+    expect(hidden.length).toBe(baseline.length - 2);
+    const included = surpriseIdeas(buildIndex([]), '2026-11-20', 24, '2026-11-16', { matches: list.matches, keys: new Set(), include: true });
+    expect(included.map((i) => i.name)).toContain('Ramen');
+    expect(included.findIndex((i) => i.name === 'Ramen')).toBeGreaterThan(baseline.indexOf('Ramen'));
+    // Les repas de la liste noire ne dessinent pas les goûts (un kebab ne dit pas ce qu'on aime cuisiner).
+    const profile = tasteProfile(index, 24, '2026-11-16');
+    expect(profile.get('snack') ?? 0).toBeGreaterThan(0);
+    const without = tasteProfile(index, 24, '2026-11-16', blacklistedKeys(index, parseBlacklist('kebab\nwafu')));
+    expect(without.get('snack') ?? 0).toBe(0);
+    expect(without.get('boeuf') ?? 0).toBe(0);
+    expect(without.get('poisson')).toBeCloseTo(1);
+  });
+});

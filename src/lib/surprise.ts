@@ -1,6 +1,7 @@
 import { CATALOG, CONCEPTS, type CatalogDish, type Concept } from './catalog';
 import { dayNumber, monthOf } from './dates';
-import { DEFAULT_RANDOMNESS, RANDOMNESS_LEVELS, fold, normalize, type DishIndex } from './suggest';
+import type { BlacklistFilter } from './blacklist';
+import { BLACKLIST_PENALTY, DEFAULT_RANDOMNESS, RANDOMNESS_LEVELS, fold, normalize, type DishIndex } from './suggest';
 
 /** Périodes proposées pour calculer les préférences, en mois (0 : tout l'historique). */
 export const PERIODS: { months: number; label: string }[] = [
@@ -38,13 +39,13 @@ export function conceptsOf(key: string): Concept[] {
  * Part des repas de la période qui contiennent chaque famille (entre 0 et 1).
  * Les « restes » ne comptent pas.
  */
-export function tasteProfile(index: DishIndex, months: number, today: string): Map<Concept, number> {
+export function tasteProfile(index: DishIndex, months: number, today: string, skip?: ReadonlySet<string>): Map<Concept, number> {
   const now = dayNumber(today);
   const from = months > 0 ? now - Math.round(months * 30.44) : -Infinity;
   const counts = new Map<Concept, number>();
   let total = 0;
   for (const dish of index.dishes) {
-    if (dish.generic) continue;
+    if (dish.generic || skip?.has(dish.key)) continue;
     const eaten = dish.occurrences.filter((o) => o.day >= from && o.day <= now).length;
     if (eaten === 0) continue;
     total += eaten;
@@ -73,13 +74,22 @@ function inSeason(entry: CatalogDish, month: number): boolean {
  * récents : un plat est bien classé si ses familles (poisson, riz…) reviennent
  * souvent dans les repas de la période, et s'il est de saison à la date visée.
  */
-export function surpriseIdeas(index: DishIndex, date: string, months: number, today: string): Surprise[] {
-  const profile = tasteProfile(index, months, today);
+export function surpriseIdeas(
+  index: DishIndex,
+  date: string,
+  months: number,
+  today: string,
+  blacklist?: BlacklistFilter,
+): Surprise[] {
+  // Les repas de la liste noire (restos…) ne disent rien de ce que tu aimes cuisiner.
+  const profile = tasteProfile(index, months, today, blacklist?.keys);
   const dishWords = index.dishes.map((d) => d.key.split(' '));
   const month = monthOf(date);
   const ideas: Surprise[] = [];
   for (const entry of CATALOG) {
     if (isKnown(entry, dishWords, index)) continue;
+    const listed = blacklist?.matches(entry.name) ?? false;
+    if (listed && !blacklist?.include) continue;
     const weights = entry.tags.map((tag) => profile.get(tag) ?? 0);
     const affinity = weights.reduce((sum, w) => sum + w, 0) / weights.length;
     const because = entry.tags
@@ -87,7 +97,7 @@ export function surpriseIdeas(index: DishIndex, date: string, months: number, to
       .sort((a, b) => profile.get(b)! - profile.get(a)!)
       .slice(0, 2)
       .map((tag) => CONCEPTS[tag].label);
-    ideas.push({ name: entry.name, because, score: (affinity + 0.01) * (inSeason(entry, month) ? 1 : 0.3) });
+    ideas.push({ name: entry.name, because, score: (affinity + 0.01) * (inSeason(entry, month) ? 1 : 0.3) * (listed ? BLACKLIST_PENALTY : 1) });
   }
   return ideas.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }

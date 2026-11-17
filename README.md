@@ -79,6 +79,35 @@ les repas de la période choisie (6 mois à tout l'historique, 5 ans par défaut
 saison, puis tirées au sort parmi les mieux classées : le niveau de hasard règle combien d'idées
 sont en lice (voir « Réglages des propositions »).
 
+## Liste noire
+
+Pour les plats que tu ne veux pas voir proposés (noms de restos, plats de restaurant ou à emporter),
+le bloc « Réglages des propositions » contient une **liste noire** : une entrée par ligne.
+
+- Un mot ou une expression (`kebab`, `chez paul`) : tous les plats dont le nom **contient** ce texte sont
+  cachés, sans tenir compte des majuscules ni des accents (« kebab » cache aussi « Kebabs frites »).
+  Les différentes écritures d'un même plat comptent : si « kebab » et « kebbab » sont regroupés, l'une ou
+  l'autre suffit.
+- Une ligne entourée de barres obliques est une **expression régulière** : `/\bpho\b/` (le mot « pho »,
+  pas « photo »), `/^(sushi|maki)/`. Une expression mal formée est signalée et ignorée.
+- Les lignes vides et celles qui commencent par `#` sont ignorées.
+
+Les plats concernés ne sont **jamais** proposés dans le planning, ni dans la liste de la fenêtre d'un
+créneau, ni par « Surprise Me » (les idées du catalogue dont le nom correspond sont retirées), et leurs
+repas ne comptent plus dans le calcul de tes goûts. Ils reviennent seulement si :
+
+- tu actives **« Inclure la liste noire (rarement) »** : environ une proposition sur dix vient alors de la
+  liste, les neuf autres jamais ;
+- tu appuies sur le bouton **🍽️** d'une proposition (visible quand la liste concerne au moins un plat de
+  ton historique) : il propose un plat de la liste noire, un autre à chaque appui ;
+- tu ouvres la fenêtre d'un créneau et choisis « Afficher aussi les plats de la liste noire », ou tu
+  cherches un nom précis (ils portent alors l'étiquette « liste noire »).
+
+La liste et l'option sont enregistrées dans ce navigateur (`localStorage`) : elles survivent à la fermeture
+de l'application, mais elles sont propres à chaque appareil, et un navigateur peut les effacer s'il manque
+de place ou si le site n'est pas ouvert pendant longtemps (Safari sur iPhone, après environ une semaine). Le
+texte de la liste se copie-colle d'un appareil à l'autre.
+
 ## Page « Doublons »
 
 **Doublons suspectés (affichés en premier).** L'application repère elle-même les libellés qui

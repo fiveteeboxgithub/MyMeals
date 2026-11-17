@@ -41,6 +41,8 @@ export interface Suggestion {
   count: number;
   /** Mangé ou prévu à moins d'une semaine de la date visée. */
   recent?: boolean;
+  /** Plat de la liste noire (seulement quand `suggest` a reçu l'option `includeBlacklist`). */
+  blacklisted?: boolean;
   reason: string;
 }
 
@@ -254,6 +256,11 @@ export const HISTORY_WINDOWS: { months: number; label: string }[] = [
 ];
 export const DEFAULT_HISTORY_MONTHS = 60;
 
+/** Les plats de la liste noire gardent ce dixième de leur score quand on les inclut : ils restent exceptionnels. */
+export const BLACKLIST_PENALTY = 0.1;
+/** Avec l'option « inclure la liste noire », environ une proposition sur dix vient de la liste. */
+export const BLACKLIST_CHANCE = 0.1;
+
 function seasonWeight(a: number, b: number): number {
   const diff = Math.abs(a - b);
   const distance = Math.min(diff, 12 - diff);
@@ -295,6 +302,10 @@ export interface SuggestOptions {
    * (la demi-vie suit la période). Sans cette option : demi-vie de deux ans, rien d'ignoré.
    */
   historyMonths?: number;
+  /** Clés des plats de la liste noire. Sans `includeBlacklist`, ils ne sont pas proposés du tout. */
+  blacklist?: ReadonlySet<string>;
+  /** Garde les plats de la liste noire (repérés par `blacklisted`), avec un score divisé par dix. */
+  includeBlacklist?: boolean;
 }
 
 /**
@@ -306,7 +317,7 @@ export interface SuggestOptions {
  * semaine contient déjà un plat proche.
  */
 export function suggest(index: DishIndex, date: string, slot: Slot, options: SuggestOptions = {}): Suggestion[] {
-  const { exclude, weekWords, historyMonths } = options;
+  const { exclude, weekWords, historyMonths, blacklist, includeBlacklist } = options;
   const target = dayNumber(date);
   const now = dayNumber(options.today ?? todayIso());
   const windowDays = historyMonths ? Math.round(historyMonths * 30.44) : undefined;
@@ -319,6 +330,8 @@ export function suggest(index: DishIndex, date: string, slot: Slot, options: Sug
 
   for (const dish of index.dishes) {
     if (exclude?.has(dish.key)) continue;
+    const listed = blacklist?.has(dish.key) ?? false;
+    if (listed && !includeBlacklist) continue;
     let base = 0;
     let count = 0;
     let lastEaten = -Infinity;
@@ -346,6 +359,7 @@ export function suggest(index: DishIndex, date: string, slot: Slot, options: Sug
       const repeats = Math.max(0, ...dish.words.map((w) => weekWords?.get(w) ?? 0));
       score *= Math.pow(REPEAT_PENALTY, repeats);
     }
+    if (listed) score *= BLACKLIST_PENALTY;
     out.push({
       key: dish.key,
       label: dish.label,
@@ -354,6 +368,7 @@ export function suggest(index: DishIndex, date: string, slot: Slot, options: Sug
       score,
       count,
       recent: !dish.generic && nearestGap < 7,
+      blacklisted: listed,
       reason: eaten ? `${count} fois · ${ago(now - lastEaten)}` : `${count} fois`,
     });
   }
@@ -412,7 +427,7 @@ export const RANDOMNESS_LEVELS = [
 export const DEFAULT_RANDOMNESS = 3;
 
 /** Nombre pseudo-aléatoire entre 0 et 1, toujours le même pour un texte donné. */
-function hashToUnit(text: string): number {
+export function hashToUnit(text: string): number {
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) {
     h ^= text.charCodeAt(i);

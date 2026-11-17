@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DuplicatesPage } from './Duplicates';
+import { blacklistedKeys, parseBlacklist, type BlacklistFilter } from './lib/blacklist';
 import { ThemePicker } from './ThemePicker';
 import { addDays, dayName, longDate, mondayOf, shortDate, todayIso, weekday } from './lib/dates';
 import { useGoogleMeals } from './lib/googleStore';
 import { parseIcs } from './lib/ics';
 import { useMeals, useSkippedSlots } from './lib/store';
 import {
+  BLACKLIST_CHANCE,
   DEFAULT_HISTORY_MONTHS,
   DEFAULT_RANDOMNESS,
   HISTORY_WINDOWS,
   RANDOMNESS_LEVELS,
   buildIndex,
   fold,
+  hashToUnit,
   normalize,
   pickProposal,
   suggest,
@@ -203,12 +206,39 @@ function loadPeriod(): number {
   }
 }
 
-function remember(key: string, value: number): void {
+function remember(key: string, value: number | string): void {
   try {
     localStorage.setItem(key, String(value));
   } catch {
     // le réglage vaudra pour cette session
   }
+}
+
+const BLACKLIST_TEXT_KEY = 'mymeals.blacklist.text';
+const BLACKLIST_INCLUDE_KEY = 'mymeals.blacklist.include';
+
+function loadText(key: string): string {
+  try {
+    return localStorage.getItem(key) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** Demande au navigateur de ne pas effacer les réglages quand il manque de place (selon le navigateur). */
+function requestPersistentStorage(): void {
+  try {
+    void navigator.storage?.persist?.();
+  } catch {
+    // pas pris en charge : sans conséquence
+  }
+}
+
+/** Ce qui remplace la proposition d'un créneau : une idée « Surprise Me » ou un plat de la liste noire. */
+interface Override {
+  name: string;
+  icon: string;
+  note: string;
 }
 
 const RANDOMNESS_KEY = 'mymeals.randomness';
@@ -268,12 +298,22 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
   const [pendingOnly, setPendingOnly] = useState(loadPendingOnly);
   const [slotMode, setSlotMode] = useState(loadSlotMode);
   const activeSlots = useMemo(() => (slotMode === 'both' ? SLOTS : SLOTS.filter((slot) => slot === slotMode)), [slotMode]);
-  // Idées « Surprise Me » affichées à la place de la proposition, par créneau.
-  const [surprises, setSurprises] = useState<Record<string, Surprise>>({});
+  // Idées « Surprise Me » ou plats de la liste noire affichés à la place de la proposition, par créneau.
+  const [overrides, setOverrides] = useState<Record<string, Override>>({});
   const surprisesShown = useRef(new Set<string>());
+  const blacklistShown = useRef(new Set<string>());
+  const [flash, setFlash] = useState('');
+  const [blacklistText, setBlacklistText] = useState(() => loadText(BLACKLIST_TEXT_KEY));
+  const [includeBlacklist, setIncludeBlacklist] = useState(() => loadText(BLACKLIST_INCLUDE_KEY) === '1');
   const { skipped, setSkip } = useSkippedSlots(today);
 
   const dishes = useMemo(() => buildIndex(meals), [meals]);
+  const blacklist = useMemo(() => parseBlacklist(blacklistText), [blacklistText]);
+  const blacklistKeys = useMemo(() => blacklistedKeys(dishes, blacklist), [dishes, blacklist]);
+  const blacklistFilter = useMemo<BlacklistFilter>(
+    () => ({ matches: blacklist.matches, keys: blacklistKeys, include: includeBlacklist }),
+    [blacklist, blacklistKeys, includeBlacklist],
+  );
   const usual = useMemo(() => usualSlots(meals, today), [meals, today]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(monday, i)), [monday]);
 
@@ -309,19 +349,31 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
       for (const slot of activeSlots) {
         const key = `${date}|${slot}`;
         if (bySlot.has(key) || skipped.has(key) || !usual.has(`${weekday(date)}-${slot}`)) continue;
-        const ranked = suggest(dishes, date, slot, { exclude: used, weekWords, historyMonths });
+        const ranked = suggest(dishes, date, slot, {
+          exclude: used,
+          weekWords,
+          historyMonths,
+          blacklist: blacklistKeys,
+          includeBlacklist,
+        });
         const tried = new Set(rejected[key]);
-        const fresh = ranked.filter((s) => !tried.has(s.key));
-        // Quand tout a été écarté, on repart du classement complet.
         // Chaque appui sur ↻ change le tirage : le nombre de propositions déjà écartées entre dans la graine.
-        const pick = pickProposal(fresh.length > 0 ? fresh : ranked, randomness, `${seed}|${key}|${tried.size}`);
+        // (on compte les appuis, pas les plats distincts : un même plat peut être écarté deux fois)
+        const draw = `${seed}|${key}|${rejected[key]?.length ?? 0}`;
+        // Liste noire incluse : une proposition sur dix environ en vient, les autres jamais.
+        const listedTurn = includeBlacklist && hashToUnit(`${draw}|liste`) < BLACKLIST_CHANCE;
+        const eligible = ranked.filter((s) => (listedTurn ? s.blacklisted : !s.blacklisted));
+        const pool = listedTurn && eligible.length === 0 ? ranked.filter((s) => !s.blacklisted) : eligible;
+        const fresh = pool.filter((s) => !tried.has(s.key));
+        // Quand tout a été écarté, on repart du classement complet.
+        const pick = pickProposal(fresh.length > 0 ? fresh : pool, randomness, draw);
         if (!pick) continue;
         out.set(key, pick);
         count(pick.key);
       }
     }
     return out;
-  }, [days, today, bySlot, usual, dishes, rejected, skipped, randomness, historyMonths, seed, activeSlots]);
+  }, [days, today, bySlot, usual, dishes, rejected, skipped, randomness, historyMonths, seed, activeSlots, blacklistKeys, includeBlacklist]);
 
   const sunday = days[6];
 
@@ -336,7 +388,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
     .filter((day) => day.slots.length > 0);
 
   function surpriseSlot(key: string, date: string) {
-    const ideas = surpriseIdeas(dishes, date, surprisePeriod, today);
+    const ideas = surpriseIdeas(dishes, date, surprisePeriod, today, blacklistFilter);
     let pick = pickSurprise(ideas, surprisesShown.current, randomness);
     if (!pick && ideas.length > 0) {
       surprisesShown.current.clear();
@@ -344,12 +396,38 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
     }
     if (!pick) return;
     surprisesShown.current.add(pick.name);
-    setSurprises({ ...surprises, [key]: pick });
+    setOverrides({
+      ...overrides,
+      [key]: { name: pick.name, icon: '✨', note: ['Idée nouvelle', ...pick.because].join(' · ') },
+    });
   }
 
-  function dropSurprise(key: string) {
-    const { [key]: _dropped, ...rest } = surprises;
-    setSurprises(rest);
+  /** Bouton spécial : propose, exceptionnellement, un plat de la liste noire (resto, plat à emporter…). */
+  function blacklistSlot(key: string, date: string, slot: Slot) {
+    const plannedThisWeek = new Set<string>();
+    for (const day of days) for (const s of SLOTS) for (const m of bySlot.get(`${day}|${s}`) ?? []) plannedThisWeek.add(normalize(m.name));
+    const ranked = suggest(dishes, date, slot, { exclude: plannedThisWeek, blacklist: blacklistKeys, includeBlacklist: true }).filter(
+      (s) => s.blacklisted,
+    );
+    if (ranked.length === 0) {
+      setFlash("Aucun plat de la liste noire dans ton historique pour l'instant.");
+      return;
+    }
+    let fresh = ranked.filter((s) => !blacklistShown.current.has(s.key));
+    if (fresh.length === 0) {
+      blacklistShown.current.clear();
+      fresh = ranked;
+    }
+    const pick = pickProposal(fresh, randomness, `${Math.random()}|bl|${key}`);
+    if (!pick) return;
+    blacklistShown.current.add(pick.key);
+    setFlash('');
+    setOverrides({ ...overrides, [key]: { name: pick.label, icon: '🍽️', note: `Liste noire · ${pick.reason}` } });
+  }
+
+  function dropOverride(key: string) {
+    const { [key]: _dropped, ...rest } = overrides;
+    setOverrides(rest);
   }
 
   return (
@@ -438,7 +516,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                 const level = Number(e.target.value);
                 setRandomness(level);
                 setRejected({});
-                setSurprises({});
+                setOverrides({});
                 surprisesShown.current.clear();
                 remember(RANDOMNESS_KEY, level);
               }}
@@ -475,7 +553,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
               onChange={(e) => {
                 const months = Number(e.target.value);
                 setSurprisePeriod(months);
-                setSurprises({});
+                setOverrides({});
                 surprisesShown.current.clear();
                 remember(PERIOD_KEY, months);
               }}
@@ -487,8 +565,63 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
               ))}
             </select>
           </label>
+          <label className="switch advanced-switch">
+            <input
+              type="checkbox"
+              checked={includeBlacklist}
+              onChange={(e) => {
+                setIncludeBlacklist(e.target.checked);
+                setRejected({});
+                setOverrides({});
+                surprisesShown.current.clear();
+                remember(BLACKLIST_INCLUDE_KEY, e.target.checked ? '1' : '0');
+              }}
+            />
+            <span className="switch-track" aria-hidden="true" />
+            Inclure la liste noire (rarement)
+          </label>
+          <label className="blacklist">
+            Liste noire
+            <textarea
+              value={blacklistText}
+              rows={4}
+              spellCheck={false}
+              autoCapitalize="off"
+              placeholder={'kebab\nwafu\n/\\bpho\\b/'}
+              onChange={(e) => {
+                setBlacklistText(e.target.value);
+                setRejected({});
+                setOverrides({});
+                remember(BLACKLIST_TEXT_KEY, e.target.value);
+                requestPersistentStorage();
+              }}
+            />
+          </label>
+          <p className="blacklist-help">
+            Un mot ou une expression par ligne : tous les plats dont le nom <em>contient</em> ce texte sont cachés
+            (« kebab » cache aussi « Kebabs frites »). Entoure une ligne de barres pour une expression régulière :{' '}
+            <code>/\bpho\b/</code>, <code>/^(sushi|maki)/</code>. Ils ne reviennent que si tu actives l'option ci-dessus
+            (alors environ une proposition sur dix), avec le bouton 🍽️ d'une proposition, ou en cherchant leur nom.
+          </p>
+          {blacklist.invalid.map((entry) => (
+            <p key={entry.line} className="dup-error" role="alert">
+              Ligne ignorée {entry.line} : {entry.error}
+            </p>
+          ))}
+          {blacklist.entries > 0 && (
+            <p className="blacklist-help">
+              {blacklistKeys.size === 0
+                ? "Aucun plat de ton historique n'est concerné pour l'instant."
+                : `${blacklistKeys.size} ${blacklistKeys.size > 1 ? 'plats concernés' : 'plat concerné'} : ${[...blacklistKeys]
+                    .slice(0, 8)
+                    .map((key) => dishes.byKey.get(key)?.label ?? key)
+                    .join(', ')}${blacklistKeys.size > 8 ? '…' : ''}.`}
+            </p>
+          )}
         </details>
       )}
+
+      {flash && <Notice text={flash} onClose={() => setFlash('')} />}
 
       <main className="week">
         {visibleDays.length === 0 && <p className="all-done">Tout est décidé pour cette semaine.</p>}
@@ -501,7 +634,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
               const key = `${date}|${slot}`;
               const planned = bySlot.get(key);
               const proposal = proposals.get(key);
-              const surprise = surprises[key];
+              const override = overrides[key];
               return (
                 <div key={slot} className="slot">
                   <span className="slot-label">{SLOT_LABEL[slot]}</span>
@@ -516,12 +649,8 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                   ) : proposal ? (
                     <div className="proposal">
                       <button className="proposal-name" onClick={() => setEditing({ date, slot })}>
-                        {surprise ? `✨ ${surprise.name}` : proposal.label}
-                        <small>
-                          {surprise
-                            ? ['Idée nouvelle', ...surprise.because].join(' · ')
-                            : proposal.reason}
-                        </small>
+                        {override ? `${override.icon} ${override.name}` : proposal.label}
+                        <small>{override ? override.note : proposal.reason}</small>
                       </button>
                       <button
                         className="icon"
@@ -534,7 +663,7 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                       <button
                         className="icon"
                         onClick={() => {
-                          if (surprise) dropSurprise(key);
+                          if (override) dropOverride(key);
                           else setRejected({ ...rejected, [key]: [...(rejected[key] ?? []), proposal.key] });
                         }}
                         aria-label={`Autre proposition pour ${dayName(date)} ${SLOT_LABEL[slot]}`}
@@ -550,13 +679,23 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
                       >
                         ✨
                       </button>
+                      {blacklistKeys.size > 0 && (
+                        <button
+                          className="icon"
+                          onClick={() => blacklistSlot(key, date, slot)}
+                          aria-label={`Plat de la liste noire pour ${dayName(date)} ${SLOT_LABEL[slot]}`}
+                          title="Plat de la liste noire (resto, à emporter…) : exceptionnel"
+                        >
+                          🍽️
+                        </button>
+                      )}
                       <button
                         className="icon accept"
                         onClick={() => {
-                          setSlot(date, slot, surprise?.name ?? proposal.label);
-                          if (surprise) dropSurprise(key);
+                          setSlot(date, slot, override?.name ?? proposal.label);
+                          if (override) dropOverride(key);
                         }}
-                        aria-label={`Accepter ${surprise?.name ?? proposal.label}`}
+                        aria-label={`Accepter ${override?.name ?? proposal.label}`}
                         title="Accepter"
                       >
                         ✓
@@ -588,14 +727,16 @@ function Planner({ store, action, banner, footer }: PlannerProps) {
           date={editing.date}
           slot={editing.slot}
           current={bySlot.get(`${editing.date}|${editing.slot}`)}
-          suggestions={suggest(dishes, editing.date, editing.slot)}
+          suggestions={suggest(dishes, editing.date, editing.slot, { blacklist: blacklistKeys, includeBlacklist: true })}
+          includeBlacklist={includeBlacklist}
+          blacklistFilter={blacklistFilter}
           dishes={dishes}
           today={today}
           randomness={randomness}
           period={surprisePeriod}
           onPeriodChange={(months) => {
             setSurprisePeriod(months);
-            setSurprises({});
+            setOverrides({});
             surprisesShown.current.clear();
             remember(PERIOD_KEY, months);
           }}
@@ -625,6 +766,8 @@ interface SheetProps {
   slot: Slot;
   current: Meal[] | undefined;
   suggestions: Suggestion[];
+  includeBlacklist: boolean;
+  blacklistFilter: BlacklistFilter;
   dishes: DishIndex;
   today: string;
   randomness: number;
@@ -637,11 +780,17 @@ interface SheetProps {
   onClose: () => void;
 }
 
-function SlotSheet({ date, slot, current, suggestions, dishes, today, randomness, period, onPeriodChange, skipped, onSkip, onPick, onClear, onClose }: SheetProps) {
+function SlotSheet({ date, slot, current, suggestions, includeBlacklist, blacklistFilter, dishes, today, randomness, period, onPeriodChange, skipped, onSkip, onPick, onClear, onClose }: SheetProps) {
   const [query, setQuery] = useState('');
+  const [revealed, setRevealed] = useState(false);
   // Chaque mot saisi doit se retrouver dans une des écritures du plat, dans n'importe quel ordre.
   const needles = fold(query).split(/[\s/]+/).filter(Boolean);
-  const shown = suggestions.filter((s) => needles.every((n) => s.search.includes(n))).slice(0, 30);
+  // La liste noire n'apparaît pas d'elle-même : il faut l'option, le bouton ci-dessous, ou chercher un nom précis.
+  const showListed = includeBlacklist || revealed || needles.length > 0;
+  const listedCount = suggestions.filter((s) => s.blacklisted).length;
+  const shown = suggestions
+    .filter((s) => (showListed || !s.blacklisted) && needles.every((n) => s.search.includes(n)))
+    .slice(0, 30);
   const queryKey = normalize(query);
   const exact = suggestions.some((s) => s.key === queryKey);
 
@@ -692,7 +841,7 @@ function SlotSheet({ date, slot, current, suggestions, dishes, today, randomness
             aria-label="Chercher ou saisir un plat"
           />
         </form>
-        <SurpriseMe date={date} dishes={dishes} today={today} randomness={randomness} months={period} onMonthsChange={onPeriodChange} onPick={onPick} />
+        <SurpriseMe date={date} dishes={dishes} today={today} blacklist={blacklistFilter} randomness={randomness} months={period} onMonthsChange={onPeriodChange} onPick={onPick} />
         <ul className="choices">
           {query.trim() && !exact && (
             <li>
@@ -706,6 +855,7 @@ function SlotSheet({ date, slot, current, suggestions, dishes, today, randomness
               <button onClick={() => onPick(s.label)}>
                 <span>
                   {s.label}
+                  {s.blacklisted && <small className="tag">liste noire</small>}
                   {s.variants.length > 0 && <small>aussi écrit : {s.variants.slice(0, 3).join(', ')}</small>}
                 </span>
                 <small>{s.reason}</small>
@@ -716,6 +866,11 @@ function SlotSheet({ date, slot, current, suggestions, dishes, today, randomness
             <li className="hint">Pas encore d'historique : saisis un plat ci-dessus.</li>
           )}
         </ul>
+        {!showListed && listedCount > 0 && (
+          <button className="link reveal" onClick={() => setRevealed(true)}>
+            Afficher aussi les plats de la liste noire ({listedCount})
+          </button>
+        )}
       </div>
     </div>
   );
@@ -725,6 +880,7 @@ interface SurpriseProps {
   date: string;
   dishes: DishIndex;
   today: string;
+  blacklist: BlacklistFilter;
   randomness: number;
   /** Période (en mois) sur laquelle sont calculés les goûts ; 0 : tout l'historique. */
   months: number;
@@ -733,13 +889,13 @@ interface SurpriseProps {
 }
 
 /** Propose un plat absent de l'historique, choisi d'après les goûts de la période réglée. */
-function SurpriseMe({ date, dishes, today, randomness, months, onMonthsChange, onPick }: SurpriseProps) {
+function SurpriseMe({ date, dishes, today, blacklist, randomness, months, onMonthsChange, onPick }: SurpriseProps) {
   const [idea, setIdea] = useState<Surprise | null>(null);
   const [opened, setOpened] = useState(false);
   const shown = useRef(new Set<string>());
 
   function draw(period: number) {
-    const ideas = surpriseIdeas(dishes, date, period, today);
+    const ideas = surpriseIdeas(dishes, date, period, today, blacklist);
     let pick = pickSurprise(ideas, shown.current, randomness);
     if (!pick && ideas.length > 0) {
       // Toutes les idées ont été vues : on repart du début.
