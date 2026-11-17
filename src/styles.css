@@ -156,6 +156,10 @@ h1 {
   font-weight: 400;
 }
 
+.date-short {
+  display: none;
+}
+
 .slot {
   display: flex;
   align-items: center;
@@ -1302,16 +1306,69 @@ small {
     max-width: 1320px;
   }
 
+  /* Chaque jour occupe trois rangées partagées (en-tête, midi, soir) : les midis de la semaine
+     commencent tous à la même hauteur, les soirs aussi. */
   .app.wide .week {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 10px;
-    align-items: start;
+    grid-template-rows: auto auto auto;
+    column-gap: 10px;
+    row-gap: 0;
   }
 
   .app.wide .day {
     margin-bottom: 0;
     padding: 10px;
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+    align-content: start;
+  }
+
+  .app.wide .day > * {
+    min-width: 0;
+  }
+
+  .app.wide .day h2 {
+    grid-row: 1;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .app.wide .date-long {
+    display: none;
+  }
+
+  .app.wide .date-short {
+    display: inline;
+  }
+
+  /* Colonnes étroites : l'image passe au-dessus du nom, qui garde toute la largeur. */
+  .app.wide .with-thumb {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .app.wide .dish-thumb {
+    width: 100%;
+    height: 72px;
+  }
+
+  .app.wide .slot-midi {
+    grid-row: 2;
+  }
+
+  .app.wide .slot-soir {
+    grid-row: 3;
+  }
+
+  .app.wide .slot {
+    align-self: start;
   }
 
   .app.wide .all-done {

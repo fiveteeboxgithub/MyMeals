@@ -56,6 +56,13 @@ export function shortDate(iso: string): string {
   return `${Number(iso.slice(8, 10))} ${MONTH_NAMES[monthOf(iso) - 1]}`;
 }
 
+const MONTH_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+/** « 22 nov. » : pour les en-têtes étroits. */
+export function tinyDate(iso: string): string {
+  return `${Number(iso.slice(8, 10))} ${MONTH_SHORT[monthOf(iso) - 1]}`;
+}
+
 export function longDate(iso: string): string {
   return `${shortDate(iso)} ${iso.slice(0, 4)}`;
 }

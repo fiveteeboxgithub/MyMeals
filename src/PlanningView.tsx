@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { BlacklistFilter } from './lib/blacklist';
-import { addDays, dayName, longDate, mondayOf, shortDate, weekday } from './lib/dates';
+import { addDays, dayName, longDate, mondayOf, shortDate, tinyDate, weekday } from './lib/dates';
 import type { CalendarInfo, TimedEvent } from './lib/google';
 import type { PastNote } from './lib/notes';
 import { overlapsBySlot, weekRange, type OtherEvent } from './lib/otherCalendars';
@@ -441,7 +441,11 @@ export function PlanningView(props: PlanningProps) {
           {visibleDays.map(({ date, slots }) => (
             <section key={date} className={`day${date === today ? ' today' : ''}${date < today ? ' past' : ''}`}>
               <h2>
-                {dayName(date)} <span>{shortDate(date)}</span>
+                {dayName(date)}{' '}
+                <span>
+                  <span className="date-long">{shortDate(date)}</span>
+                  <span className="date-short">{tinyDate(date)}</span>
+                </span>
               </h2>
               {slots.map((slot) => {
                 const key = `${date}|${slot}`;
@@ -452,7 +456,7 @@ export function PlanningView(props: PlanningProps) {
                 const slotOthers = others.get(key);
                 const where = `${dayName(date)} ${SLOT_LABEL[slot]}`;
                 return (
-                  <div key={slot} className="slot">
+                  <div key={slot} className={`slot slot-${slot}`}>
                     <span className="slot-label">{SLOT_LABEL[slot]}</span>
                     <div className="slot-body">
                       {planned ? (
