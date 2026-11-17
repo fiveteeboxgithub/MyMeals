@@ -992,7 +992,15 @@ small {
 /* ---------- Organisation des pages ---------- */
 
 .tabs {
+  /* Défile à l'horizontale sur un petit écran, sans barre de défilement visible.
+     overflow-y: hidden évite la petite barre verticale (Windows) causée par le soulignement de l'onglet. */
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tabs button {
