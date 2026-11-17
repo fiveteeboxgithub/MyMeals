@@ -13,11 +13,13 @@ import { useAppSettings } from './lib/useAppSettings';
 import { Notice } from './Notice';
 import { PlanningView, type SlotMode } from './PlanningView';
 import { SettingsPage } from './SettingsPage';
+import { StatsPage } from './StatsPage';
 
-type View = 'planning' | 'doublons' | 'reglages';
+type View = 'planning' | 'doublons' | 'stats' | 'reglages';
 const VIEWS: { id: View; label: string }[] = [
   { id: 'planning', label: 'Planning' },
   { id: 'doublons', label: 'Doublons' },
+  { id: 'stats', label: 'Stats' },
   { id: 'reglages', label: 'Réglages' },
 ];
 
@@ -200,6 +202,7 @@ export function Planner(props: PlannerProps) {
         />
       )}
       {view === 'doublons' && <DuplicatesPage store={store} dishes={dishes} />}
+      {view === 'stats' && <StatsPage meals={store.meals} dishes={dishes} today={today} blacklistKeys={blacklistKeys} />}
       {view === 'reglages' && (
         <SettingsPage
           shared={shared}

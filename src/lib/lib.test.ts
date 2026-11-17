@@ -1004,3 +1004,43 @@ describe('planification', async () => {
     expect(byLabel.get('poisson/purée/fromage')!.frequent).toBe(false);
   });
 });
+
+describe('statistiques', async () => {
+  const { newDishesByYear, onThisDay, seasonTop, topDishes, yearSummary } = await import('./stats');
+  const meals: Meal[] = [
+    meal('2024-11-18', 'soir', 'raclette'),
+    meal('2025-11-18', 'midi', 'pizza'),
+    meal('2025-11-18', 'soir', 'Raclette'),
+    meal('2025-07-10', 'soir', 'salade niçoise'),
+    meal('2026-01-05', 'soir', 'curry'),
+    meal('2026-02-05', 'soir', 'curry'),
+    meal('2026-03-05', 'soir', 'kebab'),
+    meal('2026-11-10', 'soir', 'restes'),
+    meal('2026-11-12', 'soir', 'raclette'),
+    meal('2026-11-25', 'soir', 'raclette'), // prévu, pas encore mangé
+  ];
+  const index = buildIndex(meals);
+
+  it('retrouve les repas du même jour les années passées', () => {
+    expect(onThisDay(meals, '2026-11-18').map((y) => `${y.year}:${y.meals.map((m) => m.name).join('+')}`)).toEqual(['2025:pizza+Raclette', '2024:raclette']);
+  });
+
+  it('classe les plats les plus mangés, sans les restes ni les repas à venir', () => {
+    // Douze mois glissants : le 18 novembre 2025 en est exclu, le repas prévu le 25 aussi.
+    expect(topDishes(index, meals, '2026-11-18')).toEqual([
+      { label: 'curry', count: 2 },
+      { label: 'kebab', count: 1 },
+      { label: 'raclette', count: 1 },
+    ]);
+    expect(seasonTop(index, meals, '2026-11-18').map((d) => d.label)).toEqual([index.byKey.get('raclette')!.label, 'pizza']);
+  });
+
+  it('compte les nouveaux plats par année et résume l’année', () => {
+    expect(newDishesByYear(index, '2026-11-18')).toEqual([
+      { year: 2024, count: 1 },
+      { year: 2025, count: 2 },
+      { year: 2026, count: 2 },
+    ]);
+    expect(yearSummary(index, meals, '2026-11-18', new Set(['kebab']))).toEqual({ year: '2026', meals: 5, dishes: 3, newDishes: 2, listed: 1 });
+  });
+});

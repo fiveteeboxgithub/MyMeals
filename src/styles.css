@@ -1345,3 +1345,161 @@ small {
     left: 0;
   }
 }
+
+/* ---------- Statistiques ---------- */
+
+.stats section {
+  margin: 0 0 14px;
+  padding: 12px 14px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.stats h2 {
+  font-size: 1rem;
+  margin: 0 0 10px;
+}
+
+.stats-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.tile {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.tile strong {
+  display: block;
+  color: var(--text);
+  font-size: 1.6rem;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.on-this-day {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.92rem;
+}
+
+.on-this-day li {
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: break-word;
+}
+
+.on-this-day li:first-child {
+  border-top: 0;
+}
+
+.on-this-day strong {
+  margin-right: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 2.5em;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 0.88rem;
+}
+
+.bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  height: 10px;
+}
+
+.bar {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
+}
+
+.bar-value {
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.columns {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 140px;
+  padding-top: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.column {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  position: relative;
+}
+
+.column-bar {
+  width: 70%;
+  max-width: 28px;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+}
+
+.column-value {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.column-year {
+  position: absolute;
+  bottom: -20px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.stats section:last-child .columns {
+  margin-bottom: 22px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
