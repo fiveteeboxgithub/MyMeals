@@ -156,7 +156,7 @@ cherche « X ». Pas de résultat fiable : pas d'image.
 ## Réglages partagés
 
 Avec Google Agenda, les réglages qui décrivent tes goûts sont enregistrés dans l'agenda lui-même, pour être
-retrouvés sur tous les appareils et par le foyer : la liste noire et son option, les favoris, le niveau de hasard,
+retrouvés sur tous les appareils et par le foyer : la liste noire et son option, les favoris, les créneaux « Pas de repas », le niveau de hasard,
 l'historique pris en compte, la période des goûts de « Surprise Me », « Mes idées » et les heures des
 repas. Ils vivent dans un **événement
 spécial** de l'agenda « Repas » : « ⚙ MyMeals : réglages (ne pas supprimer) », une journée entière le
@@ -172,7 +172,7 @@ réglages restent sur l'appareil.
   reprend les réglages de l'agenda ; des réglages faits avant la synchronisation sont envoyés s'il n'y en a pas
   encore dans l'agenda.
 - Les réglages d'affichage restent propres à chaque appareil : couleur de fond, Midi/Soir/Les deux, « À décider
-  seulement », créneaux « Pas de repas », groupes de doublons écartés.
+  seulement », vue colonnes ou liste, images des plats, autres agendas affichés, groupes de doublons écartés.
 - Sans connexion Google (mode import de fichier), tout reste local ; le texte de la liste noire se copie-colle.
 
 Supprimer l'événement dans Google Agenda remet les réglages de l'agenda à zéro : le premier appareil qui se

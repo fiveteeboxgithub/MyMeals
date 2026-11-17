@@ -5,7 +5,6 @@ import type { CalendarInfo, TimedEvent } from './lib/google';
 import type { PastNote } from './lib/notes';
 import { overlapsBySlot, weekRange, type OtherEvent } from './lib/otherCalendars';
 import type { SharedSettings } from './lib/settings';
-import { useSkippedSlots } from './lib/store';
 import {
   BLACKLIST_CHANCE,
   fold,
@@ -60,6 +59,9 @@ interface PlanningProps {
   showImages: boolean;
   weekLayout: WeekLayout;
   setWeekLayout: (layout: WeekLayout) => void;
+  /** Créneaux marqués « Pas de repas » (partagés avec les réglages). */
+  skipped: ReadonlySet<string>;
+  setSkip: (key: string, skip: boolean) => void;
   blacklistKeys: ReadonlySet<string>;
   blacklistFilter: BlacklistFilter;
   /** Change quand les réglages changent : les tirages en cours sont alors oubliés. */
@@ -182,7 +184,7 @@ export function PlanningView(props: PlanningProps) {
   const [seed] = useState(() => String(Math.random()));
   const shownIdeas = useRef(new Set<string>());
   const shownExtras = useRef(new Set<string>());
-  const { skipped, setSkip } = useSkippedSlots(today);
+  const { skipped, setSkip } = props;
   const activeSlots = useMemo(() => (slotMode === 'both' ? SLOTS : SLOTS.filter((s) => s === slotMode)), [slotMode]);
 
   useEffect(() => {

@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DuplicatesPage } from './Duplicates';
 import { addToBlacklist, blacklistedKeys, parseBlacklist, removeFromList, type BlacklistFilter } from './lib/blacklist';
 import { dishKeyOf, notesByDish } from './lib/notes';
-import { todayIso } from './lib/dates';
+import { addDays, todayIso } from './lib/dates';
 import { setMealTimes, type CalendarInfo, type TimedEvent } from './lib/google';
 import { shownByDefault } from './lib/otherCalendars';
 import { KEYS, readPref, writePref } from './lib/prefs';
-import { MAX_FAVORITES_CHARS, type SharedSettings } from './lib/settings';
+import { MAX_FAVORITES_CHARS, parseSkipped, withSkip, type SharedSettings } from './lib/settings';
 import { buildIndex, normalize } from './lib/suggest';
 import { parseIdeas } from './lib/surprise';
 import type { MealStore, SettingsSync } from './lib/types';
@@ -168,6 +168,20 @@ export function Planner(props: PlannerProps) {
   );
   const notes = useMemo(() => notesByDish(store.meals, dishes), [store.meals, dishes]);
 
+  // Créneaux « Pas de repas » : partagés avec les réglages (sans effacer les tirages en cours).
+  const skipped = useMemo<ReadonlySet<string>>(() => new Set(parseSkipped(shared.skippedSlots)), [shared.skippedSlots]);
+  const skippedRef = useRef(shared.skippedSlots);
+  skippedRef.current = shared.skippedSlots;
+  const setSkip = useCallback(
+    (key: string, skip: boolean) => {
+      const next = withSkip(skippedRef.current, key, skip, today, addDays(today, -7));
+      if (next === skippedRef.current) return;
+      skippedRef.current = next;
+      update({ skippedSlots: next });
+    },
+    [update, today],
+  );
+
   // Autres agendas : la liste (pour les réglages) et ceux affichés à côté des créneaux.
   const listCalendars = props.calendars?.list;
   const eventsOf = props.calendars?.events;
@@ -236,6 +250,8 @@ export function Planner(props: PlannerProps) {
           showImages={showImages}
           weekLayout={weekLayout}
           setWeekLayout={setWeekLayout}
+          skipped={skipped}
+          setSkip={setSkip}
           blacklistKeys={blacklistKeys}
           blacklistFilter={blacklistFilter}
           resetToken={resetToken}

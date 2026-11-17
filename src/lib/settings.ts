@@ -19,6 +19,8 @@ export interface SharedSettings {
   /** Heures (HH:MM) des repas créés depuis l'application. */
   lunchTime: string;
   dinnerTime: string;
+  /** Créneaux marqués « Pas de repas », clés « AAAA-MM-JJ|midi » séparées par des virgules. */
+  skippedSlots: string;
 }
 
 /** Réglages et date (en ms) de leur dernière modification : la plus récente l'emporte. */
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: SharedSettings = {
   ideasText: '',
   lunchTime: '13:00',
   dinnerTime: '20:00',
+  skippedSlots: '',
 };
 
 /**
@@ -45,6 +48,27 @@ export const DEFAULT_SETTINGS: SharedSettings = {
 export const MAX_BLACKLIST_CHARS = 2500;
 export const MAX_IDEAS_CHARS = 3500;
 export const MAX_FAVORITES_CHARS = 800;
+
+/** Nombre maximal de créneaux « Pas de repas » gardés (les plus récents). */
+export const MAX_SKIPPED = 60;
+const SLOT_KEY = /^\d{4}-\d{2}-\d{2}\|(midi|soir)$/;
+
+/** Lit la liste des créneaux « Pas de repas » ; garde les clés valables, sans doublon, triées. */
+export function parseSkipped(text: unknown): string[] {
+  if (typeof text !== 'string' || !text) return [];
+  return [...new Set(text.split(',').map((k) => k.trim()).filter((k) => SLOT_KEY.test(k)))].sort();
+}
+
+/**
+ * Ajoute ou retire un créneau « Pas de repas ». Les créneaux de plus d'une semaine sont oubliés,
+ * et la liste ne dépasse pas MAX_SKIPPED (elle doit tenir dans l'événement des réglages).
+ */
+export function withSkip(text: string, key: string, skip: boolean, today: string, weekAgo: string): string {
+  const set = new Set(parseSkipped(text).filter((k) => k >= weekAgo || k.slice(0, 10) >= today));
+  if (skip) set.add(key);
+  else set.delete(key);
+  return [...set].sort().slice(-MAX_SKIPPED).join(',');
+}
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -78,6 +102,7 @@ export function parseSettingsRecord(payload: unknown): SettingsRecord | null {
       ideasText: typeof s.ideasText === 'string' ? s.ideasText.slice(0, MAX_IDEAS_CHARS) : DEFAULT_SETTINGS.ideasText,
       lunchTime: validTime(s.lunchTime) ?? DEFAULT_SETTINGS.lunchTime,
       dinnerTime: validTime(s.dinnerTime) ?? DEFAULT_SETTINGS.dinnerTime,
+      skippedSlots: parseSkipped(s.skippedSlots).slice(-MAX_SKIPPED).join(','),
     },
   };
 }

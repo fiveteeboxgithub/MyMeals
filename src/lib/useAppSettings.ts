@@ -5,7 +5,9 @@ import {
   MAX_BLACKLIST_CHARS,
   MAX_FAVORITES_CHARS,
   MAX_IDEAS_CHARS,
+  MAX_SKIPPED,
   decideSync,
+  parseSkipped,
   loadSettingsStamp,
   sameSettings,
   saveSettingsStamp,
@@ -28,7 +30,18 @@ export function loadSharedSettings(): SharedSettings {
     ideasText: (readPref(KEYS.ideasText) ?? '').slice(0, MAX_IDEAS_CHARS),
     lunchTime: validTime(readPref(KEYS.lunchTime)) ?? DEFAULT_SETTINGS.lunchTime,
     dinnerTime: validTime(readPref(KEYS.dinnerTime)) ?? DEFAULT_SETTINGS.dinnerTime,
+    skippedSlots: parseSkipped(readPref(KEYS.skippedSlots) ?? legacySkipped()).slice(-MAX_SKIPPED).join(','),
   };
+}
+
+/** Créneaux « Pas de repas » enregistrés par une version précédente, sur cet appareil seulement. */
+function legacySkipped(): string {
+  try {
+    const stored = JSON.parse(readPref(KEYS.skippedLegacy) ?? '[]') as unknown;
+    return Array.isArray(stored) ? stored.filter((k) => typeof k === 'string').join(',') : '';
+  } catch {
+    return '';
+  }
 }
 
 function saveSharedSettings(settings: SharedSettings): void {
@@ -41,6 +54,7 @@ function saveSharedSettings(settings: SharedSettings): void {
   writePref(KEYS.favoritesText, settings.favoritesText);
   writePref(KEYS.lunchTime, settings.lunchTime);
   writePref(KEYS.dinnerTime, settings.dinnerTime);
+  writePref(KEYS.skippedSlots, settings.skippedSlots);
 }
 
 /**

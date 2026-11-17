@@ -9,6 +9,9 @@ export const KEYS = {
   favoritesText: 'mymeals.favorites.text',
   lunchTime: 'mymeals.time.midi',
   dinnerTime: 'mymeals.time.soir',
+  skippedSlots: 'mymeals.skipped.shared',
+  /** Ancienne liste des créneaux « Pas de repas » (avant leur partage via l'agenda). */
+  skippedLegacy: 'mymeals.skipped.v1',
   slotMode: 'mymeals.slotMode',
   pendingOnly: 'mymeals.pendingOnly',
   calendars: 'mymeals.calendars.shown',

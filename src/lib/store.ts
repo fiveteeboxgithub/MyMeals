@@ -97,37 +97,3 @@ export function useMeals() {
 
   return { meals, importMeals, setSlot, clearSlot, removeMeal, clearAll, renameMeals, setNote };
 }
-
-const SKIPPED_KEY = 'mymeals.skipped.v1';
-
-/**
- * Créneaux marqués « pas de repas » (clés « AAAA-MM-JJ|créneau »). Ils sont gardés
- * dans ce navigateur seulement ; les créneaux passés sont oubliés au chargement.
- */
-export function useSkippedSlots(today: string) {
-  const [skipped, setSkipped] = useState<ReadonlySet<string>>(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(SKIPPED_KEY) ?? '[]') as unknown;
-      return new Set(Array.isArray(stored) ? stored.filter((k): k is string => typeof k === 'string' && k >= today) : []);
-    } catch {
-      return new Set<string>();
-    }
-  });
-
-  const setSkip = useCallback((key: string, skip: boolean) => {
-    setSkipped((current) => {
-      if (current.has(key) === skip) return current;
-      const next = new Set(current);
-      if (skip) next.add(key);
-      else next.delete(key);
-      try {
-        localStorage.setItem(SKIPPED_KEY, JSON.stringify([...next]));
-      } catch {
-        // stockage indisponible : le choix vaut pour cette session
-      }
-      return next;
-    });
-  }, []);
-
-  return { skipped, setSkip };
-}

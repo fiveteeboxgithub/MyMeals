@@ -826,7 +826,7 @@ describe('réglages partagés et connexion', async () => {
   });
 
   it('valide les réglages venus de l’agenda', () => {
-    const full = { blacklistText: 'kebab\nwafu', includeBlacklist: true, favoritesText: '', randomness: 4, historyMonths: 120, surprisePeriod: 0, ideasText: 'poulet yassa', lunchTime: '12:30', dinnerTime: '19:45' };
+    const full = { blacklistText: 'kebab\nwafu', includeBlacklist: true, favoritesText: '', randomness: 4, historyMonths: 120, surprisePeriod: 0, ideasText: 'poulet yassa', lunchTime: '12:30', dinnerTime: '19:45', skippedSlots: '2026-11-20|soir' };
     expect(parseSettingsRecord({ updatedAt: 12, settings: full })).toEqual({ updatedAt: 12, settings: full });
     // Réglages enregistrés par une version plus ancienne : les nouveaux champs prennent leur valeur par défaut.
     const old = parseSettingsRecord({ updatedAt: 12, settings: { blacklistText: 'kebab', includeBlacklist: false, randomness: 3, historyMonths: 60, surprisePeriod: 60 } })!;
@@ -1122,5 +1122,19 @@ describe('images des plats', () => {
     expect(pickImage([{ title: 'Potée', pageprops: { disambiguation: '' }, thumbnail: { source: 'x' } }], 'potée', true)).toBeNull();
     expect(pickImage([{ title: 'Potée', missing: true }], 'potée', true)).toBeNull();
     expect(pickImage([{ title: 'Croque-monsieur', thumbnail: { source: 'c.jpg' } }], 'croque monsieur', true)?.url).toBe('c.jpg');
+  });
+});
+
+describe('créneaux « Pas de repas » partagés', () => {
+  it('ajoute, retire et oublie les vieux créneaux', async () => {
+    const { withSkip, parseSkipped, parseSettingsRecord } = await import('./settings');
+    let text = withSkip('', '2026-11-20|soir', true, '2026-11-17', '2026-11-10');
+    text = withSkip(text, '2026-11-18|midi', true, '2026-11-17', '2026-11-10');
+    expect(text).toBe('2026-11-18|midi,2026-11-20|soir');
+    expect(withSkip(text, '2026-11-20|soir', false, '2026-11-17', '2026-11-10')).toBe('2026-11-18|midi');
+    // Un créneau de plus d'une semaine disparaît à la prochaine modification.
+    expect(withSkip('2026-10-01|soir,2026-11-12|midi', '2026-11-20|soir', true, '2026-11-17', '2026-11-10')).toBe('2026-11-12|midi,2026-11-20|soir');
+    expect(parseSkipped('2026-11-20|soir, bidon ,2026-11-20|soir')).toEqual(['2026-11-20|soir']);
+    expect(parseSettingsRecord({ updatedAt: 1, settings: { skippedSlots: 'x,2026-11-20|midi' } })!.settings.skippedSlots).toBe('2026-11-20|midi');
   });
 });
