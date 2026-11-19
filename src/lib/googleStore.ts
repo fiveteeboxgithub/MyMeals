@@ -206,14 +206,26 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     loadGoogleSignIn().catch(() => undefined);
   }, []);
 
+  // Relit l'agenda : à la connexion, au retour sur l'onglet ou la fenêtre, et toutes les trois minutes
+  // tant que la page est visible (pour voir un repas ajouté depuis Google Agenda ou un autre appareil).
   useEffect(() => {
     if (!token) return;
+    let last = Date.now();
     void sync(token);
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void sync(token);
+    const refresh = (minGapMs: number) => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < minGapMs) return;
+      last = Date.now();
+      void sync(token);
     };
+    const onVisible = () => refresh(10_000);
+    const timer = setInterval(() => refresh(60_000), 180_000);
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, [token, sync]);
 
   const connect = useCallback(() => {
