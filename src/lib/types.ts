@@ -30,6 +30,8 @@ export interface SettingsSync {
 export interface MealStore {
   meals: Meal[];
   setSlot: (date: string, slot: Slot, name: string) => void;
+  /** Ajoute un repas au créneau sans toucher à ceux qui y sont déjà. */
+  addMeal: (date: string, slot: Slot, name: string) => void;
   clearSlot: (date: string, slot: Slot) => void;
   /** Retire un seul repas (utile quand un créneau en contient plusieurs). */
   removeMeal: (id: string) => void;

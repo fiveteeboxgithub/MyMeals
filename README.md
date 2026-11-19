@@ -192,8 +192,10 @@ connecte ensuite le recrée avec ses propres réglages.
 
 Deux événements le même jour à la même heure (ou, plus généralement, du même côté de 16 h) tombent dans le
 même créneau, affiché « pizza + salade ». Le créneau compte comme décidé. Dans sa fenêtre, chaque repas a
-son propre bouton « Retirer » (et « Tout retirer »). Choisir un plat renomme **le premier** repas du créneau
-et laisse les autres ; c'est la même règle avec Google Agenda et avec l'import de fichier.
+son propre bouton « Retirer » (et « Tout retirer »). Quand le créneau a déjà un repas, un choix apparaît
+au-dessus de la recherche : **Remplacer** (par défaut : le plat choisi renomme le premier repas du créneau et
+laisse les autres) ou **+ Ajouter un plat** (le plat choisi crée un événement de plus, à la même heure, avec
+« Annuler »). C'est la même règle avec Google Agenda et avec l'import de fichier.
 
 ## Page « Doublons »
 

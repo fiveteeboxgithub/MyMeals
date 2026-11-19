@@ -68,6 +68,15 @@ export function useMeals() {
     [update],
   );
 
+  const addMeal = useCallback(
+    (date: string, slot: Slot, rawName: string) => {
+      const name = rawName.trim();
+      if (!name) return;
+      update((current) => [...current, { id: `app-${date}-${slot}-${Date.now()}`, date, slot, name, source: 'app' }]);
+    },
+    [update],
+  );
+
   const removeMeal = useCallback((id: string) => update((current) => current.filter((m) => m.id !== id)), [update]);
 
   const clearSlot = useCallback(
@@ -95,5 +104,5 @@ export function useMeals() {
     [meals, update],
   );
 
-  return { meals, importMeals, setSlot, clearSlot, removeMeal, clearAll, renameMeals, setNote };
+  return { meals, importMeals, setSlot, addMeal, clearSlot, removeMeal, clearAll, renameMeals, setNote };
 }

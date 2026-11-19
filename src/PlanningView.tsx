@@ -171,7 +171,9 @@ function MenuItem({ icon, label, hint, onClick }: { icon: string; label: string;
 export function PlanningView(props: PlanningProps) {
   const { store, dishes, today, shared, ideas, slotMode, pendingOnly, blacklistKeys, blacklistFilter, resetToken, loading, flash, blacklistDish } = props;
   const { favoriteKeys, isFavorite, toggleFavorite } = props;
-  const { meals, setSlot, clearSlot, removeMeal, setNote } = store;
+  const { meals, setSlot, addMeal, clearSlot, removeMeal, setNote } = store;
+  const mealsRef = useRef(meals);
+  mealsRef.current = meals;
   const { randomness, historyMonths, includeBlacklist } = shared;
   const thisMonday = mondayOf(today);
   const [monday, setMonday] = useState(thisMonday);
@@ -319,6 +321,16 @@ export function PlanningView(props: PlanningProps) {
     flash(`« ${name} » prévu ${dayName(date).toLowerCase()} ${SLOT_LABEL[slot].toLowerCase()}.`, () =>
       previous ? setSlot(date, slot, previous) : clearSlot(date, slot),
     );
+  }
+
+  /** Ajoute un plat à un créneau déjà rempli, avec « Annuler ». */
+  function addAnother(date: string, slot: Slot, name: string) {
+    const before = new Set((bySlot.get(`${date}|${slot}`) ?? []).map((m) => m.id));
+    addMeal(date, slot, name);
+    flash(`« ${name} » ajouté ${dayName(date).toLowerCase()} ${SLOT_LABEL[slot].toLowerCase()}.`, () => {
+      const added = mealsRef.current.find((m) => m.date === date && m.slot === slot && m.name === name.trim() && !before.has(m.id));
+      if (added) removeMeal(added.id);
+    });
   }
 
   function acceptAll() {
@@ -583,6 +595,10 @@ export function PlanningView(props: PlanningProps) {
           }}
           onPick={(name) => {
             accept(editing.date, editing.slot, name);
+            setEditing(null);
+          }}
+          onAdd={(name) => {
+            addAnother(editing.date, editing.slot, name);
             setEditing(null);
           }}
           onClear={() => {

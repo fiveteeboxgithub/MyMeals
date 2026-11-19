@@ -323,6 +323,37 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     [access],
   );
 
+  /** Crée un événement pour un repas (affiché tout de suite, avec un identifiant provisoire). */
+  const insertMeal = useCallback(
+    (a: { token: string; calendar: GoogleCalendar }, date: string, slot: Slot, name: string) => {
+      const tempId = `tmp-${date}-${slot}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      commit((c) => ({ ...c, meals: [...c.meals, { id: tempId, date, slot, name, source: 'google' }] }));
+      insertEvent(a.token, a.calendar, date, slot, name).then(
+        (event) => {
+          if (pendingDeletes.current.delete(tempId)) {
+            deleteEvent(a.token, a.calendar, event.id).catch(fail);
+            return;
+          }
+          commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === tempId ? { ...m, id: event.id } : m)) }));
+        },
+        (e) => {
+          commit((c) => ({ ...c, meals: c.meals.filter((m) => m.id !== tempId) }));
+          fail(e);
+        },
+      );
+    },
+    [commit, fail],
+  );
+
+  /** Ajoute un repas au créneau, même s'il en a déjà un (un événement de plus, à la même heure). */
+  const addMeal = useCallback(
+    (date: string, slot: Slot, rawName: string) => {
+      const name = rawName.trim();
+      if (name) withAccess((a) => insertMeal(a, date, slot, name));
+    },
+    [insertMeal, withAccess],
+  );
+
   const setSlot = useCallback(
     (date: string, slot: Slot, rawName: string) => {
       const name = rawName.trim();
@@ -337,25 +368,11 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
             fail(e);
           });
         } else {
-          const tempId = `tmp-${date}-${slot}-${Date.now()}`;
-          commit((c) => ({ ...c, meals: [...c.meals, { id: tempId, date, slot, name, source: 'google' }] }));
-          insertEvent(a.token, a.calendar, date, slot, name).then(
-            (event) => {
-              if (pendingDeletes.current.delete(tempId)) {
-                deleteEvent(a.token, a.calendar, event.id).catch(fail);
-                return;
-              }
-              commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === tempId ? { ...m, id: event.id } : m)) }));
-            },
-            (e) => {
-              commit((c) => ({ ...c, meals: c.meals.filter((m) => m.id !== tempId) }));
-              fail(e);
-            },
-          );
+          insertMeal(a, date, slot, name);
         }
       });
     },
-    [commit, fail, withAccess],
+    [commit, fail, withAccess, insertMeal],
   );
 
   const clearSlot = useCallback(
@@ -550,6 +567,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     listCalendars: listCalendarsNow,
     listTimedEvents: listTimedEventsNow,
     setSlot,
+    addMeal,
     clearSlot,
     removeMeal,
     renameMeals,

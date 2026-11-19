@@ -40,6 +40,8 @@ interface SheetProps {
   skipped: boolean;
   onSkip: (skip: boolean) => void;
   onPick: (name: string) => void;
+  /** Ajoute le plat au créneau sans remplacer ceux qui y sont déjà. */
+  onAdd: (name: string) => void;
   onClear: () => void;
   onClose: () => void;
 }
@@ -51,7 +53,10 @@ function variantsLine(variants: string[]): string {
 }
 
 /** Fenêtre d'un créneau : ce qui est prévu, la proposition, la recherche d'un plat et « Surprise Me ». */
-export function SlotSheet(props: SheetProps) {
+export function SlotSheet(sheetProps: SheetProps) {
+  // Créneau déjà rempli : le plat choisi remplace le premier, ou s'ajoute (un repas de plus).
+  const [adding, setAdding] = useState(false);
+  const props: SheetProps = adding ? { ...sheetProps, onPick: sheetProps.onAdd } : sheetProps;
   const { date, slot, current, proposal, others, suggestions, includeBlacklist, onRemoveMeal, skipped, onSkip, onPick, onClear, onClose } = props;
   const [query, setQuery] = useState('');
   const [revealed, setRevealed] = useState(false);
@@ -132,6 +137,16 @@ export function SlotSheet(props: SheetProps) {
               {skipped ? 'Remettre ce créneau' : 'Retirer ce créneau'}
             </button>
           </p>
+        )}
+        {current && (
+          <div className="segmented pick-mode" role="group" aria-label="Le plat choisi ci-dessous">
+            <button aria-pressed={!adding} onClick={() => setAdding(false)} title={`Le plat choisi remplace « ${current[0].name} »`}>
+              Remplacer
+            </button>
+            <button aria-pressed={adding} onClick={() => setAdding(true)} title="Le plat choisi s'ajoute à ce créneau">
+              + Ajouter un plat
+            </button>
+          </div>
         )}
         <form
           onSubmit={(e) => {
