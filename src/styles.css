@@ -1907,3 +1907,43 @@ small {
 .link.blacklisted {
   color: var(--muted);
 }
+
+/* Changement de semaine : la nouvelle semaine glisse depuis le côté d'où l'on vient. */
+.week {
+  touch-action: pan-y;
+}
+body {
+  overflow-x: clip;
+}
+@keyframes week-in-next {
+  from {
+    transform: translateX(48px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes week-in-prev {
+  from {
+    transform: translateX(-48px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.week.slide-next {
+  animation: week-in-next 0.22s ease-out;
+}
+.week.slide-prev {
+  animation: week-in-prev 0.22s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .week.slide-next,
+  .week.slide-prev {
+    animation: none;
+  }
+}

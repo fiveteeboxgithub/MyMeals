@@ -433,37 +433,94 @@ export function PlanningView(props: PlanningProps) {
     extraSlot(key, list, '🍽️', (s) => `Liste noire · ${s.reason}`, "Aucun plat de la liste noire dans ton historique pour l'instant.");
   }
 
-  // Balayer vers la gauche ou la droite change de semaine.
-  const touch = useRef<{ x: number; y: number } | null>(null);
+  // Changer de semaine : la semaine affichée glisse hors de l'écran, la nouvelle arrive du côté opposé.
+  const weekRef = useRef<HTMLElement>(null);
+  const animating = useRef(false);
+  const [slideDir, setSlideDir] = useState<'next' | 'prev' | null>(null);
+
+  function goToWeek(target: string, offset = 0) {
+    if (target === monday || animating.current) return;
+    const dir = target > monday ? 'next' : 'prev';
+    const el = weekRef.current;
+    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setSlideDir(null);
+      setMonday(target);
+      return;
+    }
+    animating.current = true;
+    const away = (dir === 'next' ? -1 : 1) * Math.max(48, Math.abs(offset) + 24);
+    el.style.transition = 'transform 0.14s ease-in, opacity 0.14s ease-in';
+    el.style.transform = `translateX(${away}px)`;
+    el.style.opacity = '0';
+    window.setTimeout(() => {
+      animating.current = false;
+      setSlideDir(dir);
+      setMonday(target);
+    }, 140);
+  }
+
+  // Sur téléphone, la semaine suit le doigt ; relâchée au-delà de 70 px, on change de semaine, sinon elle revient.
+  const touch = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
+  const FOLLOW = 0.7;
   const onTouchStart = (e: React.TouchEvent) => {
-    touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    if (animating.current) return;
+    touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, dragging: false };
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    const start = touch.current;
+    const el = weekRef.current;
+    if (!start || !el) return;
+    const dx = e.touches[0].clientX - start.x;
+    const dy = e.touches[0].clientY - start.y;
+    if (!start.dragging) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        touch.current = null; // défilement vertical : on laisse faire
+        return;
+      }
+      if (Math.abs(dx) < 10 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+      start.dragging = true;
+    }
+    el.style.transition = 'none';
+    el.style.transform = `translateX(${dx * FOLLOW}px)`;
+    el.style.opacity = String(1 - Math.min(Math.abs(dx) / 400, 0.5));
+  };
+  const snapBack = () => {
+    const el = weekRef.current;
+    if (!el) return;
+    el.style.transition = 'transform 0.18s ease-out, opacity 0.18s ease-out';
+    el.style.transform = '';
+    el.style.opacity = '';
   };
   const onTouchEnd = (e: React.TouchEvent) => {
     const start = touch.current;
     touch.current = null;
-    if (!start) return;
+    if (!start?.dragging) return;
     const dx = e.changedTouches[0].clientX - start.x;
-    const dy = e.changedTouches[0].clientY - start.y;
-    if (Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy)) setMonday(addDays(monday, dx < 0 ? 7 : -7));
+    if (Math.abs(dx) > 70) goToWeek(addDays(monday, dx < 0 ? 7 : -7), dx * FOLLOW);
+    else snapBack();
+  };
+  const onTouchCancel = () => {
+    if (touch.current?.dragging) snapBack();
+    touch.current = null;
   };
 
   return (
     <>
       <nav className="week-nav" aria-label="Semaine affichée">
-        <button onClick={() => setMonday(addDays(monday, -7))} aria-label="Semaine précédente">
+        <button onClick={() => goToWeek(addDays(monday, -7))} aria-label="Semaine précédente">
           ‹
         </button>
         <span className="week-label">
           {shortDate(monday)} – {longDate(days[6])}
         </span>
-        <button onClick={() => setMonday(addDays(monday, 7))} aria-label="Semaine suivante">
+        <button onClick={() => goToWeek(addDays(monday, 7))} aria-label="Semaine suivante">
           ›
         </button>
       </nav>
 
       <div className="week-tools">
         {monday !== thisMonday && (
-          <button className="chip" onClick={() => setMonday(thisMonday)}>
+          <button className="chip" onClick={() => goToWeek(thisMonday)}>
             Aujourd'hui
           </button>
         )}
@@ -490,7 +547,16 @@ export function PlanningView(props: PlanningProps) {
           Chargement de l'agenda…
         </p>
       ) : (
-        <main className="week" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <main
+          key={monday}
+          ref={weekRef}
+          className={`week${slideDir ? ` slide-${slideDir}` : ''}`}
+          onAnimationEnd={() => setSlideDir(null)}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onTouchCancel={onTouchCancel}
+        >
           {visibleDays.length === 0 && <p className="all-done">Tout est décidé pour cette semaine.</p>}
           {visibleDays.map(({ date, slots }) => (
             <section key={date} className={`day${date === today ? ' today' : ''}${date < today ? ' past' : ''}`}>

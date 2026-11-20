@@ -188,6 +188,14 @@ réglages restent sur l'appareil.
 Supprimer l'événement dans Google Agenda remet les réglages de l'agenda à zéro : le premier appareil qui se
 connecte ensuite le recrée avec ses propres réglages.
 
+## Changer de semaine
+
+Les flèches ‹ ›, « Aujourd'hui » et le geste de balayage changent de semaine avec un effet de glissement : la
+semaine affichée part d'un côté, la nouvelle arrive de l'autre (vers la gauche pour la suivante, vers la droite
+pour la précédente). Sur téléphone, la semaine **suit le doigt** pendant le balayage ; relâchée au-delà de 70 px,
+on change de semaine, sinon elle revient en place. Un défilement vertical ne change jamais de semaine. Avec
+« réduire les animations » activé dans le système, le changement est immédiat.
+
 ## Accepter ailleurs, déplacer un repas
 
 - **Accepter pour un autre créneau** : dans le menu **⋯** d'une proposition (ou sous la proposition, dans la
