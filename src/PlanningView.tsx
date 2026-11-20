@@ -23,6 +23,7 @@ import { pickSurprise, surpriseIdeas } from './lib/surprise';
 import { SLOTS, type Meal, type MealStore, type Slot } from './lib/types';
 import { weekText } from './lib/weekText';
 import { Breakable } from './Breakable';
+import { SlotPicker } from './SlotPicker';
 import { DishThumb } from './DishThumb';
 import { OtherEvents, SLOT_LABEL, SlotSheet, type ShownProposal } from './SlotSheet';
 
@@ -36,6 +37,9 @@ interface Override {
   icon: string;
   note: string;
 }
+
+/** Ce qu'on place avec le choix de créneau : une proposition (acceptée ailleurs) ou un repas (déplacé). */
+type Picking = { mode: 'accept'; name: string; from: string; override: boolean } | { mode: 'move'; meal: Meal };
 
 interface Editing {
   date: string;
@@ -171,7 +175,7 @@ function MenuItem({ icon, label, hint, onClick }: { icon: string; label: string;
 export function PlanningView(props: PlanningProps) {
   const { store, dishes, today, shared, ideas, slotMode, pendingOnly, blacklistKeys, blacklistFilter, resetToken, loading, flash, blacklistDish } = props;
   const { favoriteKeys, isFavorite, toggleFavorite } = props;
-  const { meals, setSlot, addMeal, clearSlot, removeMeal, setNote } = store;
+  const { meals, setSlot, addMeal, clearSlot, removeMeal, setNote, moveMeal } = store;
   const mealsRef = useRef(meals);
   mealsRef.current = meals;
   const { randomness, historyMonths, includeBlacklist } = shared;
@@ -182,6 +186,8 @@ export function PlanningView(props: PlanningProps) {
   const [rejected, setRejected] = useState<Record<string, string[]>>({});
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  // Choix d'un autre créneau : pour accepter une proposition ailleurs, ou déplacer un repas prévu.
+  const [picking, setPicking] = useState<Picking | null>(null);
   // Change à chaque ouverture de l'application, pour ne pas revoir le même tirage.
   const [seed] = useState(() => String(Math.random()));
   const shownIdeas = useRef(new Set<string>());
@@ -331,6 +337,27 @@ export function PlanningView(props: PlanningProps) {
       const added = mealsRef.current.find((m) => m.date === date && m.slot === slot && m.name === name.trim() && !before.has(m.id));
       if (added) removeMeal(added.id);
     });
+  }
+
+  /** Accepte une proposition pour un autre créneau (elle s'ajoute si ce créneau a déjà un plat). */
+  function acceptElsewhere(name: string, date: string, slot: Slot) {
+    const key = `${date}|${slot}`;
+    const before = new Set((bySlot.get(key) ?? []).map((m) => m.id));
+    addMeal(date, slot, name);
+    setSkip(key, false);
+    flash(`« ${name} » prévu ${dayName(date).toLowerCase()} ${shortDate(date)} ${SLOT_LABEL[slot].toLowerCase()}.`, () => {
+      const added = mealsRef.current.find((m) => m.date === date && m.slot === slot && m.name === name.trim() && !before.has(m.id));
+      if (added) removeMeal(added.id);
+    });
+  }
+
+  /** Déplace un repas prévu vers un autre créneau : l'original se vide. */
+  function moveTo(meal: Meal, date: string, slot: Slot) {
+    moveMeal(meal.id, date, slot);
+    setSkip(`${date}|${slot}`, false);
+    flash(`« ${meal.name} » déplacé ${dayName(date).toLowerCase()} ${shortDate(date)} ${SLOT_LABEL[slot].toLowerCase()}.`, () =>
+      moveMeal(meal.id, meal.date, meal.slot),
+    );
   }
 
   function acceptAll() {
@@ -533,6 +560,12 @@ export function PlanningView(props: PlanningProps) {
                               🚫
                             </button>
                             <ProposalMenu label={`Plus d'options pour ${where}`} open={menuFor === key} onToggle={(open) => setMenuFor(open ? key : null)}>
+                              <MenuItem
+                                icon="📅"
+                                label="Accepter pour un autre créneau…"
+                                hint="choisir le jour, midi ou soir"
+                                onClick={() => setPicking({ mode: 'accept', name: shown.name, from: key, override: !!override })}
+                              />
                               <MenuItem icon="✨" label="Surprise Me" hint="un plat jamais noté" onClick={() => surpriseSlot(key, date)} />
                               <MenuItem icon="🕰️" label="Un plat oublié" hint="souvent mangé, plus depuis un an" onClick={() => forgottenSlot(key, date, slot)} />
                               {blacklistKeys.size > 0 && (
@@ -601,11 +634,38 @@ export function PlanningView(props: PlanningProps) {
             addAnother(editing.date, editing.slot, name);
             setEditing(null);
           }}
+          onAcceptElsewhere={(name) => {
+            const key = `${editing.date}|${editing.slot}`;
+            setPicking({ mode: 'accept', name, from: key, override: !!overrides[key] });
+            setEditing(null);
+          }}
+          onMove={(meal) => {
+            setPicking({ mode: 'move', meal });
+            setEditing(null);
+          }}
           onClear={() => {
             clearSlot(editing.date, editing.slot);
             setEditing(null);
           }}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {picking && (
+        <SlotPicker
+          title={picking.mode === 'accept' ? 'Accepter pour un autre créneau' : 'Déplacer vers…'}
+          name={picking.mode === 'accept' ? picking.name : picking.meal.name}
+          today={today}
+          bySlot={bySlot}
+          skipped={skipped}
+          from={picking.mode === 'move' ? `${picking.meal.date}|${picking.meal.slot}` : undefined}
+          onPick={(date, slot) => {
+            if (picking.mode === 'accept') {
+              acceptElsewhere(picking.name, date, slot);
+              if (picking.override) dropOverride(picking.from);
+            } else moveTo(picking.meal, date, slot);
+            setPicking(null);
+          }}
+          onClose={() => setPicking(null)}
         />
       )}
     </>

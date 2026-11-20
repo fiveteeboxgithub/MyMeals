@@ -188,6 +188,17 @@ réglages restent sur l'appareil.
 Supprimer l'événement dans Google Agenda remet les réglages de l'agenda à zéro : le premier appareil qui se
 connecte ensuite le recrée avec ses propres réglages.
 
+## Accepter ailleurs, déplacer un repas
+
+- **Accepter pour un autre créneau** : dans le menu **⋯** d'une proposition (ou sous la proposition, dans la
+  fenêtre du créneau), « 📅 Accepter pour un autre créneau… » ouvre le choix d'un créneau.
+- **Déplacer un repas prévu** : dans la fenêtre du créneau, « 📅 Déplacer » à côté du repas. Le même événement
+  Google change de date et d'heure (sa note le suit) ; le créneau d'origine se vide.
+
+Le choix d'un créneau montre les quatorze jours à partir d'aujourd'hui (jamais avant), chacun avec Midi et Soir
+et ce qui y est déjà prévu (« libre » en surbrillance) ; « Autre date » ouvre un calendrier pour aller plus loin.
+Un créneau déjà pris garde son plat : le nouveau s'y ajoute. Chaque action propose « Annuler ».
+
 ## Plusieurs repas sur un même créneau
 
 Deux événements le même jour à la même heure (ou, plus généralement, du même côté de 16 h) tombent dans le

@@ -317,6 +317,22 @@ export function renameEvent(token: string, calendar: GoogleCalendar, eventId: st
   );
 }
 
+/** Déplace un repas à un autre jour ou créneau (même événement : sa note reste). */
+export function moveEvent(token: string, calendar: GoogleCalendar, eventId: string, date: string, slot: Slot): Promise<GoogleEvent> {
+  const time = mealTimes[slot];
+  return call<GoogleEvent>(
+    token,
+    `/calendars/${encodeURIComponent(calendar.id)}/events/${encodeURIComponent(eventId)}?fields=id,status,summary,start`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        start: { dateTime: shiftTime(date, time, 0), timeZone: calendar.timeZone },
+        end: { dateTime: shiftTime(date, time, 60), timeZone: calendar.timeZone },
+      }),
+    },
+  );
+}
+
 /** Écrit la note d'un repas dans la description de l'événement (texte vide : la retire). */
 export function setEventNote(token: string, calendar: GoogleCalendar, eventId: string, note: string): Promise<GoogleEvent> {
   return call<GoogleEvent>(

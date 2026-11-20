@@ -37,6 +37,8 @@ export interface MealStore {
   removeMeal: (id: string) => void;
   /** Donne le même nom à tous les repas indiqués. Renvoie le nombre de repas renommés ou en échec. */
   renameMeals: (ids: string[], name: string) => Promise<{ renamed: number; failed: number }>;
+  /** Déplace un repas vers un autre jour ou créneau (sa note le suit). */
+  moveMeal: (id: string, date: string, slot: Slot) => void;
   /** Remplace la note d'un repas (texte vide : la retire). */
   setNote: (id: string, note: string) => void;
 }

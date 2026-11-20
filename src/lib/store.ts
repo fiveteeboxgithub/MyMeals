@@ -86,6 +86,11 @@ export function useMeals() {
     [update],
   );
 
+  const moveMeal = useCallback(
+    (id: string, date: string, slot: Slot) => update((current) => current.map((m) => (m.id === id ? { ...m, date, slot } : m))),
+    [update],
+  );
+
   const setNote = useCallback(
     (id: string, note: string) => update((current) => current.map((m) => (m.id === id ? withNote(m, note.trim()) : m))),
     [update],
@@ -104,5 +109,5 @@ export function useMeals() {
     [meals, update],
   );
 
-  return { meals, importMeals, setSlot, addMeal, clearSlot, removeMeal, clearAll, renameMeals, setNote };
+  return { meals, importMeals, setSlot, addMeal, clearSlot, removeMeal, clearAll, renameMeals, setNote, moveMeal };
 }

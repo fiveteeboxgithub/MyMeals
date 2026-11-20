@@ -42,6 +42,10 @@ interface SheetProps {
   onPick: (name: string) => void;
   /** Ajoute le plat au créneau sans remplacer ceux qui y sont déjà. */
   onAdd: (name: string) => void;
+  /** Ouvre le choix d'un autre créneau pour la proposition. */
+  onAcceptElsewhere: (name: string) => void;
+  /** Ouvre le choix d'un créneau où déplacer ce repas. */
+  onMove: (meal: Meal) => void;
   onClear: () => void;
   onClose: () => void;
 }
@@ -126,6 +130,9 @@ export function SlotSheet(sheetProps: SheetProps) {
                 ✓ Choisir
               </button>
             </div>
+            <button className="link elsewhere" onClick={() => props.onAcceptElsewhere(proposal.name)}>
+              📅 Accepter pour un autre créneau…
+            </button>
             <DishPicture name={proposal.name} enabled={props.showImages} />
             <PastNotes list={props.notes.get(dishKeyOf(proposal.name, props.dishes)) ?? []} />
           </>
@@ -252,6 +259,9 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
       <p className="current">
         Prévu : <strong>{meal.name}</strong>
         <FavoriteButton name={meal.name} {...props} />
+        <button className="link" onClick={() => props.onMove(meal)} disabled={pending} title="Déplacer ce repas vers un autre jour ou créneau">
+          📅 Déplacer
+        </button>
         <button className="link danger" onClick={onRemove}>
           Retirer
         </button>

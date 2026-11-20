@@ -20,6 +20,7 @@ import {
   IMAGES_EVENT,
   IMAGES_EVENT_ID,
   renameEvent,
+  moveEvent,
   signIn,
   storedToken,
   tokenRemainingMs,
@@ -417,6 +418,22 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     [commit, fail, withAccess],
   );
 
+  /** Déplace un repas vers un autre créneau (le même événement : sa note le suit). */
+  const moveMeal = useCallback(
+    (id: string, date: string, slot: Slot) => {
+      withAccess((a) => {
+        const meal = cacheRef.current.meals.find((m) => m.id === id);
+        if (!meal || id.startsWith('tmp-') || (meal.date === date && meal.slot === slot)) return;
+        commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === id ? { ...m, date, slot } : m)) }));
+        moveEvent(a.token, a.calendar, id, date, slot).catch((e) => {
+          commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === id ? meal : m)) }));
+          fail(e);
+        });
+      });
+    },
+    [commit, fail, withAccess],
+  );
+
   /** Écrit la note d'un repas dans la description de son événement. */
   const setNote = useCallback(
     (id: string, rawNote: string) => {
@@ -572,6 +589,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     removeMeal,
     renameMeals,
     setNote,
+    moveMeal,
     settings,
     saveSettings,
     images,

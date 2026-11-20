@@ -68,7 +68,7 @@ function GoogleApp() {
 }
 
 function LocalApp() {
-  const { meals, importMeals, setSlot, addMeal, clearSlot, removeMeal, clearAll, renameMeals, setNote } = useMeals();
+  const { meals, importMeals, setSlot, addMeal, clearSlot, removeMeal, clearAll, renameMeals, setNote, moveMeal } = useMeals();
   const [notice, setNotice] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -108,7 +108,7 @@ function LocalApp() {
 
   return (
     <Planner
-      store={{ meals, setSlot, addMeal, clearSlot, removeMeal, renameMeals, setNote }}
+      store={{ meals, setSlot, addMeal, clearSlot, removeMeal, renameMeals, setNote, moveMeal }}
       headerAction={importButton}
       banner={
         <>
