@@ -76,6 +76,8 @@ interface PlanningProps {
   favoriteKeys: ReadonlySet<string>;
   isFavorite: (name: string) => boolean;
   toggleFavorite: (name: string) => void;
+  isBlacklisted: (name: string) => boolean;
+  toggleBlacklist: (name: string) => void;
   /** Notes des repas, par plat. */
   notes: Map<string, PastNote[]>;
   onSurprisePeriod: (months: number) => void;
@@ -610,6 +612,8 @@ export function PlanningView(props: PlanningProps) {
           showImages={props.showImages}
           isFavorite={isFavorite}
           onToggleFavorite={toggleFavorite}
+          isBlacklisted={props.isBlacklisted}
+          onToggleBlacklist={props.toggleBlacklist}
           notes={props.notes}
           onSetNote={setNote}
           includeBlacklist={includeBlacklist}

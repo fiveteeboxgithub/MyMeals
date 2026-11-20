@@ -138,6 +138,31 @@ export function Planner(props: PlannerProps) {
     [shared.blacklistText, change, dishes, blacklistKeys, showFlash],
   );
 
+  /** Plat sur la liste noire (par une de ses écritures ou une règle). */
+  const isBlacklisted = useCallback(
+    (name: string) => blacklist.matches(name) || blacklistKeys.has(dishKeyOf(name, dishes)),
+    [blacklist, blacklistKeys, dishes],
+  );
+  /** Ajoute un plat à la liste noire, ou l'en retire, depuis la fiche d'un plat. */
+  const toggleBlacklist = useCallback(
+    (name: string) => {
+      if (!isBlacklisted(name)) {
+        blacklistDish(name);
+        return;
+      }
+      const previous = shared.blacklistText;
+      const next = removeFromList(previous, name);
+      const stillListed = parseBlacklist(next);
+      if (stillListed.matches(name) || blacklistedKeys(dishes, stillListed).has(dishKeyOf(name, dishes))) {
+        showFlash(`« ${name} » est sur la liste noire par une règle plus large : modifie-la dans Réglages → Liste noire.`);
+        return;
+      }
+      change({ blacklistText: next });
+      showFlash(`« ${name} » n'est plus sur la liste noire.`, () => change({ blacklistText: previous }));
+    },
+    [isBlacklisted, blacklistDish, shared.blacklistText, dishes, change, showFlash],
+  );
+
   // Favoris : même syntaxe que la liste noire ; ils reviennent plus souvent dans les propositions.
   const favorites = useMemo(() => parseBlacklist(shared.favoritesText), [shared.favoritesText]);
   const favoriteKeys = useMemo(() => blacklistedKeys(dishes, favorites), [dishes, favorites]);
@@ -266,6 +291,8 @@ export function Planner(props: PlannerProps) {
           favoriteKeys={favoriteKeys}
           isFavorite={isFavorite}
           toggleFavorite={toggleFavorite}
+          isBlacklisted={isBlacklisted}
+          toggleBlacklist={toggleBlacklist}
           notes={notes}
           onSurprisePeriod={(months) => change({ surprisePeriod: months })}
           calendars={eventsApi}

@@ -30,6 +30,8 @@ interface SheetProps {
   showImages: boolean;
   isFavorite: (name: string) => boolean;
   onToggleFavorite: (name: string) => void;
+  isBlacklisted: (name: string) => boolean;
+  onToggleBlacklist: (name: string) => void;
   notes: Map<string, PastNote[]>;
   onSetNote: (id: string, note: string) => void;
   dishes: DishIndex;
@@ -130,9 +132,20 @@ export function SlotSheet(sheetProps: SheetProps) {
                 ✓ Choisir
               </button>
             </div>
-            <button className="link elsewhere" onClick={() => props.onAcceptElsewhere(proposal.name)}>
-              📅 Accepter pour un autre créneau…
-            </button>
+            <p className="sheet-proposal-links">
+              <button className="link elsewhere" onClick={() => props.onAcceptElsewhere(proposal.name)}>
+                📅 Accepter pour un autre créneau…
+              </button>
+              <BlacklistButton
+                name={proposal.name}
+                isBlacklisted={props.isBlacklisted}
+                onToggleBlacklist={(name) => {
+                  // La proposition va changer : la fenêtre se ferme.
+                  props.onToggleBlacklist(name);
+                  onClose();
+                }}
+              />
+            </p>
             <DishPicture name={proposal.name} enabled={props.showImages} />
             <PastNotes list={props.notes.get(dishKeyOf(proposal.name, props.dishes)) ?? []} />
           </>
@@ -219,6 +232,21 @@ function FavoriteButton({ name, isFavorite, onToggleFavorite }: { name: string }
   );
 }
 
+/** Ajoute le plat à la liste noire, ou l'en retire. */
+function BlacklistButton({ name, isBlacklisted, onToggleBlacklist }: { name: string } & Pick<SheetProps, 'isBlacklisted' | 'onToggleBlacklist'>) {
+  const on = isBlacklisted(name);
+  return (
+    <button
+      className={`link ${on ? 'blacklisted' : 'danger'}`}
+      onClick={() => onToggleBlacklist(name)}
+      aria-pressed={on}
+      title={on ? 'Ce plat est sur la liste noire : il n’est plus proposé' : 'Ne plus jamais proposer ce plat'}
+    >
+      {on ? '🚫 Sur la liste noire (retirer)' : '🚫 Liste noire'}
+    </button>
+  );
+}
+
 /** Texte d'une note, avec ses liens cliquables. */
 export function NoteText({ note }: { note: string }) {
   return (
@@ -265,6 +293,7 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
         <button className="link danger" onClick={onRemove}>
           Retirer
         </button>
+        <BlacklistButton name={meal.name} {...props} />
       </p>
       <DishPicture name={meal.name} enabled={props.showImages} />
       {editing ? (

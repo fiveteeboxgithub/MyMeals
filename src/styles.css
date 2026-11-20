@@ -1894,3 +1894,16 @@ small {
   margin: 6px 0 0;
   padding: 0;
 }
+.sheet-proposal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0 0;
+}
+.sheet-proposal-links .link {
+  margin: 0;
+  padding: 0;
+}
+.link.blacklisted {
+  color: var(--muted);
+}
