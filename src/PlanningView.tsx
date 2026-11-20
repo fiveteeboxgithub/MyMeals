@@ -619,6 +619,7 @@ export function PlanningView(props: PlanningProps) {
                             <button
                               className="icon ban"
                               onClick={() => {
+                                if (!window.confirm(`Ne plus jamais proposer « ${shown.name} » ?\n\nLe plat est ajouté à la liste noire (tu pourras l'en retirer dans les réglages). Tes repas passés ne changent pas.`)) return;
                                 blacklistDish(shown.name);
                                 if (override) dropOverride(key);
                               }}

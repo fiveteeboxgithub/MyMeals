@@ -92,7 +92,7 @@ l'onglet **Réglages** contient une **liste noire** : une entrée par ligne.
   pas « photo »), `/^(sushi|maki)/`. Une expression mal formée est signalée et ignorée.
 - Les lignes vides et celles qui commencent par `#` sont ignorées.
 
-**Ajouter un plat d'un geste** : le bouton **🚫** (« Ne plus jamais proposer ce plat ») d'une proposition du planning (ou d'une idée « Surprise Me »), ou « 🚫 Liste noire » dans la fiche d'un plat (fenêtre du créneau, pour un repas prévu comme pour la proposition ; « Sur la liste noire (retirer) » l'en retire),
+**Ajouter un plat d'un geste** : le bouton **🚫** (« Ne plus jamais proposer ce plat », avec une demande de confirmation) d'une proposition du planning (ou d'une idée « Surprise Me »), ou « 🚫 Liste noire » dans la fiche d'un plat (fenêtre du créneau, pour un repas prévu comme pour la proposition ; « Sur la liste noire (retirer) » l'en retire),
 ajoute son nom à la liste noire, retire aussitôt la proposition et affiche un message avec « Annuler ». Le
 message indique combien de plats sont masqués si la ligne en touche plusieurs (« kebab » masque aussi
 « kebab frites ») ; on peut ensuite affiner la ligne dans les réglages.
