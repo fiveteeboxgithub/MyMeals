@@ -188,6 +188,12 @@ réglages restent sur l'appareil.
 Supprimer l'événement dans Google Agenda remet les réglages de l'agenda à zéro : le premier appareil qui se
 connecte ensuite le recrée avec ses propres réglages.
 
+## Jours passés
+
+Dans un jour passé, un créneau sans repas n'est pas affiché du tout (ni « + Ajouter », ni les événements des autres
+agendas) ; un jour passé sans aucun repas disparaît lui aussi de la semaine. Les créneaux d'aujourd'hui et à
+venir s'affichent toujours.
+
 ## Changer de semaine
 
 Les flèches ‹ ›, « Aujourd'hui » et le geste de balayage changent de semaine avec un effet de glissement : la

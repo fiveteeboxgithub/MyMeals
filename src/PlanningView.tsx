@@ -291,8 +291,13 @@ export function PlanningView(props: PlanningProps) {
     if (date < today || bySlot.has(key) || skipped.has(key)) return false;
     return usual.size === 0 || usual.has(`${weekday(date)}-${slot}`);
   };
+  // Un créneau passé sans repas n'a plus rien à montrer : il disparaît (avec ses autres agendas), et le jour
+  // aussi s'il ne lui reste aucun créneau.
   const visibleDays = days
-    .map((date) => ({ date, slots: activeSlots.filter((slot) => !pendingOnly || needsDecision(date, slot)) }))
+    .map((date) => ({
+      date,
+      slots: activeSlots.filter((slot) => (date >= today || bySlot.has(`${date}|${slot}`)) && (!pendingOnly || needsDecision(date, slot))),
+    }))
     .filter((day) => day.slots.length > 0);
 
   /** Ce qui sera accepté pour un créneau : l'idée affichée à la place de la proposition, sinon la proposition. */
@@ -563,7 +568,9 @@ export function PlanningView(props: PlanningProps) {
           onTouchEnd={onTouchEnd}
           onTouchCancel={onTouchCancel}
         >
-          {visibleDays.length === 0 && <p className="all-done">Tout est décidé pour cette semaine.</p>}
+          {visibleDays.length === 0 && (
+            <p className="all-done">{days[6] < today ? 'Aucun repas enregistré cette semaine.' : 'Tout est décidé pour cette semaine.'}</p>
+          )}
           {visibleDays.map(({ date, slots }) => (
             <section key={date} className={`day${date === today ? ' today' : ''}${date < today ? ' past' : ''}`}>
               <h2>
