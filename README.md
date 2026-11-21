@@ -254,7 +254,9 @@ on change de semaine, sinon elle revient en place. Un défilement vertical ne ch
 jusqu'au jour d'aujourd'hui, une fois par semaine affichée et seulement si tu n'as pas déjà fait défiler la page.
 
 **Fenêtres ouvertes** (fiche d'un créneau, choix d'un créneau) : la page derrière est figée ; glisser dans la
-fenêtre ne fait plus défiler la semaine du dessous, et la position est retrouvée à la fermeture.
+fenêtre ne fait plus défiler la semaine du dessous, et la position est retrouvée à la fermeture. La fenêtre elle-même
+défile en entier (titre fixe en haut, avec le bouton de fermeture) : la liste des plats s'étale au lieu de se réduire
+à une ligne.
 
 La semaine affichée est gardée pour la session du navigateur : après un rechargement de la page (ou un détour par
 Réglages, Stats…), on retrouve la même semaine ; un nouvel onglet ou une nouvelle ouverture de l'application repart de

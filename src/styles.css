@@ -2193,3 +2193,22 @@ html {
 .backdrop {
   overscroll-behavior: contain;
 }
+
+/* Fenêtres : un seul défilement, celui de la fenêtre entière (la liste des plats ne se réduit plus à une ligne). */
+.choices,
+.picker-days {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.sheet > * {
+  flex-shrink: 0;
+}
+.sheet-head {
+  position: sticky;
+  top: calc(-14px);
+  z-index: 2;
+  margin: -14px -16px 0;
+  padding: 14px 16px 10px;
+  background: var(--card);
+  box-shadow: 0 1px 0 var(--line);
+}
