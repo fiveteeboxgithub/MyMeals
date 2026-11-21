@@ -27,6 +27,9 @@ export interface SettingsSync {
   save: (record: SettingsRecord) => void;
 }
 
+/** Résultat de l'ajout d'un nom à la liste noire. */
+export type BlacklistOutcome = 'added' | 'already' | 'full';
+
 export interface MealStore {
   meals: Meal[];
   setSlot: (date: string, slot: Slot, name: string) => void;

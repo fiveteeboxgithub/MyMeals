@@ -6,10 +6,10 @@ import { addDays, todayIso } from './lib/dates';
 import { setMealTimes, type CalendarInfo, type TimedEvent } from './lib/google';
 import { shownByDefault } from './lib/otherCalendars';
 import { KEYS, readPref, writePref } from './lib/prefs';
-import { MAX_FAVORITES_CHARS, parseSkipped, withSkip, type SharedSettings } from './lib/settings';
+import { MAX_BLACKLIST_CHARS, MAX_FAVORITES_CHARS, parseSkipped, withSkip, type SharedSettings } from './lib/settings';
 import { buildIndex, normalize } from './lib/suggest';
 import { parseIdeas } from './lib/surprise';
-import type { ImagesSync, MealStore, SettingsSync } from './lib/types';
+import type { BlacklistOutcome, ImagesSync, MealStore, SettingsSync } from './lib/types';
 import { CustomImagesContext, useCustomImages } from './lib/customImages';
 import { useAppSettings } from './lib/useAppSettings';
 import { Notice } from './Notice';
@@ -136,6 +136,22 @@ export function Planner(props: PlannerProps) {
       showFlash(`« ${name} » est sur la liste noire${more}.`, () => change({ blacklistText: previous }));
     },
     [shared.blacklistText, change, dishes, blacklistKeys, showFlash],
+  );
+
+  /** Ajoute un nom à la liste noire sans message (fusion de doublons) : dit ce qui s'est passé. */
+  const blacklistTextRef = useRef(shared.blacklistText);
+  blacklistTextRef.current = shared.blacklistText;
+  const blacklistName = useCallback(
+    (name: string): BlacklistOutcome => {
+      const previous = blacklistTextRef.current;
+      const next = addToBlacklist(previous, name);
+      if (next === previous) return 'already';
+      if (next.length > MAX_BLACKLIST_CHARS) return 'full';
+      blacklistTextRef.current = next;
+      change({ blacklistText: next });
+      return 'added';
+    },
+    [change],
   );
 
   /** Plat sur la liste noire (par une de ses écritures ou une règle). */
@@ -298,7 +314,7 @@ export function Planner(props: PlannerProps) {
           shownCalendars={shownCalendars}
         />
       )}
-      {view === 'doublons' && <DuplicatesPage store={store} dishes={dishes} />}
+      {view === 'doublons' && <DuplicatesPage store={store} dishes={dishes} onBlacklist={blacklistName} />}
       {view === 'stats' && <StatsPage meals={store.meals} dishes={dishes} today={today} blacklistKeys={blacklistKeys} />}
       {view === 'reglages' && (
         <SettingsPage

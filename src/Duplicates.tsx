@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { longDate } from './lib/dates';
 import { compileRegex, findOccurrences, hasQuery, mealsToRename, proposeLabel } from './lib/duplicates';
 import type { DishIndex } from './lib/suggest';
-import type { MealStore } from './lib/types';
+import type { BlacklistOutcome, MealStore } from './lib/types';
+import { ListAfterMerge, listedMessage } from './ListAfterMerge';
 import { ApproximateDuplicates } from './ApproximateDuplicates';
 import { SuspectedDuplicates } from './SuspectedDuplicates';
 
@@ -34,7 +35,7 @@ const MAX_ROWS = 300;
 type Mode = 'suspects' | 'approx' | 'search';
 
 /** Page des doublons : propositions toutes prêtes à confirmer, ou recherche à la main. */
-export function DuplicatesPage({ store, dishes }: { store: MealStore; dishes: DishIndex }) {
+export function DuplicatesPage({ store, dishes, onBlacklist }: { store: MealStore; dishes: DishIndex; onBlacklist: (name: string) => BlacklistOutcome }) {
   const [mode, setMode] = useState<Mode>('suspects');
   return (
     <>
@@ -49,15 +50,15 @@ export function DuplicatesPage({ store, dishes }: { store: MealStore; dishes: Di
           Recherche
         </button>
       </div>
-      {mode === 'suspects' && <SuspectedDuplicates store={store} dishes={dishes} />}
-      {mode === 'approx' && <ApproximateDuplicates store={store} dishes={dishes} />}
-      {mode === 'search' && <ManualSearch store={store} />}
+      {mode === 'suspects' && <SuspectedDuplicates store={store} dishes={dishes} onBlacklist={onBlacklist} />}
+      {mode === 'approx' && <ApproximateDuplicates store={store} dishes={dishes} onBlacklist={onBlacklist} />}
+      {mode === 'search' && <ManualSearch store={store} onBlacklist={onBlacklist} />}
     </>
   );
 }
 
 /** Recherche des libellés proches dans le calendrier, pour les fusionner en un seul. */
-function ManualSearch({ store }: { store: MealStore }) {
+function ManualSearch({ store, onBlacklist }: { store: MealStore; onBlacklist: (name: string) => BlacklistOutcome }) {
   const [query, setQuery] = useState('');
   const [regex, setRegex] = useState(loadRegexMode);
   const [tipOpen, setTipOpen] = useState(false);
@@ -66,6 +67,7 @@ function ManualSearch({ store }: { store: MealStore }) {
   const [label, setLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState('');
+  const [listAfter, setListAfter] = useState(false);
 
   const regexError = regex ? compileRegex(query).error : undefined;
   const results = useMemo(() => findOccurrences(store.meals, query, { regex }), [store.meals, query, regex]);
@@ -99,10 +101,11 @@ function ManualSearch({ store }: { store: MealStore }) {
     setBusy(false);
     setMerging(false);
     setSelected(new Set());
+    const listed = listAfter && failed === 0 ? onBlacklist(name) : null;
     setResult(
-      failed > 0
+      (failed > 0
         ? `${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'} en « ${name} », ${failed} en échec : ils ont gardé leur nom.`
-        : `${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'} en « ${name} ».`,
+        : `${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'} en « ${name} ».`) + listedMessage(name, listed),
     );
   }
 
@@ -267,6 +270,7 @@ function ManualSearch({ store }: { store: MealStore }) {
             Fusionner {checked.length} libellés ? {mealsToRename(checked, label)} repas seront renommés en{' '}
             <strong>« {label.trim() || '…'} »</strong>. Cela modifie les événements du calendrier.
           </p>
+          <ListAfterMerge name={label.trim()} checked={listAfter} onChange={setListAfter} disabled={busy} />
           <div className="dup-actions">
             <button type="submit" className="ghost-btn primary" disabled={!label.trim() || busy}>
               {busy ? 'Fusion en cours…' : 'Oui, fusionner'}

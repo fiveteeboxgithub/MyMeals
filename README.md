@@ -263,6 +263,12 @@ coché le plus utilisé, modifiable) puis, après confirmation, renomme tous les
 cochés. Avec Google Agenda, ce sont les événements de l'agenda qui sont renommés ;
 ceux qui échouent gardent leur nom.
 
+
+**Fusionner puis mettre en liste noire** : chaque fusion (Suspectés, Approchants, Recherche) a une case « Ensuite,
+mettre « nom » en liste noire ». Une fois les repas renommés (et seulement si aucun n'a échoué), le nom retenu est
+ajouté à la liste noire : ce plat, avec ses variantes, ne sera plus proposé. Les repas restent dans l'agenda. Dans
+« Suspectés », « Tout confirmer » a la même case pour tous les groupes ; un groupe déjà au bon nom peut être mis
+en liste noire sans rien renommer. La liste noire cache tout plat dont le nom contient le texte ajouté.
 ## Organisation de l'application
 
 Quatre onglets : **Planning**, **Doublons**, **Stats** et **Réglages**. L'en-tête n'affiche un bouton que

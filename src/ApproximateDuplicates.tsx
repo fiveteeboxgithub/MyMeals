@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { approximateGroups, prefersLowercase, applyInitialStyle, mealsToRename, proposeLabel, type ApproxGroup } from './lib/duplicates';
 import type { DishIndex } from './lib/suggest';
-import type { MealStore } from './lib/types';
+import type { BlacklistOutcome, MealStore } from './lib/types';
+import { ListAfterMerge, listedMessage } from './ListAfterMerge';
 
 const IGNORED_KEY = 'mymeals.duplicates.ignoredApprox';
 const PAGE_SIZE = 20;
@@ -27,13 +28,14 @@ function saveIgnored(ignored: ReadonlySet<string>): void {
  * Plats dont les mots sont inclus dans ceux d'un plat plus détaillé (« pâtes saumon », « pâtes saumon fumé »).
  * Moins sûr que les variantes d'écriture : rien n'est coché d'avance, on coche ce qui est bien le même plat.
  */
-export function ApproximateDuplicates({ store, dishes }: { store: MealStore; dishes: DishIndex }) {
+export function ApproximateDuplicates({ store, dishes, onBlacklist }: { store: MealStore; dishes: DishIndex; onBlacklist: (name: string) => BlacklistOutcome }) {
   const [ignored, setIgnored] = useState(loadIgnored);
   const [checked, setChecked] = useState<Record<string, ReadonlySet<string>>>({});
   const [edited, setEdited] = useState<Record<string, string>>({});
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState('');
+  const [listed, setListed] = useState<Record<string, boolean>>({});
   // Les plats déjà souvent mangés sous leur nom sont sans doute des plats à part : masqués par défaut.
   const [showFrequent, setShowFrequent] = useState(false);
 
@@ -72,10 +74,11 @@ export function ApproximateDuplicates({ store, dishes }: { store: MealStore; dis
     const { renamed, failed } = await store.renameMeals(ids, name);
     setBusy(null);
     setChecked({ ...checked, [group.signature]: new Set() });
+    const outcome = listed[group.signature] === true && failed === 0 ? onBlacklist(name) : null;
     setResult(
-      failed > 0
+      (failed > 0
         ? `${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'} en « ${name} », ${failed} en échec : ils ont gardé leur nom.`
-        : `${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'} en « ${name} ».`,
+        : `${renamed} ${renamed > 1 ? 'repas renommés' : 'repas renommé'} en « ${name} ».`) + listedMessage(name, outcome),
     );
   }
 
@@ -192,6 +195,14 @@ export function ApproximateDuplicates({ store, dishes }: { store: MealStore; dis
                       />
                     </label>
                   )}
+                  {chosen.length > 0 && (
+                    <ListAfterMerge
+                      name={nameOf(group)}
+                      checked={listed[group.signature] === true}
+                      onChange={(value) => setListed({ ...listed, [group.signature]: value })}
+                      disabled={busy !== null}
+                    />
+                  )}
                   <div className="dup-actions">
                     <button
                       className="ghost-btn primary"
@@ -202,7 +213,7 @@ export function ApproximateDuplicates({ store, dishes }: { store: MealStore; dis
                         ? 'Fusion en cours…'
                         : chosen.length === 0
                           ? 'Coche au moins un plat'
-                          : `Renommer ${toRename} repas`}
+                          : `Renommer ${toRename} repas${listed[group.signature] === true ? ' + liste noire' : ''}`}
                     </button>
                     <button className="ghost-btn" disabled={busy !== null} onClick={() => ignore(group)}>
                       Pas des doublons

@@ -1948,3 +1948,19 @@ body {
     animation: none;
   }
 }
+
+/* Doublons : mettre le nom retenu en liste noire après la fusion */
+.list-after {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+}
+.list-after input {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}

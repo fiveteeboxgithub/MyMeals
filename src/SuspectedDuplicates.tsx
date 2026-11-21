@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { longDate } from './lib/dates';
 import { applyInitialStyle, mealsToRename, prefersLowercase, proposeLabel, suspectedGroups, type Occurrence, type SuspectedGroup } from './lib/duplicates';
 import type { DishIndex } from './lib/suggest';
-import type { MealStore } from './lib/types';
+import type { BlacklistOutcome, MealStore } from './lib/types';
+import { ListAfterMerge, listedMessage } from './ListAfterMerge';
 
 const IGNORED_KEY = 'mymeals.duplicates.ignored';
 const PAGE_SIZE = 20;
@@ -31,7 +32,7 @@ const renamedText = (n: number) => `${n} ${n > 1 ? 'repas renommés' : 'repas re
  * Doublons que l'on soupçonne déjà. Tous les libellés d'un groupe sont cochés d'avance : on décoche ceux
  * qui n'en font pas partie, puis on confirme. Seuls les libellés cochés sont renommés.
  */
-export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishes: DishIndex }) {
+export function SuspectedDuplicates({ store, dishes, onBlacklist }: { store: MealStore; dishes: DishIndex; onBlacklist: (name: string) => BlacklistOutcome }) {
   const [ignored, setIgnored] = useState(loadIgnored);
   // Libellés décochés, par groupe : tout est coché tant qu'on n'a rien décoché.
   const [unchecked, setUnchecked] = useState<Record<string, ReadonlySet<string>>>({});
@@ -40,6 +41,9 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const [result, setResult] = useState('');
+  // Mettre le nom retenu en liste noire une fois la fusion faite : par groupe, ou pour tous.
+  const [listed, setListed] = useState<Record<string, boolean>>({});
+  const [listAll, setListAll] = useState(false);
 
   const groups = useMemo(() => suspectedGroups(store.meals, dishes, ignored), [store.meals, dishes, ignored]);
   const lowercase = useMemo(() => prefersLowercase(store.meals), [store.meals]);
@@ -75,18 +79,25 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
     const name = nameOf(group);
     const picked = pickedOf(group);
     if (!name || picked.length === 0 || busy) return;
+    const wantsList = listed[group.signature] === true;
+    if (!changes(group) && !wantsList) return;
     setBusy(group.signature);
     setResult('');
-    const { renamed, failed } = await store.renameMeals(
-      picked.flatMap((o) => o.ids),
-      name,
-    );
+    const { renamed, failed } = changes(group)
+      ? await store.renameMeals(
+          picked.flatMap((o) => o.ids),
+          name,
+        )
+      : { renamed: 0, failed: 0 };
     setBusy(null);
-    setResult(
-      failed > 0
-        ? `${renamedText(renamed)} en « ${name} », ${failed} en échec : ils ont gardé leur nom.`
-        : `${renamedText(renamed)} en « ${name} ».`,
-    );
+    const outcome = wantsList && failed === 0 ? onBlacklist(name) : null;
+    const base =
+      renamed === 0 && failed === 0
+        ? ''
+        : failed > 0
+          ? `${renamedText(renamed)} en « ${name} », ${failed} en échec : ils ont gardé leur nom.`
+          : `${renamedText(renamed)} en « ${name} ».`;
+    setResult(base + listedMessage(name, outcome));
   }
 
   async function mergeAll() {
@@ -97,6 +108,7 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
     let renamed = 0;
     let failed = 0;
     let merged = 0;
+    let listedCount = 0;
     for (const group of todo) {
       setBusy(`all:${merged + 1}/${todo.length}`);
       const outcome = await store.renameMeals(
@@ -107,13 +119,15 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
       failed += outcome.failed;
       // Rien n'a pu être renommé (connexion expirée, refus de Google) : inutile d'insister.
       if (outcome.failed > 0 && outcome.renamed === 0) break;
+      if (listAll && outcome.failed === 0 && onBlacklist(nameOf(group)) === 'added') listedCount++;
       merged++;
     }
     setBusy(null);
+    const listedText = listedCount > 0 ? ` ${plural(listedCount, 'nom mis', 'noms mis')} en liste noire.` : '';
     setResult(
-      failed > 0
+      (failed > 0
         ? `${plural(merged, 'groupe fusionné', 'groupes fusionnés')} (${renamedText(renamed)}), puis arrêt : ${failed} ${failed > 1 ? "repas n'ont" : "repas n'a"} pas pu être renommé${failed > 1 ? 's' : ''}.`
-        : `${plural(merged, 'groupe fusionné', 'groupes fusionnés')} : ${renamedText(renamed)}.`,
+        : `${plural(merged, 'groupe fusionné', 'groupes fusionnés')} : ${renamedText(renamed)}.`) + listedText,
     );
   }
 
@@ -176,6 +190,13 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
                 Fusionner <strong>{plural(active.length, 'groupe', 'groupes')}</strong> ({activeMeals} repas à renommer) sous le nom
                 retenu pour chacun ? Seuls les libellés cochés sont renommés. Cela modifie les événements du calendrier.
               </p>
+              <label className="list-after">
+                <input type="checkbox" checked={listAll} onChange={(e) => setListAll(e.target.checked)} />
+                <span>
+                  Ensuite, mettre chaque nom retenu en liste noire
+                  <small>La liste noire cache tout plat dont le nom contient ce texte.</small>
+                </span>
+              </label>
               <div className="dup-actions">
                 <button className="ghost-btn primary" onClick={() => void mergeAll()}>
                   Oui, tout fusionner
@@ -239,10 +260,16 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
                       disabled={busy !== null}
                     />
                   </label>
+                  <ListAfterMerge
+                    name={nameOf(group)}
+                    checked={listed[group.signature] === true}
+                    onChange={(value) => setListed({ ...listed, [group.signature]: value })}
+                    disabled={busy !== null}
+                  />
                   <div className="dup-actions">
                     <button
                       className="ghost-btn primary"
-                      disabled={busy !== null || picked.length === 0 || !nameOf(group) || !changes(group)}
+                      disabled={busy !== null || picked.length === 0 || !nameOf(group) || (!changes(group) && listed[group.signature] !== true)}
                       onClick={() => void merge(group)}
                     >
                       {busy === group.signature
@@ -250,8 +277,10 @@ export function SuspectedDuplicates({ store, dishes }: { store: MealStore; dishe
                         : picked.length === 0
                           ? 'Coche au moins un libellé'
                           : !changes(group)
-                            ? 'Rien à changer'
-                            : `Renommer ${mealsToRename(picked, nameOf(group))} repas`}
+                            ? listed[group.signature] === true
+                              ? `Mettre « ${nameOf(group)} » en liste noire`
+                              : 'Rien à changer'
+                            : `Renommer ${mealsToRename(picked, nameOf(group))} repas${listed[group.signature] === true ? ' + liste noire' : ''}`}
                     </button>
                     <button className="ghost-btn" disabled={busy !== null} onClick={() => ignore(group)}>
                       Pas des doublons
