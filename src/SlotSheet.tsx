@@ -353,7 +353,7 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
       </div>
       <DishPicture name={meal.name} enabled={props.showImages} />
       <div className="act-row">
-        {canLike(meal, props.me) && (
+        {canLike(meal, props.me) && props.date >= props.today && (
           <Act icon="heart" pressed={likedBy(meal, props.me)} disabled={pending} onClick={() => props.onToggleLike(meal.id)} title="Dire aux autres que ce plat te convient (visible de tous)">
             {likedBy(meal, props.me) ? "Je n'aime plus" : "J'aime"}
           </Act>

@@ -55,8 +55,10 @@ export function likedBy(meal: Pick<Meal, 'likes'>, me: string | undefined): bool
 }
 
 /** Y a-t-il quelque chose à montrer sur la ligne d'un créneau (un « J'aime » possible, ou déjà donné) ? */
-export function likeVisible(meals: Pick<Meal, 'by' | 'likes'>[], me: string | undefined): boolean {
+export function likeVisible(meals: Pick<Meal, 'by' | 'likes'>[], me: string | undefined, past = false): boolean {
   if (!me) return false;
+  // Dans le passé, on ne propose plus d'aimer : seuls les « J'aime » déjà donnés restent visibles.
+  if (past) return meals.some((m) => (m.likes?.length ?? 0) > 0);
   if (meals.length === 1) return canLike(meals[0], me) || (meals[0].likes?.length ?? 0) > 0;
   return meals.some((m) => (m.likes?.length ?? 0) > 0);
 }

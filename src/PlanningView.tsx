@@ -644,7 +644,7 @@ export function PlanningView(props: PlanningProps) {
                     <div className="slot-body">
                       {planned ? (
                         <>
-                        <button className={`meal with-thumb${likeVisible(planned, store.me) ? ' has-like' : ''}`} onClick={() => setEditing({ date, slot })}>
+                        <button className={`meal with-thumb${likeVisible(planned, store.me, date < today) ? ' has-like' : ''}`} onClick={() => setEditing({ date, slot })}>
                           <DishThumb name={planned[0].name} enabled={props.showImages} />
                           <span className="meal-text">
                           <Breakable text={planned.map((m) => m.name).join(' + ')} />
@@ -655,7 +655,7 @@ export function PlanningView(props: PlanningProps) {
                           )}
                           </span>
                         </button>
-                        <LikeMark meals={planned} me={store.me} onToggle={store.toggleLike} />
+                        <LikeMark meals={planned} me={store.me} past={date < today} onToggle={store.toggleLike} />
                         </>
                       ) : skipped.has(key) ? (
                         <button className="add skipped" onClick={() => setEditing({ date, slot })}>

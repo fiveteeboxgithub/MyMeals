@@ -1208,3 +1208,12 @@ describe('J’aime et auteur du plat', () => {
     expect(meal).toMatchObject({ by: 'marie@x.fr', likes: ['paul@x.fr'] });
   });
 });
+
+describe('J’aime et créneaux passés', () => {
+  it('ne propose plus d’aimer dans le passé, mais garde les « J’aime » déjà donnés', async () => {
+    const { likeVisible } = await import('./people');
+    expect(likeVisible([{ by: 'a@x.fr' }], 'b@x.fr', false)).toBe(true);
+    expect(likeVisible([{ by: 'a@x.fr' }], 'b@x.fr', true)).toBe(false);
+    expect(likeVisible([{ by: 'a@x.fr', likes: ['b@x.fr'] }], 'b@x.fr', true)).toBe(true);
+  });
+});
