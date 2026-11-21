@@ -156,12 +156,21 @@ partagées entre les appareils par un second événement spécial de l'agenda, �
 supprimer) », le 2 janvier 2100 (une quarantaine d'images y tiennent) ; sans Google, elles restent dans le
 navigateur.
 
+- Un plat sans image garde une case vide à la place de la vignette : le texte des plats reste aligné d'une ligne à
+  l'autre, en vue liste comme en colonnes.
 - Chaque plat n'est cherché qu'une fois puis gardé sur l'appareil (un plat sans image est recherché à nouveau au
   bout d'un mois), deux recherches à la fois au plus. Seul le nom du plat est envoyé à Wikipédia.
 - Dans la fenêtre d'un créneau, l'image est plus grande, avec un lien vers l'article (source et licence) et
   « Pas la bonne image », qui la retire pour ce plat sur cet appareil.
 - **Réglages → Planning → Images des plats** les désactive (aucune requête n'est alors faite) ; on y rétablit
   aussi les images écartées. Ce réglage est propre à chaque appareil.
+
+## Connexion expirée
+
+Le jeton Google dure une heure. Quand il expire, l'appli propose « Reconnecter » (ou se renouvelle au premier
+toucher) ; l'avertissement « La connexion Google a expiré… » disparaît tout seul dès qu'on est reconnecté et que
+l'agenda est synchronisé. Les autres erreurs (un repas qui n'a pas pu être renommé, par exemple) restent affichées
+jusqu'à ce qu'on les ferme.
 
 ## Réglages partagés
 

@@ -123,6 +123,13 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   const [token, setToken] = useState<string | null>(storedToken);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
+  // Le message d'erreur actuel vient d'une connexion expirée : il disparaît dès qu'on est reconnecté et synchronisé.
+  const authError = useRef(false);
+  const clearAuthError = useCallback(() => {
+    if (!authError.current) return;
+    authError.current = false;
+    setError('');
+  }, []);
   const cacheRef = useRef(cache);
   const busy = useRef(false);
   const renewing = useRef<Promise<string | null> | null>(null);
@@ -154,6 +161,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
       forgetToken();
       setToken(null);
     }
+    authError.current = e instanceof AuthError;
     setError(e instanceof Error ? e.message : 'Erreur inattendue.');
   }, []);
 
@@ -208,6 +216,8 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
             // lecture impossible : les images choisies sur cet appareil restent seules
           }
         }
+        // Reconnecté et synchronisé : l'avertissement de connexion expirée n'a plus lieu d'être.
+        clearAuthError();
       } catch (e) {
         fail(e);
       } finally {
@@ -215,7 +225,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
         setSyncing(false);
       }
     },
-    [calendarName, commit, fail],
+    [calendarName, commit, fail, clearAuthError],
   );
 
   // Charge la connexion Google à l'avance, et resynchronise au retour sur l'application.
@@ -273,6 +283,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
           (fresh) => {
             lastRenewSuccess.current = Date.now();
             setToken(fresh);
+            clearAuthError();
             return fresh;
           },
           () => {
@@ -285,7 +296,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
         });
     }
     return renewing.current;
-  }, [clientId]);
+  }, [clientId, clearAuthError]);
 
   const canRenew = cache.calendar !== undefined;
 
@@ -318,6 +329,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     const fresh = storedToken() ?? (await renew());
     if (!fresh) {
       setToken(null);
+      authError.current = true;
       setError('La connexion Google a expiré : reconnecte-toi, puis recommence.');
       return null;
     }
@@ -644,6 +656,9 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     error,
     connect,
     disconnect,
-    dismissError: () => setError(''),
+    dismissError: () => {
+      authError.current = false;
+      setError('');
+    },
   };
 }

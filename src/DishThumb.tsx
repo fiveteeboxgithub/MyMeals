@@ -7,7 +7,8 @@ import { articleUrl, hideDishImage, imageKey, useDishImage } from './lib/dishIma
 export function DishThumb({ name, enabled }: { name: string; enabled: boolean }) {
   const { images } = useCustomImagesContext();
   const image = useDishImage(name, enabled, images[imageKey(name)]);
-  if (!image) return null;
+  // Sans image, une case vide garde la place : le texte des plats reste aligné d'une ligne à l'autre.
+  if (!image) return enabled ? <span className="dish-thumb blank" aria-hidden="true" /> : null;
   return <img className="dish-thumb" src={image.url} alt="" loading="lazy" referrerPolicy="no-referrer" />;
 }
 

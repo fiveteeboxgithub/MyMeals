@@ -2174,3 +2174,9 @@ body {
 .sp-main .by {
   margin-top: 2px;
 }
+
+.dish-thumb.blank {
+  display: block;
+  background: var(--line);
+  opacity: 0.4;
+}
