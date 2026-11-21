@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Icon } from './Icons';
 import { useCustomImagesContext, validImageUrl } from './lib/customImages';
 import { articleUrl, hideDishImage, imageKey, useDishImage } from './lib/dishImages';
 
@@ -36,35 +37,40 @@ export function DishPicture({ name, enabled }: { name: string; enabled: boolean 
       )}
       <figcaption>
         {image?.source === 'perso' ? (
-          <span>{broken ? "Ton image ne s'affiche pas : vérifie l'adresse." : 'Ton image'}</span>
+          <span className="credit">{broken ? "Ton image ne s'affiche pas : vérifie l'adresse." : 'Ton image'}</span>
         ) : (
           image && (
-            <a href={articleUrl(image)} target="_blank" rel="noopener noreferrer">
+            <a className="credit" href={articleUrl(image)} target="_blank" rel="noopener noreferrer">
               {image.source === 'openverse' ? `Openverse · ${image.credit || image.title}` : `Wikipédia · ${image.title}`}
             </a>
           )
         )}
-        {image && image.source !== 'perso' && (
-          <button className="link" onClick={() => hideDishImage(name)}>
-            Pas la bonne image
-          </button>
-        )}
-        {!editing && (
-          <button
-            className="link"
-            onClick={() => {
-              setDraft(custom ?? '');
-              setEditing(true);
-            }}
-          >
-            {custom ? 'Changer mon image' : '🖼️ Choisir une image'}
-          </button>
-        )}
-        {custom && !editing && (
-          <button className="link danger" onClick={() => setImage(key, null)}>
-            Retirer mon image
-          </button>
-        )}
+        <span className="pic-actions">
+          {image && image.source !== 'perso' && (
+            <button className="act sm" onClick={() => hideDishImage(name)}>
+              <Icon name="ban" />
+              Pas la bonne image
+            </button>
+          )}
+          {!editing && (
+            <button
+              className="act sm"
+              onClick={() => {
+                setDraft(custom ?? '');
+                setEditing(true);
+              }}
+            >
+              <Icon name="image" />
+              {custom ? 'Changer mon image' : 'Choisir une image'}
+            </button>
+          )}
+          {custom && !editing && (
+            <button className="act sm danger" onClick={() => setImage(key, null)}>
+              <Icon name="trash" />
+              Retirer mon image
+            </button>
+          )}
+        </span>
       </figcaption>
       {editing && (
         <div className="image-edit">

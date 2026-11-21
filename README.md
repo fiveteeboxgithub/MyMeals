@@ -190,11 +190,16 @@ connecte ensuite le recrée avec ses propres réglages.
 
 ## Dans la fiche d'un créneau
 
-- **↻** (proposition) : une autre proposition, comme sur la ligne du planning ; la ligne derrière suit.
-- **↻** (repas prévu) : remplace le repas par un autre plat tiré au hasard (jamais déjà prévu cette semaine, ni
-  déjà tiré pour ce créneau), avec « Annuler » ; on peut appuyer plusieurs fois. La note du repas reste en place.
-- **✏️ Modifier le nom** (proposition) : on corrige le nom, puis « ✓ Choisir » (ou Entrée) prévoit le plat sous ce nom.
-- **✏️ Renommer** (repas prévu) : renomme l'événement de l'agenda, avec « Annuler ».
+Le nom du plat en titre, l'étoile des favoris à droite, l'image avec sa source, puis des boutons-pastilles à icône
+(les actions qui détruisent ou excluent sont en rouge).
+
+- **Repas prévu** : *Autre plat* (le remplace par un plat tiré au hasard : jamais déjà prévu cette semaine ni déjà
+  tiré pour ce créneau, avec « Annuler » ; on peut appuyer plusieurs fois), *Déplacer*, *Renommer* (renomme
+  l'événement de l'agenda), *Ajouter / Modifier la note*, *Liste noire*, *Retirer*. La note reste en place quand le
+  plat change.
+- **Proposition** : *Choisir ce plat*, *Autre proposition* (comme ↻ sur la ligne du planning ; la ligne derrière
+  suit), *Modifier le nom* (puis « Choisir » ou Entrée prévoit le plat sous ce nom), *Autre créneau*, *Liste noire*.
+- **Créneau vide** : *Pas de repas ce midi / ce soir*.
 
 Les messages avec « Annuler » sont un bandeau fixe en haut de l'écran : ils restent atteignables même quand une
 fenêtre est ouverte.

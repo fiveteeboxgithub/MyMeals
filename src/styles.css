@@ -1985,3 +1985,151 @@ body {
   border: 1px solid var(--accent);
   box-shadow: 0 6px 20px rgb(0 0 0 / 30%);
 }
+
+/* ---------- Fiche d'un créneau : titre, étoile, pastilles d'action ---------- */
+.eyebrow {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.meal-head,
+.sheet-proposal {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.meal-head {
+  margin: 14px 0 0;
+}
+.sp-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+}
+.sp-main h3 {
+  margin: 2px 0 0;
+  font-size: 1.2rem;
+  line-height: 1.25;
+}
+.star-btn {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--muted);
+}
+.star-btn svg {
+  width: 20px;
+  height: 20px;
+}
+.star-btn.on {
+  color: #d29a12;
+  border-color: #d29a12;
+}
+.choose {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  margin: 12px 0 0;
+  font-size: 1rem;
+}
+.choose svg {
+  width: 20px;
+  height: 20px;
+}
+.act-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+.act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.1;
+  text-decoration: none;
+}
+.act svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+.act:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.act.danger {
+  color: var(--danger);
+}
+.act[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.act:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.act.sm {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+.act.sm svg {
+  width: 14px;
+  height: 14px;
+}
+.sheet-proposal {
+  margin: 14px 0 0;
+}
+.dish-picture figcaption {
+  gap: 8px;
+}
+.dish-picture .credit {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+.dish-picture a.credit:hover {
+  text-decoration: underline;
+}
+.pic-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.note svg {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  color: var(--muted);
+}
+.dish-picture figcaption {
+  flex: 1 1 150px;
+  min-width: 0;
+  align-self: flex-end;
+}
+.pic-actions {
+  flex-direction: column;
+  align-items: flex-start;
+}

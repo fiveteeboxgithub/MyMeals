@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { BlacklistFilter } from './lib/blacklist';
 import { dayName, shortDate } from './lib/dates';
 import { DishPicture } from './DishThumb';
+import { Icon, type IconName } from './Icons';
 import { MAX_NOTE_CHARS, dishKeyOf, splitLinks, type PastNote } from './lib/notes';
 import { clock, type OtherEvent } from './lib/otherCalendars';
 import { fold, normalize, type DishIndex, type Suggestion } from './lib/suggest';
@@ -125,17 +126,19 @@ export function SlotSheet(sheetProps: SheetProps) {
           <MealCard key={meal.id} meal={meal} onRemove={() => (current.length === 1 ? onClear() : onRemoveMeal(meal.id))} {...props} />
         ))}
         {current && current.length > 1 && (
-          <button className="link danger" onClick={onClear}>
-            Tout retirer
-          </button>
+          <div className="act-row">
+            <Act icon="trash" tone="danger" onClick={onClear}>
+              Tout retirer
+            </Act>
+          </div>
         )}
         {!current && proposal && (
           <>
             <div className="sheet-proposal">
-              <span>
-                <small>Proposition</small>
+              <div className="sp-main">
+                <small className="eyebrow">Proposition</small>
                 {draftName === null ? (
-                  <strong>{proposal.name}</strong>
+                  <h3>{proposal.name}</h3>
                 ) : (
                   <input
                     className="proposal-edit"
@@ -154,22 +157,23 @@ export function SlotSheet(sheetProps: SheetProps) {
                   />
                 )}
                 <small>{proposal.note}</small>
-              </span>
+              </div>
               <FavoriteButton name={chosenName || proposal.name} {...props} />
-              <button className="icon star" onClick={props.onNextProposal} aria-label="Autre proposition" title="Autre proposition">
-                ↻
-              </button>
-              <button className="ghost-btn primary" disabled={!chosenName} onClick={() => onPick(chosenName)}>
-                ✓ Choisir
-              </button>
             </div>
-            <p className="sheet-proposal-links">
-              <button className="link elsewhere" onClick={() => props.onAcceptElsewhere(chosenName || proposal.name)}>
-                📅 Accepter pour un autre créneau…
-              </button>
-              <button className="link elsewhere" onClick={() => setDraftName(draftName === null ? proposal.name : null)}>
-                ✏️ {draftName === null ? 'Modifier le nom' : 'Annuler la modification'}
-              </button>
+            <button className="ghost-btn primary choose" disabled={!chosenName} onClick={() => onPick(chosenName)}>
+              <Icon name="check" />
+              Choisir ce plat
+            </button>
+            <div className="act-row">
+              <Act icon="refresh" onClick={props.onNextProposal}>
+                Autre proposition
+              </Act>
+              <Act icon="pencil" pressed={draftName !== null} onClick={() => setDraftName(draftName === null ? proposal.name : null)}>
+                {draftName === null ? 'Modifier le nom' : 'Annuler la modification'}
+              </Act>
+              <Act icon="calendar" onClick={() => props.onAcceptElsewhere(chosenName || proposal.name)}>
+                Autre créneau
+              </Act>
               <BlacklistButton
                 name={proposal.name}
                 isBlacklisted={props.isBlacklisted}
@@ -179,18 +183,17 @@ export function SlotSheet(sheetProps: SheetProps) {
                   onClose();
                 }}
               />
-            </p>
+            </div>
             <DishPicture name={proposal.name} enabled={props.showImages} />
             <PastNotes list={props.notes.get(dishKeyOf(proposal.name, props.dishes)) ?? []} />
           </>
         )}
         {!current && (
-          <p className="current">
-            {skipped ? 'Créneau marqué sans repas.' : 'Pas besoin de repas ?'}
-            <button className="link skip-link" onClick={() => onSkip(!skipped)}>
-              {skipped ? 'Remettre ce créneau' : 'Retirer ce créneau'}
-            </button>
-          </p>
+          <div className="act-row">
+            <Act icon="minus" pressed={skipped} onClick={() => onSkip(!skipped)}>
+              {skipped ? 'Remettre ce créneau' : `Pas de repas ce ${SLOT_LABEL[slot].toLowerCase()}`}
+            </Act>
+          </div>
         )}
         {current && (
           <div className="segmented pick-mode" role="group" aria-label="Le plat choisi ci-dessous">
@@ -250,18 +253,28 @@ export function SlotSheet(sheetProps: SheetProps) {
   );
 }
 
+/** Bouton d'action en pastille : une icône et un libellé. */
+function Act({ icon, children, onClick, tone, disabled, title, pressed, small }: { icon: IconName; children: React.ReactNode; onClick: () => void; tone?: 'danger'; disabled?: boolean; title?: string; pressed?: boolean; small?: boolean }) {
+  return (
+    <button className={`act${tone ? ` ${tone}` : ''}${small ? ' sm' : ''}`} onClick={onClick} disabled={disabled} title={title} aria-pressed={pressed}>
+      <Icon name={icon} />
+      {children}
+    </button>
+  );
+}
+
 /** Étoile qui ajoute un plat aux favoris ou l'en retire. */
 function FavoriteButton({ name, isFavorite, onToggleFavorite }: { name: string } & Pick<SheetProps, 'isFavorite' | 'onToggleFavorite'>) {
   const on = isFavorite(name);
   return (
     <button
-      className={`icon star${on ? ' on' : ''}`}
+      className={`star-btn${on ? ' on' : ''}`}
       onClick={() => onToggleFavorite(name)}
       aria-pressed={on}
       aria-label={on ? `Retirer « ${name} » des favoris` : `Ajouter « ${name} » aux favoris`}
       title={on ? 'Favori (proposé plus souvent)' : 'Ajouter aux favoris'}
     >
-      {on ? '★' : '☆'}
+      <Icon name="star" filled={on} />
     </button>
   );
 }
@@ -270,14 +283,15 @@ function FavoriteButton({ name, isFavorite, onToggleFavorite }: { name: string }
 function BlacklistButton({ name, isBlacklisted, onToggleBlacklist }: { name: string } & Pick<SheetProps, 'isBlacklisted' | 'onToggleBlacklist'>) {
   const on = isBlacklisted(name);
   return (
-    <button
-      className={`link ${on ? 'blacklisted' : 'danger'}`}
+    <Act
+      icon="ban"
+      tone={on ? undefined : 'danger'}
+      pressed={on}
       onClick={() => onToggleBlacklist(name)}
-      aria-pressed={on}
-      title={on ? 'Ce plat est sur la liste noire : il n’est plus proposé' : 'Ne plus jamais proposer ce plat'}
+      title={on ? 'Ce plat est sur la liste noire : touche pour le retirer' : 'Ne plus jamais proposer ce plat'}
     >
-      {on ? '🚫 Sur la liste noire (retirer)' : '🚫 Liste noire'}
-    </button>
+      {on ? 'Sur la liste noire' : 'Liste noire'}
+    </Act>
   );
 }
 
@@ -325,21 +339,41 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
 
   return (
     <div className="meal-card">
-      <p className="current">
-        Prévu : <strong>{meal.name}</strong>
+      <div className="meal-head">
+        <div className="sp-main">
+          <small className="eyebrow">Prévu</small>
+          <h3>{meal.name}</h3>
+        </div>
         <FavoriteButton name={meal.name} {...props} />
-        <button className="icon star" onClick={() => props.onRerollMeal(meal)} disabled={pending} aria-label={`Autre plat à la place de ${meal.name}`} title="Remplacer par un autre plat tiré au hasard">
-          ↻
-        </button>
-        <button className="link" onClick={() => props.onMove(meal)} disabled={pending} title="Déplacer ce repas vers un autre jour ou créneau">
-          📅 Déplacer
-        </button>
-        <button className="link danger" onClick={onRemove}>
-          Retirer
-        </button>
+      </div>
+      <DishPicture name={meal.name} enabled={props.showImages} />
+      <div className="act-row">
+        <Act icon="refresh" disabled={pending} onClick={() => props.onRerollMeal(meal)} title="Remplacer par un autre plat tiré au hasard">
+          Autre plat
+        </Act>
+        <Act icon="calendar" disabled={pending} onClick={() => props.onMove(meal)} title="Déplacer ce repas vers un autre jour ou créneau">
+          Déplacer
+        </Act>
+        <Act
+          icon="pencil"
+          disabled={pending}
+          pressed={renaming}
+          onClick={() => {
+            setNameDraft(meal.name);
+            setRenaming(!renaming);
+          }}
+        >
+          Renommer
+        </Act>
+        <Act icon="note" disabled={pending} pressed={editing} onClick={editing ? () => setEditing(false) : startEditing} title={pending ? "En cours d'enregistrement dans l'agenda" : undefined}>
+          {meal.note ? 'Modifier la note' : 'Ajouter une note'}
+        </Act>
         <BlacklistButton name={meal.name} {...props} />
-      </p>
-      {renaming ? (
+        <Act icon="trash" tone="danger" onClick={onRemove}>
+          Retirer
+        </Act>
+      </div>
+      {renaming && (
         <div className="note-edit">
           <input
             className="proposal-edit"
@@ -365,19 +399,7 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
             </button>
           </div>
         </div>
-      ) : (
-        <button
-          className="link note-add"
-          disabled={pending}
-          onClick={() => {
-            setNameDraft(meal.name);
-            setRenaming(true);
-          }}
-        >
-          ✏️ Renommer
-        </button>
       )}
-      <DishPicture name={meal.name} enabled={props.showImages} />
       {editing ? (
         <div className="note-edit">
           <textarea
@@ -407,18 +429,13 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
             </button>
           </div>
         </div>
-      ) : meal.note ? (
-        <div className="note">
-          <span aria-hidden="true">📝</span>
-          <NoteText note={meal.note} />
-          <button className="link" onClick={startEditing}>
-            Modifier
-          </button>
-        </div>
       ) : (
-        <button className="link note-add" onClick={startEditing} disabled={pending} title={pending ? "En cours d'enregistrement dans l'agenda" : undefined}>
-          📝 Ajouter une note
-        </button>
+        meal.note && (
+          <div className="note">
+            <Icon name="note" />
+            <NoteText note={meal.note} />
+          </div>
+        )
       )}
       <PastNotes list={past} />
     </div>
