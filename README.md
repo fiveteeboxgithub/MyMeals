@@ -241,6 +241,10 @@ pour la précédente). Sur téléphone, la semaine **suit le doigt** pendant le 
 on change de semaine, sinon elle revient en place. Un défilement vertical ne change jamais de semaine. Avec
 « réduire les animations » activé dans le système, le changement est immédiat.
 
+La semaine affichée est gardée pour la session du navigateur : après un rechargement de la page (ou un détour par
+Réglages, Stats…), on retrouve la même semaine ; un nouvel onglet ou une nouvelle ouverture de l'application repart de
+la semaine d'aujourd'hui, comme le bouton « Aujourd'hui ».
+
 ## Accepter ailleurs, déplacer un repas
 
 - **Accepter pour un autre créneau** : dans le menu **⋯** d'une proposition (ou sous la proposition, dans la

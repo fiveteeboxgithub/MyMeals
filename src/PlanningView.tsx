@@ -89,6 +89,26 @@ interface PlanningProps {
 
 const CACHE_MS = 10 * 60_000;
 
+const WEEK_KEY = 'mymeals.week';
+
+/** Lundi de la semaine consultée avant le rechargement, s'il est valable. */
+function readStoredWeek(): string | null {
+  try {
+    const stored = sessionStorage.getItem(WEEK_KEY);
+    return stored && /^\d{4}-\d{2}-\d{2}$/.test(stored) && mondayOf(stored) === stored ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeWeek(monday: string): void {
+  try {
+    sessionStorage.setItem(WEEK_KEY, monday);
+  } catch {
+    // sans stockage, la page repart d'aujourd'hui
+  }
+}
+
 /** Événements des agendas choisis pendant la semaine affichée, gardés dix minutes en mémoire. */
 function useOtherEvents(api: CalendarsApi | undefined, calendars: CalendarInfo[], monday: string): OtherEvent[] {
   const [events, setEvents] = useState<OtherEvent[]>([]);
@@ -184,7 +204,10 @@ export function PlanningView(props: PlanningProps) {
   mealsRef.current = meals;
   const { randomness, historyMonths, includeBlacklist } = shared;
   const thisMonday = mondayOf(today);
-  const [monday, setMonday] = useState(thisMonday);
+  // La semaine affichée survit à un rechargement de la page (et à un détour par un autre onglet de l'appli) ;
+  // une nouvelle session du navigateur repart de la semaine d'aujourd'hui.
+  const [monday, setMonday] = useState(() => readStoredWeek() ?? thisMonday);
+  useEffect(() => storeWeek(monday), [monday]);
   const [editing, setEditing] = useState<Editing | null>(null);
   // Propositions déjà écartées avec ↻, par créneau.
   const [rejected, setRejected] = useState<Record<string, string[]>>({});
