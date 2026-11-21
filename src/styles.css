@@ -271,6 +271,8 @@ small {
   max-height: 85vh;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-radius: 18px 18px 0 0;
   padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
 }
@@ -2179,4 +2181,15 @@ body {
   display: block;
   background: var(--line);
   opacity: 0.4;
+}
+
+/* Le défilement de la page ne bouge pas quand une fenêtre se ferme ou s'ouvre (la barre reste réservée). */
+html {
+  scrollbar-gutter: stable;
+}
+.choices {
+  overscroll-behavior: contain;
+}
+.backdrop {
+  overscroll-behavior: contain;
 }

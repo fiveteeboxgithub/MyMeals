@@ -250,6 +250,12 @@ pour la précédente). Sur téléphone, la semaine **suit le doigt** pendant le 
 on change de semaine, sinon elle revient en place. Un défilement vertical ne change jamais de semaine. Avec
 « réduire les animations » activé dans le système, le changement est immédiat.
 
+**Semaine courante en liste verticale** (téléphone, ou « Vue liste » sur ordinateur) : l'appli descend d'elle-même
+jusqu'au jour d'aujourd'hui, une fois par semaine affichée et seulement si tu n'as pas déjà fait défiler la page.
+
+**Fenêtres ouvertes** (fiche d'un créneau, choix d'un créneau) : la page derrière est figée ; glisser dans la
+fenêtre ne fait plus défiler la semaine du dessous, et la position est retrouvée à la fermeture.
+
 La semaine affichée est gardée pour la session du navigateur : après un rechargement de la page (ou un détour par
 Réglages, Stats…), on retrouve la même semaine ; un nouvel onglet ou une nouvelle ouverture de l'application repart de
 la semaine d'aujourd'hui, comme le bouton « Aujourd'hui ».

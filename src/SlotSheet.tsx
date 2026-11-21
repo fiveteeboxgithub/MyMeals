@@ -3,6 +3,7 @@ import type { BlacklistFilter } from './lib/blacklist';
 import { dayName, shortDate } from './lib/dates';
 import { DishPicture } from './DishThumb';
 import { Icon, type IconName } from './Icons';
+import { useScrollLock } from './useScrollLock';
 import { MAX_NOTE_CHARS, dishKeyOf, splitLinks, type PastNote } from './lib/notes';
 import { canLike, likeSummary, likedBy } from './lib/people';
 import { clock, type OtherEvent } from './lib/otherCalendars';
@@ -71,6 +72,7 @@ function variantsLine(variants: string[]): string {
 
 /** Fenêtre d'un créneau : ce qui est prévu, la proposition, la recherche d'un plat et « Surprise Me ». */
 export function SlotSheet(sheetProps: SheetProps) {
+  useScrollLock();
   // Créneau déjà rempli : le plat choisi remplace le premier, ou s'ajoute (un repas de plus).
   const [adding, setAdding] = useState(false);
   const props: SheetProps = adding ? { ...sheetProps, onPick: sheetProps.onAdd } : sheetProps;

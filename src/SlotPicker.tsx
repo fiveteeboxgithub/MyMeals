@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { addDays, dayName, shortDate, tinyDate } from './lib/dates';
 import { SLOTS, type Meal, type Slot } from './lib/types';
 import { SLOT_LABEL } from './SlotSheet';
+import { useScrollLock } from './useScrollLock';
 
 /** Nombre de jours proposés d'emblée (à partir d'aujourd'hui) ; « Autre date » pour aller plus loin. */
 const DAYS_SHOWN = 14;
@@ -24,6 +25,7 @@ interface PickerProps {
  * prévu. Jamais avant aujourd'hui ; « Autre date » ouvre un calendrier pour une date plus lointaine.
  */
 export function SlotPicker({ title, name, today, bySlot, skipped, from, onPick, onClose }: PickerProps) {
+  useScrollLock();
   const [extra, setExtra] = useState('');
 
   useEffect(() => {

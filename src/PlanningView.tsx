@@ -512,6 +512,27 @@ export function PlanningView(props: PlanningProps) {
     extraSlot(key, list, '🍽️', (s) => `Liste noire · ${s.reason}`, "Aucun plat de la liste noire dans ton historique pour l'instant.");
   }
 
+  // Semaine courante en liste verticale : on descend jusqu'au jour d'aujourd'hui (une seule fois par semaine
+  // affichée, pour ne pas disputer le défilement à l'utilisateur).
+  const scrolledFor = useRef<string | null>(null);
+  useEffect(() => {
+    const el = weekRef.current;
+    if (loading || !el || scrolledFor.current === monday) return;
+    if (monday !== thisMonday || getComputedStyle(el).display === 'grid') {
+      scrolledFor.current = monday;
+      return;
+    }
+    const day = el.querySelector<HTMLElement>('.day.today');
+    // Les jours ne sont pas encore là (agenda en cours de lecture) : on réessaie quand ils arrivent.
+    if (!day) return;
+    // Aujourd'hui est le premier jour affiché : rien à faire (les jours d'avant peuvent arriver avec l'agenda).
+    if (day === el.querySelector('.day')) return;
+    scrolledFor.current = monday;
+    // La page a déjà été défilée (par l'utilisateur) : on ne la déplace pas.
+    if (window.scrollY > 0) return;
+    window.scrollTo({ top: Math.max(0, window.scrollY + day.getBoundingClientRect().top - 12) });
+  }, [monday, thisMonday, loading, props.weekLayout, visibleDays.length]);
+
   // Changer de semaine : la semaine affichée glisse hors de l'écran, la nouvelle arrive du côté opposé.
   const weekRef = useRef<HTMLElement>(null);
   const animating = useRef(false);
