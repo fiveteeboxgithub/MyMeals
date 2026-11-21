@@ -44,7 +44,8 @@ type Picking = { mode: 'accept'; name: string; from: string; override: boolean }
 interface Editing {
   date: string;
   slot: Slot;
-  proposal?: ShownProposal;
+  /** Ouvert depuis une proposition : la fenêtre montre la proposition du moment (elle change avec ↻). */
+  fromProposal?: boolean;
 }
 
 /** Accès aux autres agendas Google (lecture seule). */
@@ -345,6 +346,48 @@ export function PlanningView(props: PlanningProps) {
     });
   }
 
+  /** Une autre proposition pour le créneau (la même que le bouton ↻ de la ligne). */
+  function nextProposal(key: string) {
+    const proposal = proposals.get(key);
+    if (overrides[key]) dropOverride(key);
+    else if (proposal) setRejected({ ...rejected, [key]: [...(rejected[key] ?? []), proposal.key] });
+  }
+
+  // Plats déjà tirés au hasard pour un repas prévu, par créneau : chaque appui sur ↻ en donne un nouveau.
+  const rerolled = useRef(new Map<string, Set<string>>());
+
+  /** Remplace un repas prévu par un autre plat tiré au hasard (avec « Annuler »). */
+  function rerollMeal(meal: Meal) {
+    const key = `${meal.date}|${meal.slot}`;
+    const seen = rerolled.current.get(key) ?? new Set([normalize(meal.name)]);
+    const ranked = suggest(dishes, meal.date, meal.slot, {
+      exclude: new Set([...plannedThisWeek(), ...seen]),
+      historyMonths,
+      blacklist: blacklistKeys,
+      favorites: favoriteKeys,
+    });
+    const pick = pickProposal(ranked, randomness, `${Math.random()}|${key}`);
+    if (!pick) {
+      flash("Pas d'autre idée pour ce créneau.");
+      return;
+    }
+    seen.add(pick.key);
+    rerolled.current.set(key, seen);
+    const first = bySlot.get(key)?.[0]?.id === meal.id;
+    const previous = meal.name;
+    const apply = (name: string) => (first ? setSlot(meal.date, meal.slot, name) : void store.renameMeals([meal.id], name));
+    apply(pick.label);
+    flash(`« ${previous} » remplacé par « ${pick.label} ».`, () => apply(previous));
+  }
+
+  /** Renomme un repas prévu (corriger une faute, préciser le plat). */
+  function renameMealTo(meal: Meal, rawName: string) {
+    const name = rawName.trim();
+    if (!name || name === meal.name) return;
+    void store.renameMeals([meal.id], name);
+    flash(`« ${meal.name} » renommé en « ${name} ».`, () => void store.renameMeals([meal.id], meal.name));
+  }
+
   /** Marque le créneau « Pas de repas » (la proposition disparaît), avec « Annuler ». */
   function skipSlot(key: string, date: string, slot: Slot) {
     setSkip(key, true);
@@ -615,7 +658,7 @@ export function PlanningView(props: PlanningProps) {
                         </button>
                       ) : proposal && shown ? (
                         <div className="proposal">
-                          <button className="proposal-name with-thumb" onClick={() => setEditing({ date, slot, proposal: shown })}>
+                          <button className="proposal-name with-thumb" onClick={() => setEditing({ date, slot, fromProposal: true })}>
                             <DishThumb name={shown.name} enabled={props.showImages} />
                             <span className="meal-text">
                               <Breakable text={override ? `${override.icon} ${override.name}` : proposal.label} />
@@ -625,10 +668,7 @@ export function PlanningView(props: PlanningProps) {
                           <div className="proposal-actions">
                             <button
                               className="icon"
-                              onClick={() => {
-                                if (override) dropOverride(key);
-                                else setRejected({ ...rejected, [key]: [...(rejected[key] ?? []), proposal.key] });
-                              }}
+                              onClick={() => nextProposal(key)}
                               aria-label={`Autre proposition pour ${where}`}
                               title="Autre proposition"
                             >
@@ -686,7 +726,7 @@ export function PlanningView(props: PlanningProps) {
           date={editing.date}
           slot={editing.slot}
           current={bySlot.get(`${editing.date}|${editing.slot}`)}
-          proposal={editing.proposal}
+          proposal={editing.fromProposal && !bySlot.has(`${editing.date}|${editing.slot}`) ? shownFor(`${editing.date}|${editing.slot}`) : undefined}
           others={others.get(`${editing.date}|${editing.slot}`)}
           suggestions={suggest(dishes, editing.date, editing.slot, { blacklist: blacklistKeys, includeBlacklist: true, favorites: favoriteKeys })}
           showImages={props.showImages}
@@ -705,6 +745,9 @@ export function PlanningView(props: PlanningProps) {
           period={shared.surprisePeriod}
           onPeriodChange={props.onSurprisePeriod}
           onRemoveMeal={removeMeal}
+          onNextProposal={() => nextProposal(`${editing.date}|${editing.slot}`)}
+          onRerollMeal={rerollMeal}
+          onRename={renameMealTo}
           skipped={skipped.has(`${editing.date}|${editing.slot}`)}
           onSkip={(skip) => {
             setSkip(`${editing.date}|${editing.slot}`, skip);

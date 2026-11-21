@@ -1964,3 +1964,24 @@ body {
   margin: 2px 0 0;
   accent-color: var(--accent);
 }
+
+/* Renommer un plat dans la fiche */
+.sheet .proposal-edit {
+  width: 100%;
+  margin: 4px 0;
+  padding: 8px 10px;
+}
+
+/* Messages avec « Annuler » : bandeau fixe en haut, au-dessus des fenêtres (le message reste atteignable). */
+.notice.toast {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 100;
+  width: min(560px, calc(100% - 24px));
+  margin: 0;
+  transform: translateX(-50%);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 30%);
+}

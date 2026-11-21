@@ -27,6 +27,12 @@ interface SheetProps {
   blacklistFilter: BlacklistFilter;
   ideas: string[];
   onRemoveMeal: (id: string) => void;
+  /** Une autre proposition pour ce créneau (↻). */
+  onNextProposal: () => void;
+  /** Remplace ce repas prévu par un autre plat tiré au hasard (↻). */
+  onRerollMeal: (meal: Meal) => void;
+  /** Renomme ce repas prévu. */
+  onRename: (meal: Meal, name: string) => void;
   showImages: boolean;
   isFavorite: (name: string) => boolean;
   onToggleFavorite: (name: string) => void;
@@ -64,6 +70,10 @@ export function SlotSheet(sheetProps: SheetProps) {
   const [adding, setAdding] = useState(false);
   const props: SheetProps = adding ? { ...sheetProps, onPick: sheetProps.onAdd } : sheetProps;
   const { date, slot, current, proposal, others, suggestions, includeBlacklist, onRemoveMeal, skipped, onSkip, onPick, onClear, onClose } = props;
+  // Nom de la proposition en cours de modification (null : telle quelle) ; une autre proposition le remet à zéro.
+  const [draftName, setDraftName] = useState<string | null>(null);
+  useEffect(() => setDraftName(null), [proposal?.name]);
+  const chosenName = (draftName ?? proposal?.name ?? '').trim();
   const [query, setQuery] = useState('');
   const [revealed, setRevealed] = useState(false);
 
@@ -124,17 +134,41 @@ export function SlotSheet(sheetProps: SheetProps) {
             <div className="sheet-proposal">
               <span>
                 <small>Proposition</small>
-                <strong>{proposal.name}</strong>
+                {draftName === null ? (
+                  <strong>{proposal.name}</strong>
+                ) : (
+                  <input
+                    className="proposal-edit"
+                    type="text"
+                    value={draftName}
+                    autoFocus
+                    aria-label="Nom du plat"
+                    onChange={(e) => setDraftName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && chosenName) onPick(chosenName);
+                      if (e.key === 'Escape') {
+                        e.stopPropagation();
+                        setDraftName(null);
+                      }
+                    }}
+                  />
+                )}
                 <small>{proposal.note}</small>
               </span>
-              <FavoriteButton name={proposal.name} {...props} />
-              <button className="ghost-btn primary" onClick={() => onPick(proposal.name)}>
+              <FavoriteButton name={chosenName || proposal.name} {...props} />
+              <button className="icon star" onClick={props.onNextProposal} aria-label="Autre proposition" title="Autre proposition">
+                ↻
+              </button>
+              <button className="ghost-btn primary" disabled={!chosenName} onClick={() => onPick(chosenName)}>
                 ✓ Choisir
               </button>
             </div>
             <p className="sheet-proposal-links">
-              <button className="link elsewhere" onClick={() => props.onAcceptElsewhere(proposal.name)}>
+              <button className="link elsewhere" onClick={() => props.onAcceptElsewhere(chosenName || proposal.name)}>
                 📅 Accepter pour un autre créneau…
+              </button>
+              <button className="link elsewhere" onClick={() => setDraftName(draftName === null ? proposal.name : null)}>
+                ✏️ {draftName === null ? 'Modifier le nom' : 'Annuler la modification'}
               </button>
               <BlacklistButton
                 name={proposal.name}
@@ -269,8 +303,15 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
   const { meal, onRemove, onSetNote, notes, dishes } = props;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(meal.note ?? '');
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState(meal.name);
   const pending = meal.id.startsWith('tmp-');
   const past = (notes.get(dishKeyOf(meal.name, dishes)) ?? []).filter((n) => n.id !== meal.id);
+
+  function saveName() {
+    props.onRename(meal, nameDraft);
+    setRenaming(false);
+  }
 
   function startEditing() {
     setDraft(meal.note ?? '');
@@ -287,6 +328,9 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
       <p className="current">
         Prévu : <strong>{meal.name}</strong>
         <FavoriteButton name={meal.name} {...props} />
+        <button className="icon star" onClick={() => props.onRerollMeal(meal)} disabled={pending} aria-label={`Autre plat à la place de ${meal.name}`} title="Remplacer par un autre plat tiré au hasard">
+          ↻
+        </button>
         <button className="link" onClick={() => props.onMove(meal)} disabled={pending} title="Déplacer ce repas vers un autre jour ou créneau">
           📅 Déplacer
         </button>
@@ -295,6 +339,44 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
         </button>
         <BlacklistButton name={meal.name} {...props} />
       </p>
+      {renaming ? (
+        <div className="note-edit">
+          <input
+            className="proposal-edit"
+            type="text"
+            value={nameDraft}
+            autoFocus
+            aria-label={`Nouveau nom pour ${meal.name}`}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveName();
+              if (e.key === 'Escape') {
+                e.stopPropagation();
+                setRenaming(false);
+              }
+            }}
+          />
+          <div className="note-actions">
+            <button className="ghost-btn primary" onClick={saveName} disabled={!nameDraft.trim()}>
+              Enregistrer
+            </button>
+            <button className="ghost-btn" onClick={() => setRenaming(false)}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          className="link note-add"
+          disabled={pending}
+          onClick={() => {
+            setNameDraft(meal.name);
+            setRenaming(true);
+          }}
+        >
+          ✏️ Renommer
+        </button>
+      )}
       <DishPicture name={meal.name} enabled={props.showImages} />
       {editing ? (
         <div className="note-edit">

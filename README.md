@@ -188,6 +188,17 @@ réglages restent sur l'appareil.
 Supprimer l'événement dans Google Agenda remet les réglages de l'agenda à zéro : le premier appareil qui se
 connecte ensuite le recrée avec ses propres réglages.
 
+## Dans la fiche d'un créneau
+
+- **↻** (proposition) : une autre proposition, comme sur la ligne du planning ; la ligne derrière suit.
+- **↻** (repas prévu) : remplace le repas par un autre plat tiré au hasard (jamais déjà prévu cette semaine, ni
+  déjà tiré pour ce créneau), avec « Annuler » ; on peut appuyer plusieurs fois. La note du repas reste en place.
+- **✏️ Modifier le nom** (proposition) : on corrige le nom, puis « ✓ Choisir » (ou Entrée) prévoit le plat sous ce nom.
+- **✏️ Renommer** (repas prévu) : renomme l'événement de l'agenda, avec « Annuler ».
+
+Les messages avec « Annuler » sont un bandeau fixe en haut de l'écran : ils restent atteignables même quand une
+fenêtre est ouverte.
+
 ## Jours passés
 
 Dans un jour passé, un créneau sans repas n'est pas affiché du tout (ni « + Ajouter », ni les événements des autres

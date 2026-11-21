@@ -268,6 +268,7 @@ export function Planner(props: PlannerProps) {
 
       {flash && (
         <Notice
+          floating
           text={flash.text}
           onClose={() => setFlash(null)}
           action={
