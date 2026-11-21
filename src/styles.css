@@ -1341,6 +1341,7 @@ small {
   }
 
   .app.wide .day {
+    grid-column: var(--col);
     margin-bottom: 0;
     padding: 10px;
     display: grid;

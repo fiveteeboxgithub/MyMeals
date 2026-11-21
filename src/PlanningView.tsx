@@ -572,7 +572,12 @@ export function PlanningView(props: PlanningProps) {
             <p className="all-done">{days[6] < today ? 'Aucun repas enregistré cette semaine.' : 'Tout est décidé pour cette semaine.'}</p>
           )}
           {visibleDays.map(({ date, slots }) => (
-            <section key={date} className={`day${date === today ? ' today' : ''}${date < today ? ' past' : ''}`}>
+            <section
+              key={date}
+              className={`day${date === today ? ' today' : ''}${date < today ? ' past' : ''}`}
+              // Vue colonnes : chaque jour garde sa colonne, même quand ceux d'avant sont masqués.
+              style={{ '--col': days.indexOf(date) + 1 } as React.CSSProperties}
+            >
               <h2>
                 {dayName(date)}{' '}
                 <span>
