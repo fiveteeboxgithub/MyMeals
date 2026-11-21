@@ -15,6 +15,10 @@ export interface Meal {
   slot: Slot;
   name: string;
   source: 'import' | 'app' | 'google';
+  /** Qui a choisi ce plat (adresse Google), si on le sait. */
+  by?: string;
+  /** Qui d'autre l'aime (adresses Google). Vide ou absent : personne. */
+  likes?: string[];
   /** Note libre (lien de recette, « trop salé »…) : la description de l'événement Google. */
   note?: string;
 }
@@ -39,7 +43,11 @@ export interface MealStore {
   /** Retire un seul repas (utile quand un créneau en contient plusieurs). */
   removeMeal: (id: string) => void;
   /** Donne le même nom à tous les repas indiqués. Renvoie le nombre de repas renommés ou en échec. */
-  renameMeals: (ids: string[], name: string) => Promise<{ renamed: number; failed: number }>;
+  renameMeals: (ids: string[], name: string, options?: { changeDish?: boolean }) => Promise<{ renamed: number; failed: number }>;
+  /** Adresse de l'utilisateur connecté (seulement avec Google) : sans elle, pas de « J'aime ». */
+  me?: string;
+  /** J'aime ce repas (ou je ne l'aime plus). */
+  toggleLike: (id: string) => void;
   /** Déplace un repas vers un autre jour ou créneau (sa note le suit). */
   moveMeal: (id: string, date: string, slot: Slot) => void;
   /** Remplace la note d'un repas (texte vide : la retire). */

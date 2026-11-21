@@ -109,5 +109,5 @@ export function useMeals() {
     [meals, update],
   );
 
-  return { meals, importMeals, setSlot, addMeal, clearSlot, removeMeal, clearAll, renameMeals, setNote, moveMeal };
+  return { meals, importMeals, setSlot, addMeal, clearSlot, removeMeal, clearAll, renameMeals, setNote, moveMeal, toggleLike: () => undefined };
 }

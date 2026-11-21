@@ -108,7 +108,7 @@ function LocalApp() {
 
   return (
     <Planner
-      store={{ meals, setSlot, addMeal, clearSlot, removeMeal, renameMeals, setNote, moveMeal }}
+      store={{ meals, setSlot, addMeal, clearSlot, removeMeal, renameMeals, setNote, moveMeal, toggleLike: () => undefined }}
       headerAction={importButton}
       banner={
         <>

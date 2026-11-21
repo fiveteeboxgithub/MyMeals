@@ -1164,3 +1164,47 @@ describe('Openverse et images choisies', () => {
     expect(parseImagesRecord({ updatedAt: 3, images: { lasagne: 'https://ex.fr/l.jpg', bad: 'ftp://x' } })).toEqual({ updatedAt: 3, images: { lasagne: 'https://ex.fr/l.jpg' } });
   });
 });
+
+describe('J’aime et auteur du plat', () => {
+  it('lit l’auteur (propriété partagée, sinon créateur) et ceux qui aiment', async () => {
+    const { readLikes, likeKey } = await import('./people');
+    expect(likeKey('A@x.fr')).toBe(likeKey(' a@x.fr '));
+    expect(likeKey('a@x.fr')).not.toBe(likeKey('b@x.fr'));
+    expect(likeKey('une.adresse.tres.longue.pour.un.test@exemple.fr').length).toBeLessThanOrEqual(44);
+    const shared = { mmby: 'Marie@x.fr', [likeKey('paul@x.fr')]: 'Paul@x.fr', [likeKey('old@x.fr')]: '', other: 'x' };
+    expect(readLikes(shared, 'creator@x.fr')).toEqual({ by: 'marie@x.fr', likes: ['paul@x.fr'] });
+    expect(readLikes(undefined, 'Creator@x.fr')).toEqual({ by: 'creator@x.fr' });
+    // On ne s’aime pas soi-même, et sans rien on ne sait rien.
+    expect(readLikes({ mmby: 'a@x.fr', [likeKey('a@x.fr')]: 'a@x.fr' }, undefined)).toEqual({ by: 'a@x.fr' });
+    expect(readLikes(undefined, undefined)).toEqual({});
+  });
+
+  it('seul un autre que l’auteur peut aimer ; les noms sont lisibles', async () => {
+    const { canLike, likedBy, displayName, likeSummary, likeVisible, clearLikes, likeKey } = await import('./people');
+    expect(canLike({ by: 'a@x.fr' }, 'b@x.fr')).toBe(true);
+    expect(canLike({ by: 'a@x.fr' }, 'a@x.fr')).toBe(false);
+    expect(canLike({}, 'b@x.fr')).toBe(false);
+    expect(canLike({ by: 'a@x.fr' }, undefined)).toBe(false);
+    expect(likedBy({ likes: ['b@x.fr'] }, 'b@x.fr')).toBe(true);
+    expect(displayName('marie.dupont@exemple.fr')).toBe('Marie Dupont');
+    expect(likeSummary({ by: 'a@x.fr', likes: ['b@x.fr'] }, 'b@x.fr')).toBe('Choisi par A · Aimé par toi');
+    expect(likeVisible([{ by: 'a@x.fr' }], 'b@x.fr')).toBe(true);
+    expect(likeVisible([{ by: 'a@x.fr' }], 'a@x.fr')).toBe(false);
+    expect(likeVisible([{ by: 'a@x.fr', likes: ['b@x.fr'] }], 'a@x.fr')).toBe(true);
+    expect(likeVisible([{ by: 'a@x.fr' }, { by: 'b@x.fr' }], 'c@x.fr')).toBe(false);
+    expect(clearLikes({ likes: ['b@x.fr'] })).toEqual({ [likeKey('b@x.fr')]: '' });
+  });
+
+  it('un événement Google porte son auteur et ses « J’aime » jusqu’au repas', async () => {
+    const { eventToMeal } = await import('./google');
+    const { likeKey } = await import('./people');
+    const meal = eventToMeal({
+      id: 'e1',
+      summary: 'pizza',
+      start: { dateTime: '2026-11-20T20:00:00+01:00' },
+      creator: { email: 'Marie@x.fr' },
+      extendedProperties: { shared: { [likeKey('paul@x.fr')]: 'paul@x.fr' } },
+    });
+    expect(meal).toMatchObject({ by: 'marie@x.fr', likes: ['paul@x.fr'] });
+  });
+});

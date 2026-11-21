@@ -4,6 +4,7 @@ import { dayName, shortDate } from './lib/dates';
 import { DishPicture } from './DishThumb';
 import { Icon, type IconName } from './Icons';
 import { MAX_NOTE_CHARS, dishKeyOf, splitLinks, type PastNote } from './lib/notes';
+import { canLike, likeSummary, likedBy } from './lib/people';
 import { clock, type OtherEvent } from './lib/otherCalendars';
 import { fold, normalize, type DishIndex, type Suggestion } from './lib/suggest';
 import { PERIODS, pickSurprise, surpriseIdeas, type Surprise } from './lib/surprise';
@@ -32,6 +33,9 @@ interface SheetProps {
   onNextProposal: () => void;
   /** Remplace ce repas prévu par un autre plat tiré au hasard (↻). */
   onRerollMeal: (meal: Meal) => void;
+  /** Utilisateur connecté (adresse Google) : sans lui, pas de « J'aime ». */
+  me?: string;
+  onToggleLike: (id: string) => void;
   /** Renomme ce repas prévu. */
   onRename: (meal: Meal, name: string) => void;
   showImages: boolean;
@@ -343,11 +347,17 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
         <div className="sp-main">
           <small className="eyebrow">Prévu</small>
           <h3>{meal.name}</h3>
+          {likeSummary(meal, props.me) && <small className="by">{likeSummary(meal, props.me)}</small>}
         </div>
         <FavoriteButton name={meal.name} {...props} />
       </div>
       <DishPicture name={meal.name} enabled={props.showImages} />
       <div className="act-row">
+        {canLike(meal, props.me) && (
+          <Act icon="heart" pressed={likedBy(meal, props.me)} disabled={pending} onClick={() => props.onToggleLike(meal.id)} title="Dire aux autres que ce plat te convient (visible de tous)">
+            {likedBy(meal, props.me) ? "Je n'aime plus" : "J'aime"}
+          </Act>
+        )}
         <Act icon="refresh" disabled={pending} onClick={() => props.onRerollMeal(meal)} title="Remplacer par un autre plat tiré au hasard">
           Autre plat
         </Act>

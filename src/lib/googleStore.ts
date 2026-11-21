@@ -21,6 +21,7 @@ import {
   IMAGES_EVENT_ID,
   renameEvent,
   moveEvent,
+  setLikeEvent,
   signIn,
   storedToken,
   tokenRemainingMs,
@@ -34,6 +35,7 @@ import { parseSettingsRecord, type SettingsRecord } from './settings';
 import { parseImagesRecord, type ImagesRecord } from './customImages';
 import type { Meal, MealStore, Slot } from './types';
 import { withNote } from './store';
+import { clearLikes } from './people';
 
 const CACHE_KEY = 'mymeals.google.v1';
 
@@ -44,6 +46,8 @@ interface Cache {
   syncToken?: string;
   /** Vrai une fois l'agenda relu en entier avec les notes (descriptions) des repas. */
   notes?: boolean;
+  /** Vrai une fois l'agenda relu avec qui a choisi chaque plat et qui l'aime. */
+  likes?: boolean;
   meals: Meal[];
 }
 
@@ -64,6 +68,18 @@ function applyEvents(meals: Meal[], events: GoogleEvent[]): Meal[] {
     else byId.delete(event.id);
   }
   return [...byId.values()];
+}
+
+/** Le repas devenu un autre plat : choisi par `me`, sans les « J'aime » de l'ancien. */
+function changedDish(meal: Meal, name: string, me: string | undefined): Meal {
+  const { likes: _likes, ...rest } = meal;
+  return { ...rest, name, ...(me ? { by: me } : {}) };
+}
+
+/** Le repas sans ses « J'aime » (ils ne valent que pour un plat à un créneau). */
+function withoutLikes(meal: Meal): Meal {
+  const { likes: _likes, ...rest } = meal;
+  return rest;
 }
 
 /** Repas en cours de création (pas encore dans l'agenda) : une relecture complète ne doit pas les effacer. */
@@ -161,7 +177,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
         }
         let changes;
         // Les copies faites avant les notes sont relues en entier une fois, pour récupérer les descriptions.
-        let full = !cacheRef.current.syncToken || !cacheRef.current.notes;
+        let full = !cacheRef.current.syncToken || !cacheRef.current.notes || !cacheRef.current.likes;
         try {
           changes = await listChanges(accessToken, calendar.id, full ? undefined : cacheRef.current.syncToken);
         } catch (e) {
@@ -170,7 +186,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
           changes = await listChanges(accessToken, calendar.id);
         }
         const { events, syncToken } = changes;
-        commit((c) => ({ ...c, syncToken, notes: true, meals: applyEvents(full ? keepPending(c.meals) : c.meals, events) }));
+        commit((c) => ({ ...c, syncToken, notes: true, likes: true, meals: applyEvents(full ? keepPending(c.meals) : c.meals, events) }));
         // Les réglages se relisent une fois par session, et quand l'événement spécial a changé.
         if (!settingsLoaded.current || events.some((event) => event.id === SETTINGS_EVENT_ID)) {
           try {
@@ -328,8 +344,9 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   const insertMeal = useCallback(
     (a: { token: string; calendar: GoogleCalendar }, date: string, slot: Slot, name: string) => {
       const tempId = `tmp-${date}-${slot}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      commit((c) => ({ ...c, meals: [...c.meals, { id: tempId, date, slot, name, source: 'google' }] }));
-      insertEvent(a.token, a.calendar, date, slot, name).then(
+      const me = cacheRef.current.account;
+      commit((c) => ({ ...c, meals: [...c.meals, { id: tempId, date, slot, name, source: 'google', ...(me ? { by: me } : {}) }] }));
+      insertEvent(a.token, a.calendar, date, slot, name, me).then(
         (event) => {
           if (pendingDeletes.current.delete(tempId)) {
             deleteEvent(a.token, a.calendar, event.id).catch(fail);
@@ -363,8 +380,10 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
         const existing = cacheRef.current.meals.find((m) => m.date === date && m.slot === slot);
         if (existing) {
           // Le créneau a déjà un événement : on change seulement son titre.
-          commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === existing.id ? { ...m, name } : m)) }));
-          renameEvent(a.token, a.calendar, existing.id, name).catch((e) => {
+          // Un autre plat : c'est moi qui l'ai choisi, et les « J'aime » de l'ancien plat tombent.
+          const me = cacheRef.current.account;
+          commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === existing.id ? changedDish(m, name, me) : m)) }));
+          renameEvent(a.token, a.calendar, existing.id, name, { by: me, clear: clearLikes(existing) }).catch((e) => {
             commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === existing.id ? existing : m)) }));
             fail(e);
           });
@@ -418,14 +437,33 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     [commit, fail, withAccess],
   );
 
+  /** J'aime ce repas (ou je ne l'aime plus) : visible de tous ceux qui partagent l'agenda. */
+  const toggleLike = useCallback(
+    (id: string) => {
+      const me = cacheRef.current.account;
+      const meal = cacheRef.current.meals.find((m) => m.id === id);
+      if (!me || !meal || id.startsWith('tmp-') || !meal.by || meal.by === me) return;
+      const liked = !(meal.likes ?? []).includes(me);
+      withAccess((a) => {
+        const likes = liked ? [...(meal.likes ?? []), me].sort() : (meal.likes ?? []).filter((e) => e !== me);
+        commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === id ? (likes.length ? { ...m, likes } : withoutLikes(m)) : m)) }));
+        setLikeEvent(a.token, a.calendar, id, me, liked).catch((e) => {
+          commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === id ? meal : m)) }));
+          fail(e);
+        });
+      });
+    },
+    [commit, fail, withAccess],
+  );
+
   /** Déplace un repas vers un autre créneau (le même événement : sa note le suit). */
   const moveMeal = useCallback(
     (id: string, date: string, slot: Slot) => {
       withAccess((a) => {
         const meal = cacheRef.current.meals.find((m) => m.id === id);
         if (!meal || id.startsWith('tmp-') || (meal.date === date && meal.slot === slot)) return;
-        commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === id ? { ...m, date, slot } : m)) }));
-        moveEvent(a.token, a.calendar, id, date, slot).catch((e) => {
+        commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === id ? { ...withoutLikes(m), date, slot } : m)) }));
+        moveEvent(a.token, a.calendar, id, date, slot, clearLikes(meal)).catch((e) => {
           commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === id ? meal : m)) }));
           fail(e);
         });
@@ -511,14 +549,18 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
 
   /** Renomme des événements de l'agenda, quelques-uns à la fois ; ceux qui échouent reprennent leur nom. */
   const renameMeals = useCallback(
-    async (ids: string[], rawName: string) => {
+    async (ids: string[], rawName: string, options?: { changeDish?: boolean }) => {
       const name = rawName.trim();
       const granted = await access();
       if (!granted || !name) return { renamed: 0, failed: granted ? 0 : ids.length };
       const wanted = new Set(ids);
       // Les repas pas encore créés dans l'agenda (identifiant provisoire) sont laissés de côté.
       const targets = cacheRef.current.meals.filter((m) => wanted.has(m.id) && !m.id.startsWith('tmp-') && m.name !== name);
-      commit((c) => ({ ...c, meals: c.meals.map((m) => (targets.some((t) => t.id === m.id) ? { ...m, name } : m)) }));
+      const me = cacheRef.current.account;
+      commit((c) => ({
+        ...c,
+        meals: c.meals.map((m) => (targets.some((t) => t.id === m.id) ? (options?.changeDish ? changedDish(m, name, me) : { ...m, name }) : m)),
+      }));
       const revert = (meal: Meal) =>
         commit((c) => ({ ...c, meals: c.meals.map((m) => (m.id === meal.id ? meal : m)) }));
 
@@ -532,7 +574,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
           const meal = queue.shift();
           if (!meal) return;
           try {
-            await renameEvent(granted.token, granted.calendar, meal.id, name);
+            await renameEvent(granted.token, granted.calendar, meal.id, name, options?.changeDish ? { by: me, clear: clearLikes(meal) } : undefined);
             renamed++;
           } catch (e) {
             failed++;
@@ -590,6 +632,8 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     renameMeals,
     setNote,
     moveMeal,
+    toggleLike,
+    me: cache.account,
     settings,
     saveSettings,
     images,

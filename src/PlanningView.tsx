@@ -24,6 +24,8 @@ import { SLOTS, type Meal, type MealStore, type Slot } from './lib/types';
 import { weekText } from './lib/weekText';
 import { Breakable } from './Breakable';
 import { SlotPicker } from './SlotPicker';
+import { LikeMark } from './LikeMark';
+import { likeVisible } from './lib/people';
 import { DishThumb } from './DishThumb';
 import { OtherEvents, SLOT_LABEL, SlotSheet, type ShownProposal } from './SlotSheet';
 
@@ -375,7 +377,7 @@ export function PlanningView(props: PlanningProps) {
     rerolled.current.set(key, seen);
     const first = bySlot.get(key)?.[0]?.id === meal.id;
     const previous = meal.name;
-    const apply = (name: string) => (first ? setSlot(meal.date, meal.slot, name) : void store.renameMeals([meal.id], name));
+    const apply = (name: string) => (first ? setSlot(meal.date, meal.slot, name) : void store.renameMeals([meal.id], name, { changeDish: true }));
     apply(pick.label);
     flash(`« ${previous} » remplacé par « ${pick.label} ».`, () => apply(previous));
   }
@@ -641,7 +643,8 @@ export function PlanningView(props: PlanningProps) {
                     <span className="slot-label">{SLOT_LABEL[slot]}</span>
                     <div className="slot-body">
                       {planned ? (
-                        <button className="meal with-thumb" onClick={() => setEditing({ date, slot })}>
+                        <>
+                        <button className={`meal with-thumb${likeVisible(planned, store.me) ? ' has-like' : ''}`} onClick={() => setEditing({ date, slot })}>
                           <DishThumb name={planned[0].name} enabled={props.showImages} />
                           <span className="meal-text">
                           <Breakable text={planned.map((m) => m.name).join(' + ')} />
@@ -652,6 +655,8 @@ export function PlanningView(props: PlanningProps) {
                           )}
                           </span>
                         </button>
+                        <LikeMark meals={planned} me={store.me} onToggle={store.toggleLike} />
+                        </>
                       ) : skipped.has(key) ? (
                         <button className="add skipped" onClick={() => setEditing({ date, slot })}>
                           Pas de repas
@@ -748,6 +753,8 @@ export function PlanningView(props: PlanningProps) {
           onNextProposal={() => nextProposal(`${editing.date}|${editing.slot}`)}
           onRerollMeal={rerollMeal}
           onRename={renameMealTo}
+          me={store.me}
+          onToggleLike={store.toggleLike}
           skipped={skipped.has(`${editing.date}|${editing.slot}`)}
           onSkip={(skip) => {
             setSkip(`${editing.date}|${editing.slot}`, skip);

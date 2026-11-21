@@ -1,4 +1,5 @@
 import { noteFromDescription } from './notes';
+import { BY_KEY, likeKey, readLikes } from './people';
 import { addDays } from './dates';
 import { LUNCH_LIMIT_HOUR, type Meal, type Slot } from './types';
 
@@ -72,6 +73,8 @@ export interface GoogleEvent {
   status?: string;
   summary?: string;
   description?: string;
+  creator?: { email?: string };
+  extendedProperties?: { shared?: Record<string, string> };
   start?: { dateTime?: string; date?: string };
 }
 
@@ -238,7 +241,7 @@ export async function getAccount(token: string): Promise<string | undefined> {
       `/users/me/calendarList?${query}`,
     );
     const primary = page.items?.find((c) => c.primary);
-    if (primary) return primary.id;
+    if (primary) return primary.id.trim().toLowerCase();
     pageToken = page.nextPageToken;
   } while (pageToken);
   return undefined;
@@ -276,7 +279,7 @@ export async function listChanges(
     const query = new URLSearchParams({
       singleEvents: 'true',
       maxResults: '2500',
-      fields: 'items(id,status,summary,description,start),nextPageToken,nextSyncToken',
+      fields: 'items(id,status,summary,description,start,creator(email),extendedProperties(shared)),nextPageToken,nextSyncToken',
     });
     if (syncToken) query.set('syncToken', syncToken);
     if (pageToken) query.set('pageToken', pageToken);
@@ -297,28 +300,57 @@ export function insertEvent(
   date: string,
   slot: Slot,
   name: string,
+  by?: string,
 ): Promise<GoogleEvent> {
   const time = mealTimes[slot];
   return call<GoogleEvent>(token, `/calendars/${encodeURIComponent(calendar.id)}/events?fields=id,status,summary,start`, {
     method: 'POST',
     body: JSON.stringify({
       summary: name,
+      ...(by ? { extendedProperties: { shared: { [BY_KEY]: by } } } : {}),
       start: { dateTime: shiftTime(date, time, 0), timeZone: calendar.timeZone },
       end: { dateTime: shiftTime(date, time, 60), timeZone: calendar.timeZone },
     }),
   });
 }
 
-export function renameEvent(token: string, calendar: GoogleCalendar, eventId: string, name: string): Promise<GoogleEvent> {
+/**
+ * Renomme un événement. Avec `changeDish`, c'est un autre plat : `by` en devient l'auteur et les « J'aime »
+ * (`clear` : leurs propriétés) sont effacés.
+ */
+export function renameEvent(
+  token: string,
+  calendar: GoogleCalendar,
+  eventId: string,
+  name: string,
+  changeDish?: { by?: string; clear: Record<string, string> },
+): Promise<GoogleEvent> {
+  const shared = changeDish ? { ...changeDish.clear, ...(changeDish.by ? { [BY_KEY]: changeDish.by } : {}) } : undefined;
   return call<GoogleEvent>(
     token,
     `/calendars/${encodeURIComponent(calendar.id)}/events/${encodeURIComponent(eventId)}?fields=id,status,summary,start`,
-    { method: 'PATCH', body: JSON.stringify({ summary: name }) },
+    { method: 'PATCH', body: JSON.stringify({ summary: name, ...(shared && Object.keys(shared).length ? { extendedProperties: { shared } } : {}) }) },
+  );
+}
+
+/** J'aime un repas (ou je ne l'aime plus) : chacun n'écrit que sa propre propriété partagée. */
+export function setLikeEvent(token: string, calendar: GoogleCalendar, eventId: string, me: string, liked: boolean): Promise<GoogleEvent> {
+  return call<GoogleEvent>(
+    token,
+    `/calendars/${encodeURIComponent(calendar.id)}/events/${encodeURIComponent(eventId)}?fields=id,status,summary,start`,
+    { method: 'PATCH', body: JSON.stringify({ extendedProperties: { shared: { [likeKey(me)]: liked ? me : '' } } }) },
   );
 }
 
 /** Déplace un repas à un autre jour ou créneau (même événement : sa note reste). */
-export function moveEvent(token: string, calendar: GoogleCalendar, eventId: string, date: string, slot: Slot): Promise<GoogleEvent> {
+export function moveEvent(
+  token: string,
+  calendar: GoogleCalendar,
+  eventId: string,
+  date: string,
+  slot: Slot,
+  clear: Record<string, string> = {},
+): Promise<GoogleEvent> {
   const time = mealTimes[slot];
   return call<GoogleEvent>(
     token,
@@ -328,6 +360,7 @@ export function moveEvent(token: string, calendar: GoogleCalendar, eventId: stri
       body: JSON.stringify({
         start: { dateTime: shiftTime(date, time, 0), timeZone: calendar.timeZone },
         end: { dateTime: shiftTime(date, time, 60), timeZone: calendar.timeZone },
+        ...(Object.keys(clear).length ? { extendedProperties: { shared: clear } } : {}),
       }),
     },
   );
@@ -356,7 +389,7 @@ export function eventToMeal(event: GoogleEvent): Meal | null {
   // Google renvoie l'heure dans le fuseau de l'agenda : on lit la date et l'heure telles quelles.
   const { dateTime, date } = event.start;
   const note = noteFromDescription(event.description);
-  const extra = note ? { note } : {};
+  const extra = { ...(note ? { note } : {}), ...readLikes(event.extendedProperties?.shared, event.creator?.email) };
   if (dateTime) {
     const hour = Number(dateTime.slice(11, 13));
     return { id: event.id, date: dateTime.slice(0, 10), slot: hour < LUNCH_LIMIT_HOUR ? 'midi' : 'soir', name, source: 'google', ...extra };
