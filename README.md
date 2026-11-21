@@ -204,6 +204,29 @@ Le nom du plat en titre, l'étoile des favoris à droite, l'image avec sa source
 Les messages avec « Annuler » sont un bandeau fixe en haut de l'écran : ils restent atteignables même quand une
 fenêtre est ouverte.
 
+## Aimer un plat (à plusieurs)
+
+Quand plusieurs personnes partagent l'agenda « Repas », chacune connectée avec son compte Google, on voit qui a
+choisi un plat et qui l'aime.
+
+- **Qui a choisi** : celui qui a créé l'événement (Google Agenda le sait, même pour un plat saisi dans Google Agenda),
+  ou celui qui a changé le plat depuis l'application. Celui-là n'a pas de bouton « J'aime » pour son propre plat.
+- **J'aime** : sur la ligne du créneau, un petit cœur discret (gris et vide : tu peux aimer ; plein : quelqu'un
+  l'aime) ; dans la fiche, le bouton « J'aime » / « Je n'aime plus » et la phrase « Choisi par X · Aimé par Y ». Celui
+  qui a choisi le plat voit le cœur plein dès qu'un autre l'aime. Sur un créneau qui a plusieurs repas, le cœur de la
+  ligne montre seulement qu'un plat est aimé ; on aime chaque repas dans la fiche.
+- **Pas dans le passé** : un créneau dont le jour est passé ne propose plus d'aimer (ni cœur cliquable, ni bouton) ;
+  les « J'aime » déjà donnés y restent visibles.
+- **Retirer** : la personne reclique. **Tous les « J'aime » tombent** quand le plat change (remplacé, « Autre plat »,
+  choisi ailleurs) ou quand le repas est déplacé vers un autre créneau ; un repas retiré n'existe plus. Renommer un
+  plat (faute de frappe, fusion de doublons) garde les « J'aime ».
+- **Où c'est stocké** : dans les propriétés partagées de l'événement Google lui-même (aucun serveur) : une propriété
+  par personne (`mmlike_…`, valeur : son adresse Google), donc deux personnes qui aiment en même temps ne
+  s'écrasent pas, et `mmby` pour qui a choisi le plat. Ces adresses sont visibles de toutes les personnes qui ont accès
+  à l'agenda ; les noms affichés sont tirés des adresses (« marie.dupont@… » → « Marie Dupont »).
+- Il faut être connecté avec Google ; sans connexion (import de fichier), aucune de ces fonctions n'apparaît. La
+  première synchronisation après la mise à jour relit tout l'agenda une fois.
+
 ## Jours passés
 
 Dans un jour passé, un créneau sans repas n'est pas affiché du tout (ni « + Ajouter », ni les événements des autres
