@@ -92,7 +92,7 @@ l'onglet **Réglages** contient une **liste noire** : une entrée par ligne.
   pas « photo »), `/^(sushi|maki)/`. Une expression mal formée est signalée et ignorée.
 - Les lignes vides et celles qui commencent par `#` sont ignorées.
 
-**Ajouter un plat d'un geste** : le bouton **🚫** (« Ne plus jamais proposer ce plat », avec une demande de confirmation) d'une proposition du planning (ou d'une idée « Surprise Me »), ou « 🚫 Liste noire » dans la fiche d'un plat (fenêtre du créneau, pour un repas prévu comme pour la proposition ; « Sur la liste noire (retirer) » l'en retire),
+**Ajouter un plat d'un geste** : « 🚫 Liste noire » dans la fiche d'un plat (fenêtre du créneau, pour un repas prévu comme pour la proposition ; « Sur la liste noire (retirer) » l'en retire),
 ajoute son nom à la liste noire, retire aussitôt la proposition et affiche un message avec « Annuler ». Le
 message indique combien de plats sont masqués si la ligne en touche plusieurs (« kebab » masque aussi
 « kebab frites ») ; on peut ensuite affiner la ligne dans les réglages.
@@ -268,11 +268,12 @@ noms et événements des autres agendas aussi). Le bouton « ☰ Vue liste » (o
 ### Planning
 
 - **Changer de semaine** : flèches, balayage gauche/droite sur téléphone, bouton « Aujourd'hui ».
-- **Une proposition** garde deux boutons, **↻** (une autre) et **✓** (accepter). Le menu **⋯** regroupe le
-  reste, avec un libellé : « Surprise Me » (un plat jamais noté, catalogue ou « Mes idées »), « Un plat
-  oublié » (mangé au moins quatre fois, plus depuis un an), « Un plat de la liste noire », « Pas de repas ce
-  midi » ou « ce soir » (seulement ce créneau). « Ne plus jamais proposer ce plat » a son propre bouton 🚫,
-  à côté de ↻, ⋯ et ✓ ; sur ordinateur, ces boutons sont alignés d'un jour à l'autre.
+- **Une proposition** a quatre boutons : **↻** (une autre), **∅** (pas besoin de repas ce midi / ce soir : seulement
+  ce créneau, avec « Annuler »), **⋯** et **✓** (accepter). Le menu **⋯** regroupe le reste, avec un libellé :
+  « Surprise Me » (un plat jamais noté, catalogue ou « Mes idées »), « Un plat oublié » (mangé au moins quatre
+  fois, plus depuis un an), « Un plat de la liste noire », favoris, « Accepter pour un autre créneau… ». Pour
+  ne plus jamais proposer un plat, on touche la proposition et on utilise « 🚫 Liste noire » dans sa fiche ;
+  sur ordinateur, les boutons sont alignés d'un jour à l'autre.
 - **Restes** : l'application apprend quels plats laissent des restes (au moins deux repas « restes <plat> »
   dans les trois jours qui suivent ce plat). Quand un tel plat est prévu, le créneau suivant (parmi les
   trois suivants) propose ses restes ; ce n'est qu'une proposition, ↻ en donne une autre.

@@ -287,7 +287,6 @@ export function Planner(props: PlannerProps) {
           resetToken={resetToken}
           loading={props.loading ?? false}
           flash={showFlash}
-          blacklistDish={blacklistDish}
           favoriteKeys={favoriteKeys}
           isFavorite={isFavorite}
           toggleFavorite={toggleFavorite}

@@ -72,7 +72,6 @@ interface PlanningProps {
   resetToken: number;
   loading: boolean;
   flash: (text: string, undo?: () => void) => void;
-  blacklistDish: (name: string) => void;
   favoriteKeys: ReadonlySet<string>;
   isFavorite: (name: string) => boolean;
   toggleFavorite: (name: string) => void;
@@ -175,7 +174,7 @@ function MenuItem({ icon, label, hint, onClick }: { icon: string; label: string;
 }
 
 export function PlanningView(props: PlanningProps) {
-  const { store, dishes, today, shared, ideas, slotMode, pendingOnly, blacklistKeys, blacklistFilter, resetToken, loading, flash, blacklistDish } = props;
+  const { store, dishes, today, shared, ideas, slotMode, pendingOnly, blacklistKeys, blacklistFilter, resetToken, loading, flash } = props;
   const { favoriteKeys, isFavorite, toggleFavorite } = props;
   const { meals, setSlot, addMeal, clearSlot, removeMeal, setNote, moveMeal } = store;
   const mealsRef = useRef(meals);
@@ -339,6 +338,13 @@ export function PlanningView(props: PlanningProps) {
       const added = mealsRef.current.find((m) => m.date === date && m.slot === slot && m.name === name.trim() && !before.has(m.id));
       if (added) removeMeal(added.id);
     });
+  }
+
+  /** Marque le créneau « Pas de repas » (la proposition disparaît), avec « Annuler ». */
+  function skipSlot(key: string, date: string, slot: Slot) {
+    setSkip(key, true);
+    dropOverride(key);
+    flash(`Pas de repas ${dayName(date).toLowerCase()} ${SLOT_LABEL[slot].toLowerCase()}.`, () => setSkip(key, false));
   }
 
   /** Accepte une proposition pour un autre créneau (elle s'ajoute si ce créneau a déjà un plat). */
@@ -618,15 +624,11 @@ export function PlanningView(props: PlanningProps) {
                             </button>
                             <button
                               className="icon ban"
-                              onClick={() => {
-                                if (!window.confirm(`Ne plus jamais proposer « ${shown.name} » ?\n\nLe plat est ajouté à la liste noire (tu pourras l'en retirer dans les réglages). Tes repas passés ne changent pas.`)) return;
-                                blacklistDish(shown.name);
-                                if (override) dropOverride(key);
-                              }}
-                              aria-label={`Ne plus jamais proposer ${shown.name}`}
-                              title="Ne plus jamais proposer ce plat (liste noire)"
+                              onClick={() => skipSlot(key, date, slot)}
+                              aria-label={`Pas de repas ${where}`}
+                              title={`Pas besoin de repas ce ${SLOT_LABEL[slot].toLowerCase()}`}
                             >
-                              🚫
+                              ∅
                             </button>
                             <ProposalMenu label={`Plus d'options pour ${where}`} open={menuFor === key} onToggle={(open) => setMenuFor(open ? key : null)}>
                               <MenuItem
@@ -646,7 +648,6 @@ export function PlanningView(props: PlanningProps) {
                                 hint={isFavorite(shown.name) ? undefined : 'proposé plus souvent'}
                                 onClick={() => toggleFavorite(shown.name)}
                               />
-                              <MenuItem icon="∅" label={`Pas de repas ce ${SLOT_LABEL[slot].toLowerCase()}`} onClick={() => setSkip(key, true)} />
                             </ProposalMenu>
                             <button className="icon accept" onClick={() => accept(date, slot, shown.name)} aria-label={`Accepter ${shown.name}`} title="Accepter">
                               ✓
