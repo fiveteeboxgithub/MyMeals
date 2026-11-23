@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { MAX_MEMO_CHARS, memoRoom, newMemoId, type Memo } from './memos';
-import type { Meal, Slot } from './types';
+import type { Meal, MemoOutcome, Slot } from './types';
 
 const STORAGE_KEY = 'mymeals.v1';
 
@@ -53,7 +53,7 @@ export function useLocalMemos() {
       // stockage plein : le mémo vaut pour cette session
     }
   };
-  const addMemo = (raw: string): 'ok' | 'full' | 'empty' => {
+  const addMemo = async (raw: string): Promise<MemoOutcome> => {
     const text = raw.trim().slice(0, MAX_MEMO_CHARS);
     if (!text) return 'empty';
     if (memoRoom(memos, text) === 'full') return 'full';
@@ -61,7 +61,7 @@ export function useLocalMemos() {
     return 'ok';
   };
   const removeMemo = (id: string) => save(memos.filter((m) => m.id !== id));
-  const editMemo = (id: string, raw: string): 'ok' | 'full' | 'empty' => {
+  const editMemo = async (id: string, raw: string): Promise<MemoOutcome> => {
     const text = raw.trim().slice(0, MAX_MEMO_CHARS);
     if (!text) return 'empty';
     if (memoRoom(memos.filter((m) => m.id !== id), text) === 'full') return 'full';

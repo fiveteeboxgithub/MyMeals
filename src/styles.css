@@ -2438,3 +2438,13 @@ html {
   align-items: center;
   gap: 8px;
 }
+
+.memo-sync {
+  margin: 14px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+}
+.memo-sync .link {
+  font-size: inherit;
+}

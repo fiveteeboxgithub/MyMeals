@@ -241,7 +241,12 @@ libre. Le bouton **Fridge memo** (en haut de chaque page, avec le nombre de mém
   événement Google ; au-delà, l'appli demande de supprimer quelques mémos. Un mémo supprimé libère sa propriété, qui
   est réutilisée quand il y en a beaucoup (Google limite le nombre de propriétés d'un événement).
 - **Sans connexion Google** (mode import de fichier) : les mémos restent dans le navigateur, comme les repas.
-- Les mémos se mettent à jour comme le reste de l'agenda : au retour sur la fenêtre et toutes les trois minutes.
+- Les mémos se mettent à jour comme le reste de l'agenda : au retour sur la fenêtre et toutes les trois minutes, et
+  **dès l'ouverture de la fenêtre Fridge memo** (une ligne « Mis à jour à 14:32 · Actualiser » en bas permet de
+  relire l'agenda à la main).
+- **Un mémo n'est affiché qu'une fois enregistré dans l'agenda** : si la connexion Google a expiré et ne peut pas être
+  renouvelée, l'ajout (ou la modification) échoue avec un message, le texte reste dans le champ et rien n'est montré
+  à moitié sur cet appareil (sinon un mémo pouvait n'exister que sur l'appareil qui l'avait saisi).
 
 ## Aimer un plat (à plusieurs)
 

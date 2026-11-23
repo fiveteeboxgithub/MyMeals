@@ -33,6 +33,9 @@ export interface SettingsSync {
   save: (record: SettingsRecord) => void;
 }
 
+/** Résultat d'un ajout ou d'une modification de mémo : « failed » = pas enregistré (connexion, refus de Google). */
+export type MemoOutcome = 'ok' | 'full' | 'empty' | 'failed';
+
 /** Résultat de l'ajout d'un nom à la liste noire. */
 export type BlacklistOutcome = 'added' | 'already' | 'full';
 
@@ -52,11 +55,15 @@ export interface MealStore {
   toggleLike: (id: string) => void;
   /** Fridge memo : pense-bête en texte libre, jamais utilisé comme un plat. */
   memos: Memo[];
-  addMemo: (text: string) => 'ok' | 'full' | 'empty';
+  addMemo: (text: string) => Promise<MemoOutcome>;
   /** N'importe qui peut supprimer n'importe quel mémo. */
   removeMemo: (id: string) => void;
   /** Modifie le texte d'un mémo (l'auteur et la date d'origine sont gardés). */
-  editMemo: (id: string, text: string) => 'ok' | 'full' | 'empty';
+  editMemo: (id: string, text: string) => Promise<MemoOutcome>;
+  /** Relit l'agenda tout de suite (Google seulement). */
+  refresh?: () => void;
+  /** Dernière lecture réussie de l'agenda (ms), si on la connaît. */
+  syncedAt?: number;
   /** Déplace un repas vers un autre jour ou créneau (sa note le suit). */
   moveMeal: (id: string, date: string, slot: Slot) => void;
   /** Remplace la note d'un repas (texte vide : la retire). */

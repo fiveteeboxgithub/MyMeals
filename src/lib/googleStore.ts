@@ -36,7 +36,7 @@ import {
 } from './google';
 import { parseSettingsRecord, type SettingsRecord } from './settings';
 import { parseImagesRecord, type ImagesRecord } from './customImages';
-import type { Meal, MealStore, Slot } from './types';
+import type { Meal, MealStore, MemoOutcome, Slot } from './types';
 import { withNote } from './store';
 import { clearLikes } from './people';
 import { MAX_MEMO_CHARS, encodeMemo, memoKey, memoRoom, parseMemos, pickMemoId, type Memo } from './memos';
@@ -129,6 +129,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   const [cache, setCache] = useState<Cache>(loadCache);
   const [token, setToken] = useState<string | null>(storedToken);
   const [syncing, setSyncing] = useState(false);
+  const [syncedAt, setSyncedAt] = useState<number | undefined>(undefined);
   const [error, setError] = useState('');
   // Le message d'erreur actuel vient d'une connexion expirée : il disparaît dès qu'on est reconnecté et synchronisé.
   const authError = useRef(false);
@@ -236,6 +237,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
         }
         // Reconnecté et synchronisé : l'avertissement de connexion expirée n'a plus lieu d'être.
         clearAuthError();
+        setSyncedAt(Date.now());
       } catch (e) {
         fail(e);
       } finally {
@@ -467,12 +469,24 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     [commit, fail, withAccess],
   );
 
-  /** Ajoute un mémo : une propriété de plus sur l'événement spécial, sans toucher à celles des autres. */
+  /** Relit l'agenda tout de suite ; sans connexion valable, tente de la renouveler (à appeler lors d'un toucher). */
+  const refresh = useCallback(() => {
+    const fresh = storedToken();
+    if (fresh) void sync(fresh);
+    else if (cacheRef.current.calendar) void renew();
+  }, [sync, renew]);
+
+  /**
+   * Ajoute un mémo : une propriété de plus sur l'événement spécial, sans toucher à celles des autres. Il n'est
+   * affiché qu'une fois la connexion Google valable ; s'il ne peut pas partir, rien ne reste affiché (« failed »).
+   */
   const addMemo = useCallback(
-    (raw: string): 'ok' | 'full' | 'empty' => {
+    async (raw: string): Promise<MemoOutcome> => {
       const text = raw.trim().slice(0, MAX_MEMO_CHARS);
       if (!text) return 'empty';
       if (memoRoom(cacheRef.current.memos ?? [], text) === 'full') return 'full';
+      const a = await access();
+      if (!a) return 'failed';
       const me = cacheRef.current.account;
       const { id, reused } = pickMemoId(cacheRef.current.memoFree ?? []);
       const memo: Memo = { id, text, at: Date.now(), ...(me ? { by: me } : {}) };
@@ -482,69 +496,70 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
         memos: [memo, ...(c.memos ?? []).filter((m) => m.id !== id)],
         memoFree: reused ? (c.memoFree ?? []).filter((f) => f !== id) : c.memoFree,
       }));
-      withAccess((a) => {
-        patchSpecialShared(a.token, a.calendar, FRIDGE_EVENT, { [memoKey(id)]: encodeMemo(memo) }).then(
-          () => pendingMemoAdds.current.delete(id),
-          (e) => {
-            pendingMemoAdds.current.delete(id);
-            commit((c) => ({ ...c, memos: (c.memos ?? []).filter((m) => m.id !== id) }));
-            fail(e);
-          },
-        );
-      });
-      return 'ok';
+      try {
+        await patchSpecialShared(a.token, a.calendar, FRIDGE_EVENT, { [memoKey(id)]: encodeMemo(memo) });
+        pendingMemoAdds.current.delete(id);
+        return 'ok';
+      } catch (e) {
+        pendingMemoAdds.current.delete(id);
+        commit((c) => ({ ...c, memos: (c.memos ?? []).filter((m) => m.id !== id) }));
+        fail(e);
+        return 'failed';
+      }
     },
-    [commit, fail, withAccess],
+    [access, commit, fail],
   );
 
   /** Modifie le texte d'un mémo (le sien ou celui d'un autre) : seule sa propriété est réécrite. */
   const editMemo = useCallback(
-    (id: string, raw: string): 'ok' | 'full' | 'empty' => {
+    async (id: string, raw: string): Promise<MemoOutcome> => {
       const text = raw.trim().slice(0, MAX_MEMO_CHARS);
       if (!text) return 'empty';
       const memos = cacheRef.current.memos ?? [];
       const memo = memos.find((m) => m.id === id);
-      if (!memo) return 'ok';
-      if (text === memo.text) return 'ok';
+      if (!memo || text === memo.text) return 'ok';
       if (memoRoom(memos.filter((m) => m.id !== id), text) === 'full') return 'full';
+      const a = await access();
+      if (!a) return 'failed';
       const edited: Memo = { ...memo, text };
       pendingMemoAdds.current.set(id, edited);
       commit((c) => ({ ...c, memos: (c.memos ?? []).map((m) => (m.id === id ? edited : m)) }));
-      withAccess((a) => {
-        patchSpecialShared(a.token, a.calendar, FRIDGE_EVENT, { [memoKey(id)]: encodeMemo(edited) }).then(
-          () => pendingMemoAdds.current.delete(id),
-          (e) => {
-            pendingMemoAdds.current.delete(id);
-            commit((c) => ({ ...c, memos: (c.memos ?? []).map((m) => (m.id === id ? memo : m)) }));
-            fail(e);
-          },
-        );
-      });
-      return 'ok';
+      try {
+        await patchSpecialShared(a.token, a.calendar, FRIDGE_EVENT, { [memoKey(id)]: encodeMemo(edited) });
+        pendingMemoAdds.current.delete(id);
+        return 'ok';
+      } catch (e) {
+        pendingMemoAdds.current.delete(id);
+        commit((c) => ({ ...c, memos: (c.memos ?? []).map((m) => (m.id === id ? memo : m)) }));
+        fail(e);
+        return 'failed';
+      }
     },
-    [commit, fail, withAccess],
+    [access, commit, fail],
   );
 
   /** Supprime un mémo (le sien ou celui d'un autre) : sa propriété est vidée, les autres restent. */
   const removeMemo = useCallback(
     (id: string) => {
-      const memo = (cacheRef.current.memos ?? []).find((m) => m.id === id);
-      if (!memo) return;
-      pendingMemoRemoves.current.add(id);
-      pendingMemoAdds.current.delete(id);
-      commit((c) => ({ ...c, memos: (c.memos ?? []).filter((m) => m.id !== id), memoFree: [...new Set([...(c.memoFree ?? []), id])] }));
-      withAccess((a) => {
-        patchSpecialShared(a.token, a.calendar, FRIDGE_EVENT, { [memoKey(id)]: '' }).then(
-          () => pendingMemoRemoves.current.delete(id),
-          (e) => {
-            pendingMemoRemoves.current.delete(id);
-            commit((c) => ({ ...c, memos: [memo, ...(c.memos ?? [])].sort((x, y) => y.at - x.at), memoFree: (c.memoFree ?? []).filter((f) => f !== id) }));
-            fail(e);
-          },
-        );
-      });
+      void (async () => {
+        const memo = (cacheRef.current.memos ?? []).find((m) => m.id === id);
+        if (!memo) return;
+        const a = await access();
+        if (!a) return;
+        pendingMemoRemoves.current.add(id);
+        pendingMemoAdds.current.delete(id);
+        commit((c) => ({ ...c, memos: (c.memos ?? []).filter((m) => m.id !== id), memoFree: [...new Set([...(c.memoFree ?? []), id])] }));
+        try {
+          await patchSpecialShared(a.token, a.calendar, FRIDGE_EVENT, { [memoKey(id)]: '' });
+          pendingMemoRemoves.current.delete(id);
+        } catch (e) {
+          pendingMemoRemoves.current.delete(id);
+          commit((c) => ({ ...c, memos: [memo, ...(c.memos ?? [])].sort((x, y) => y.at - x.at), memoFree: (c.memoFree ?? []).filter((f) => f !== id) }));
+          fail(e);
+        }
+      })();
     },
-    [commit, fail, withAccess],
+    [access, commit, fail],
   );
 
   /** J'aime ce repas (ou je ne l'aime plus) : visible de tous ceux qui partagent l'agenda. */
@@ -744,6 +759,8 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     moveMeal,
     toggleLike,
     memos: cache.memos ?? [],
+    syncedAt,
+    refresh,
     addMemo,
     removeMemo,
     editMemo,

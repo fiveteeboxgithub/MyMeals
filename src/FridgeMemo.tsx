@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from './Icons';
 import { displayName } from './lib/people';
 import { MAX_MEMO_CHARS, type Memo } from './lib/memos';
+import type { MemoOutcome } from './lib/types';
 import { useScrollLock } from './useScrollLock';
 
 const shortDay = (at: number) => (at > 0 ? new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '');
@@ -11,8 +12,8 @@ interface BoardProps {
   me?: string;
   /** Mémos en une rangée qui défile de côté (panneau du planning), sinon en grille (fenêtre). */
   row?: boolean;
-  onAdd: (text: string) => 'ok' | 'full' | 'empty';
-  onEdit: (id: string, text: string) => 'ok' | 'full' | 'empty';
+  onAdd: (text: string) => Promise<MemoOutcome>;
+  onEdit: (id: string, text: string) => Promise<MemoOutcome>;
   onRemove: (memo: Memo) => void;
 }
 
@@ -20,22 +21,33 @@ interface BoardProps {
 export function MemoBoard({ memos, me, row, onAdd, onEdit, onRemove }: BoardProps) {
   const [text, setText] = useState('');
   const [message, setMessage] = useState('');
+  // Une écriture est en cours : on attend la confirmation de l'agenda avant de vider le champ.
+  const [busy, setBusy] = useState(false);
   // Mémo en cours de modification.
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
 
-  function submit() {
-    const outcome = onAdd(text);
+  const FAILED = "Pas enregistré : vérifie la connexion Google (reconnecte-toi si besoin). Ton texte est gardé.";
+
+  async function submit() {
+    if (busy) return;
+    setBusy(true);
+    const outcome = await onAdd(text);
+    setBusy(false);
     if (outcome === 'full') setMessage('Le pense-bête est plein : supprime quelques mémos pour en ajouter.');
+    else if (outcome === 'failed') setMessage(FAILED);
     else if (outcome === 'ok') {
       setText('');
       setMessage('');
     }
   }
 
-  function saveEdit() {
-    if (!editing) return;
-    const outcome = onEdit(editing.id, editing.text);
+  async function saveEdit() {
+    if (!editing || busy) return;
+    setBusy(true);
+    const outcome = await onEdit(editing.id, editing.text);
+    setBusy(false);
     if (outcome === 'full') setMessage('Pas assez de place pour ce texte : raccourcis-le ou supprime des mémos.');
+    else if (outcome === 'failed') setMessage(FAILED);
     else if (outcome === 'ok') {
       setEditing(null);
       setMessage('');
@@ -47,7 +59,7 @@ export function MemoBoard({ memos, me, row, onAdd, onEdit, onRemove }: BoardProp
       className="memo-form"
       onSubmit={(e) => {
         e.preventDefault();
-        submit();
+        void submit();
       }}
     >
       <input
@@ -62,7 +74,7 @@ export function MemoBoard({ memos, me, row, onAdd, onEdit, onRemove }: BoardProp
           setMessage('');
         }}
       />
-      <button className="ghost-btn primary" type="submit" disabled={!text.trim()}>
+      <button className="ghost-btn primary" type="submit" disabled={!text.trim() || busy}>
         <Icon name="plus" />
         Ajouter
       </button>
@@ -88,7 +100,7 @@ export function MemoBoard({ memos, me, row, onAdd, onEdit, onRemove }: BoardProp
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      saveEdit();
+                      void saveEdit();
                     }
                     if (e.key === 'Escape') {
                       e.stopPropagation();
@@ -100,7 +112,7 @@ export function MemoBoard({ memos, me, row, onAdd, onEdit, onRemove }: BoardProp
                   <button className="postit-btn" onClick={() => setEditing(null)}>
                     Annuler
                   </button>
-                  <button className="postit-btn strong" onClick={saveEdit} disabled={!editing.text.trim()}>
+                  <button className="postit-btn strong" onClick={() => void saveEdit()} disabled={!editing.text.trim() || busy}>
                     Enregistrer
                   </button>
                 </div>
@@ -145,8 +157,10 @@ export function MemoBoard({ memos, me, row, onAdd, onEdit, onRemove }: BoardProp
  * « Fridge memo » : un pense-bête partagé, comme les post-it sur un frigo. Texte libre (envies de plats, restes à
  * finir…). Chacun peut supprimer n'importe quel mémo. Ces mémos ne servent jamais à proposer un plat.
  */
-export function FridgeMemo({ atTop, pinned, onTogglePin, onClose, ...board }: BoardProps & { atTop?: boolean; pinned: boolean; onTogglePin: () => void; onClose: () => void }) {
+export function FridgeMemo({ atTop, pinned, onTogglePin, onClose, syncedAt, onRefresh, ...board }: BoardProps & { atTop?: boolean; pinned: boolean; onTogglePin: () => void; onClose: () => void; syncedAt?: number; onRefresh?: () => void }) {
   useScrollLock();
+  // À l'ouverture, on relit l'agenda : on voit tout de suite ce qu'un autre appareil vient d'écrire.
+  useEffect(() => onRefresh?.(), [onRefresh]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -181,6 +195,15 @@ export function FridgeMemo({ atTop, pinned, onTogglePin, onClose, ...board }: Bo
           servent jamais à proposer un plat.
         </p>
         <MemoBoard {...board} />
+        {onRefresh && (
+          <p className="memo-sync">
+            {syncedAt ? `Mis à jour à ${new Date(syncedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'Pas encore synchronisé'}
+            {' · '}
+            <button className="link" onClick={onRefresh}>
+              Actualiser
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );
