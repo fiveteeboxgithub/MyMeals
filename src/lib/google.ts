@@ -383,7 +383,7 @@ export function deleteEvent(token: string, calendar: GoogleCalendar, eventId: st
 
 /** Un événement devient un repas ; renvoie null s'il est annulé, sans titre ou sans date. */
 export function eventToMeal(event: GoogleEvent): Meal | null {
-  if (event.id === SETTINGS_EVENT_ID || event.id === IMAGES_EVENT_ID) return null;
+  if (event.id === SETTINGS_EVENT_ID || event.id === IMAGES_EVENT_ID || event.id === FRIDGE_EVENT_ID) return null;
   const name = event.summary?.trim();
   if (event.status === 'cancelled' || !name || !event.start) return null;
   // Google renvoie l'heure dans le fuseau de l'agenda : on lit la date et l'heure telles quelles.
@@ -405,6 +405,8 @@ export function eventToMeal(event: GoogleEvent): Meal | null {
 export const SETTINGS_EVENT_ID = 'mmealsreglages00';
 /** Second événement spécial : les images choisies pour des plats (des adresses, trop longues pour les réglages). */
 export const IMAGES_EVENT_ID = 'mmealsimages00';
+/** Troisième événement spécial : le Fridge memo (pense-bête partagé en texte libre). */
+export const FRIDGE_EVENT_ID = 'mmealsfridge00';
 
 interface SpecialEvent {
   id: string;
@@ -431,6 +433,15 @@ export const IMAGES_EVENT: SpecialEvent = {
   intro: "Images choisies pour des plats dans l'application MyMeals. Ne pas supprimer ni modifier à la main.",
   tooLong: "Trop d'images choisies pour tenir dans l'agenda : retire-en quelques-unes. Elles restent enregistrées sur cet appareil.",
   date: '2100-01-02',
+};
+
+export const FRIDGE_EVENT: SpecialEvent = {
+  id: FRIDGE_EVENT_ID,
+  title: '🧲 MyMeals : fridge memo (ne pas supprimer)',
+  marker: 'MYMEALS-FRIDGE',
+  intro: "Pense-bête partagé de l'application MyMeals (un mémo par propriété partagée de cet événement). Ne pas supprimer ni modifier à la main.",
+  tooLong: 'Le pense-bête est plein : supprime quelques mémos.',
+  date: '2100-01-03',
 };
 
 /** Texte d'un événement spécial : une phrase d'explication puis les données en JSON sur une seule ligne. */
@@ -491,6 +502,31 @@ export async function writeSpecialEvent(token: string, calendar: GoogleCalendar,
     visibility: 'private',
     reminders: { useDefault: false },
     extendedProperties: { private: { mymeals: kind.marker.toLowerCase() } },
+    status: 'confirmed',
+  };
+  try {
+    await call<unknown>(token, `${base}/${kind.id}?fields=id`, { method: 'PATCH', body: JSON.stringify(body) });
+  } catch (e) {
+    if (!(e instanceof NotFoundError)) throw e;
+    await call<unknown>(token, `${base}?fields=id`, { method: 'POST', body: JSON.stringify({ id: kind.id, ...body }) });
+  }
+}
+
+/**
+ * Écrit seulement ces propriétés partagées sur un événement spécial (le crée au besoin). Une valeur vide
+ * supprime le mémo correspondant. Les autres propriétés, écrites par d'autres, ne sont pas touchées.
+ */
+export async function patchSpecialShared(token: string, calendar: GoogleCalendar, kind: SpecialEvent, shared: Record<string, string>): Promise<void> {
+  const base = `/calendars/${encodeURIComponent(calendar.id)}/events`;
+  const body = {
+    summary: kind.title,
+    description: kind.intro,
+    start: { date: kind.date },
+    end: { date: addDays(kind.date, 1) },
+    transparency: 'transparent',
+    visibility: 'private',
+    reminders: { useDefault: false },
+    extendedProperties: { private: { mymeals: kind.marker.toLowerCase() }, shared },
     status: 'confirmed',
   };
   try {

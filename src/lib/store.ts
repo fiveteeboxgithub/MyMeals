@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { MAX_MEMO_CHARS, memoRoom, newMemoId, type Memo } from './memos';
 import type { Meal, Slot } from './types';
 
 const STORAGE_KEY = 'mymeals.v1';
@@ -26,6 +27,41 @@ export function withNote(meal: Meal, note: string): Meal {
   if (note) return { ...meal, note };
   const { note: _removed, ...rest } = meal;
   return rest;
+}
+
+const MEMOS_KEY = 'mymeals.memos';
+
+function loadMemos(): Memo[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MEMOS_KEY) ?? '[]') as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((m): m is Memo => typeof m?.id === 'string' && typeof m?.text === 'string' && typeof m?.at === 'number')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Fridge memo sans Google : gardé dans le navigateur, comme les repas. */
+export function useLocalMemos() {
+  const [memos, setMemos] = useState<Memo[]>(loadMemos);
+  const save = (next: Memo[]) => {
+    setMemos(next);
+    try {
+      localStorage.setItem(MEMOS_KEY, JSON.stringify(next));
+    } catch {
+      // stockage plein : le mémo vaut pour cette session
+    }
+  };
+  const addMemo = (raw: string): 'ok' | 'full' | 'empty' => {
+    const text = raw.trim().slice(0, MAX_MEMO_CHARS);
+    if (!text) return 'empty';
+    if (memoRoom(memos, text) === 'full') return 'full';
+    save([{ id: newMemoId(), text, at: Date.now() }, ...memos]);
+    return 'ok';
+  };
+  const removeMemo = (id: string) => save(memos.filter((m) => m.id !== id));
+  return { memos, addMemo, removeMemo };
 }
 
 export function useMeals() {

@@ -2212,3 +2212,131 @@ html {
   background: var(--card);
   box-shadow: 0 1px 0 var(--line);
 }
+
+/* ---------- Fridge memo ---------- */
+:root {
+  --postit: #fff3a6;
+  --postit-text: #3a3200;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --postit: #4d4318;
+    --postit-text: #f6ebb0;
+  }
+}
+:root[data-theme='dark'] {
+  --postit: #4d4318;
+  --postit-text: #f6ebb0;
+}
+.memo-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.memo-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.memo-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+}
+.memo-help {
+  margin: 4px 0 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.memo-form {
+  display: flex;
+  gap: 8px;
+}
+.sheet .memo-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+.memo-form .ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.memo-form .ghost-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.memo-empty {
+  margin: 16px 0 4px;
+  color: var(--muted);
+  text-align: center;
+}
+.memo-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+.postit {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 92px;
+  padding: 10px 12px;
+  border-radius: 4px 4px 14px 4px;
+  background: var(--postit);
+  color: var(--postit-text);
+  box-shadow: 0 2px 5px rgb(0 0 0 / 22%);
+  transform: rotate(-0.6deg);
+}
+.postit:nth-child(even) {
+  transform: rotate(0.7deg);
+}
+.postit-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.postit-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.postit-foot small {
+  color: inherit;
+  opacity: 0.7;
+}
+.postit-del {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: inherit;
+  opacity: 0.7;
+}
+.postit-del:hover,
+.postit-del:focus-visible {
+  opacity: 1;
+  background: rgb(0 0 0 / 12%);
+}
+.postit-del svg {
+  width: 16px;
+  height: 16px;
+}

@@ -213,6 +213,28 @@ Le nom du plat en titre, l'étoile des favoris à droite, l'image avec sa source
 Les messages avec « Annuler » sont un bandeau fixe en haut de l'écran : ils restent atteignables même quand une
 fenêtre est ouverte.
 
+## Fridge memo
+
+Un pense-bête partagé, comme les post-it sur un frigo : envies de plats, restes du frigo à finir, courses… en texte
+libre. Le bouton **Fridge memo** (en haut de chaque page, avec le nombre de mémos) ouvre une fenêtre : un champ pour
+écrire, puis les mémos en post-it, du plus récent au plus ancien, avec leur auteur et leur date.
+
+- **Chacun peut supprimer n'importe quel mémo**, y compris ceux des autres (poubelle sur le post-it ; « Annuler »
+  le remet).
+- **Jamais un plat** : les mémos ne servent ni aux propositions, ni à l'historique, ni à « Surprise Me », ni aux
+  statistiques, ni à la liste des plats d'un créneau. On ne peut pas non plus en faire un repas.
+- **Où c'est stocké** : dans un événement spécial de l'agenda « Repas », « 🧲 MyMeals : fridge memo (ne pas
+  supprimer) », une journée entière le 3 janvier 2100 (identifiant `mmealsfridge00`), comme les réglages et les
+  images ; l'application ne le compte jamais comme un repas. Chaque mémo est **une propriété partagée** de cet événement
+  (`mmmemo_…`) : ajouter ou supprimer un mémo ne touche que sa propriété, donc deux personnes qui écrivent en même
+  temps ne perdent rien (les mémos se fusionnent un par un). Supprimer l'événement dans Google Agenda efface tous les
+  mémos.
+- **Limites** : 200 caractères par mémo, 40 mémos au plus et environ 6 500 caractères en tout, pour tenir dans un
+  événement Google ; au-delà, l'appli demande de supprimer quelques mémos. Un mémo supprimé libère sa propriété, qui
+  est réutilisée quand il y en a beaucoup (Google limite le nombre de propriétés d'un événement).
+- **Sans connexion Google** (mode import de fichier) : les mémos restent dans le navigateur, comme les repas.
+- Les mémos se mettent à jour comme le reste de l'agenda : au retour sur la fenêtre et toutes les trois minutes.
+
 ## Aimer un plat (à plusieurs)
 
 Quand plusieurs personnes partagent l'agenda « Repas », chacune connectée avec son compte Google, on voit qui a
