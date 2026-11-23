@@ -497,6 +497,34 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     [commit, fail, withAccess],
   );
 
+  /** Modifie le texte d'un mémo (le sien ou celui d'un autre) : seule sa propriété est réécrite. */
+  const editMemo = useCallback(
+    (id: string, raw: string): 'ok' | 'full' | 'empty' => {
+      const text = raw.trim().slice(0, MAX_MEMO_CHARS);
+      if (!text) return 'empty';
+      const memos = cacheRef.current.memos ?? [];
+      const memo = memos.find((m) => m.id === id);
+      if (!memo) return 'ok';
+      if (text === memo.text) return 'ok';
+      if (memoRoom(memos.filter((m) => m.id !== id), text) === 'full') return 'full';
+      const edited: Memo = { ...memo, text };
+      pendingMemoAdds.current.set(id, edited);
+      commit((c) => ({ ...c, memos: (c.memos ?? []).map((m) => (m.id === id ? edited : m)) }));
+      withAccess((a) => {
+        patchSpecialShared(a.token, a.calendar, FRIDGE_EVENT, { [memoKey(id)]: encodeMemo(edited) }).then(
+          () => pendingMemoAdds.current.delete(id),
+          (e) => {
+            pendingMemoAdds.current.delete(id);
+            commit((c) => ({ ...c, memos: (c.memos ?? []).map((m) => (m.id === id ? memo : m)) }));
+            fail(e);
+          },
+        );
+      });
+      return 'ok';
+    },
+    [commit, fail, withAccess],
+  );
+
   /** Supprime un mémo (le sien ou celui d'un autre) : sa propriété est vidée, les autres restent. */
   const removeMemo = useCallback(
     (id: string) => {
@@ -718,6 +746,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     memos: cache.memos ?? [],
     addMemo,
     removeMemo,
+    editMemo,
     me: cache.account,
     settings,
     saveSettings,

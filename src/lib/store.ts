@@ -61,7 +61,14 @@ export function useLocalMemos() {
     return 'ok';
   };
   const removeMemo = (id: string) => save(memos.filter((m) => m.id !== id));
-  return { memos, addMemo, removeMemo };
+  const editMemo = (id: string, raw: string): 'ok' | 'full' | 'empty' => {
+    const text = raw.trim().slice(0, MAX_MEMO_CHARS);
+    if (!text) return 'empty';
+    if (memoRoom(memos.filter((m) => m.id !== id), text) === 'full') return 'full';
+    save(memos.map((m) => (m.id === id ? { ...m, text } : m)));
+    return 'ok';
+  };
+  return { memos, addMemo, removeMemo, editMemo };
 }
 
 export function useMeals() {

@@ -7,7 +7,10 @@ import { useScrollLock } from './useScrollLock';
 interface MemoProps {
   memos: Memo[];
   me?: string;
+  /** Les mémos au-dessus du champ d'écriture (sinon en dessous). */
+  listFirst?: boolean;
   onAdd: (text: string) => 'ok' | 'full' | 'empty';
+  onEdit: (id: string, text: string) => 'ok' | 'full' | 'empty';
   onRemove: (memo: Memo) => void;
   onClose: () => void;
 }
@@ -18,10 +21,12 @@ const shortDay = (at: number) => (at > 0 ? new Date(at).toLocaleDateString('fr-F
  * « Fridge memo » : un pense-bête partagé, comme les post-it sur un frigo. Texte libre (envies de plats, restes à
  * finir…). Chacun peut supprimer n'importe quel mémo. Ces mémos ne servent jamais à proposer un plat.
  */
-export function FridgeMemo({ memos, me, onAdd, onRemove, onClose }: MemoProps) {
+export function FridgeMemo({ memos, me, listFirst, onAdd, onEdit, onRemove, onClose }: MemoProps) {
   useScrollLock();
   const [text, setText] = useState('');
   const [message, setMessage] = useState('');
+  // Mémo en cours de modification.
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -40,6 +45,102 @@ export function FridgeMemo({ memos, me, onAdd, onRemove, onClose }: MemoProps) {
     }
   }
 
+  function saveEdit() {
+    if (!editing) return;
+    const outcome = onEdit(editing.id, editing.text);
+    if (outcome === 'full') setMessage('Pas assez de place pour ce texte : raccourcis-le ou supprime des mémos.');
+    else if (outcome === 'ok') {
+      setEditing(null);
+      setMessage('');
+    }
+  }
+
+  const form = (
+    <form
+      className={`memo-form${listFirst ? ' bottom' : ''}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <input
+        type="text"
+        value={text}
+        maxLength={MAX_MEMO_CHARS}
+        placeholder="Écrire un mémo…"
+        aria-label="Nouveau mémo"
+        enterKeyHint="send"
+        onChange={(e) => {
+          setText(e.target.value);
+          setMessage('');
+        }}
+      />
+      <button className="ghost-btn primary" type="submit" disabled={!text.trim()}>
+        <Icon name="plus" />
+        Ajouter
+      </button>
+    </form>
+  );
+
+  const list =
+    memos.length === 0 ? (
+      <p className="memo-empty">Rien d'écrit pour l'instant.</p>
+    ) : (
+      <ul className="memo-list" aria-label="Mémos">
+        {memos.map((memo) => (
+          <li key={memo.id} className="postit">
+            {editing?.id === memo.id ? (
+              <div className="postit-edit">
+                <textarea
+                  value={editing.text}
+                  rows={3}
+                  maxLength={MAX_MEMO_CHARS}
+                  autoFocus
+                  aria-label="Modifier le mémo"
+                  onChange={(e) => setEditing({ id: memo.id, text: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      saveEdit();
+                    }
+                    if (e.key === 'Escape') {
+                      e.stopPropagation();
+                      setEditing(null);
+                    }
+                  }}
+                />
+                <div className="postit-foot">
+                  <button className="postit-btn" onClick={() => setEditing(null)}>
+                    Annuler
+                  </button>
+                  <button className="postit-btn strong" onClick={saveEdit} disabled={!editing.text.trim()}>
+                    Enregistrer
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="postit-text">{memo.text}</p>
+                <div className="postit-foot">
+                  <small>
+                    {[memo.by ? (memo.by === me ? 'toi' : displayName(memo.by)) : '', shortDay(memo.at)].filter(Boolean).join(' · ')}
+                  </small>
+                  <span className="postit-actions">
+                    <button className="postit-del" onClick={() => setEditing({ id: memo.id, text: memo.text })} aria-label={`Modifier le mémo « ${memo.text} »`} title="Modifier ce mémo">
+                      <Icon name="pencil" />
+                    </button>
+                    <button className="postit-del" onClick={() => onRemove(memo)} aria-label={`Supprimer le mémo « ${memo.text} »`} title="Supprimer ce mémo">
+                      <Icon name="trash" />
+                    </button>
+                  </span>
+                </div>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    );
+
   return (
     <div className="backdrop" onClick={onClose}>
       <div className="sheet memo-sheet" role="dialog" aria-modal="true" aria-label="Fridge memo" onClick={(e) => e.stopPropagation()}>
@@ -53,54 +154,14 @@ export function FridgeMemo({ memos, me, onAdd, onRemove, onClose }: MemoProps) {
           Un pense-bête pour tous : une envie de plat, un reste à finir… Chacun peut effacer les mémos des autres. Ils ne
           servent jamais à proposer un plat.
         </p>
-        <form
-          className="memo-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-        >
-          <input
-            type="text"
-            value={text}
-            maxLength={MAX_MEMO_CHARS}
-            placeholder="Écrire un mémo…"
-            aria-label="Nouveau mémo"
-            enterKeyHint="send"
-            onChange={(e) => {
-              setText(e.target.value);
-              setMessage('');
-            }}
-          />
-          <button className="ghost-btn primary" type="submit" disabled={!text.trim()}>
-            <Icon name="plus" />
-            Ajouter
-          </button>
-        </form>
+        {!listFirst && form}
         {message && (
           <p className="dup-error" role="alert">
             {message}
           </p>
         )}
-        {memos.length === 0 ? (
-          <p className="memo-empty">Rien d'écrit pour l'instant.</p>
-        ) : (
-          <ul className="memo-list" aria-label="Mémos">
-            {memos.map((memo) => (
-              <li key={memo.id} className="postit">
-                <p className="postit-text">{memo.text}</p>
-                <div className="postit-foot">
-                  <small>
-                    {[memo.by ? (memo.by === me ? 'toi' : displayName(memo.by)) : '', shortDay(memo.at)].filter(Boolean).join(' · ')}
-                  </small>
-                  <button className="postit-del" onClick={() => onRemove(memo)} aria-label={`Supprimer le mémo « ${memo.text} »`} title="Supprimer ce mémo">
-                    <Icon name="trash" />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        {list}
+        {listFirst && form}
       </div>
     </div>
   );

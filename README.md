@@ -220,7 +220,11 @@ libre. Le bouton **Fridge memo** (en haut de chaque page, avec le nombre de mém
 écrire, puis les mémos en post-it, du plus récent au plus ancien, avec leur auteur et leur date.
 
 - **Chacun peut supprimer n'importe quel mémo**, y compris ceux des autres (poubelle sur le post-it ; « Annuler »
-  le remet).
+  le remet), et **le modifier** (crayon : le texte devient un champ, Entrée ou « Enregistrer » valide, Échap annule ;
+  l'auteur et la date d'origine sont gardés, seule la propriété de ce mémo est réécrite).
+- **Position** : Réglages → Fridge memo → « Mémos en haut » (la liste au-dessus, le champ d'écriture restant visible
+  en bas de la fenêtre) ou « Mémos en bas » (par défaut : le champ d'écriture d'abord, puis la liste). Réglage propre
+  à cet appareil.
 - **Jamais un plat** : les mémos ne servent ni aux propositions, ni à l'historique, ni à « Surprise Me », ni aux
   statistiques, ni à la liste des plats d'un créneau. On ne peut pas non plus en faire un repas.
 - **Où c'est stocké** : dans un événement spécial de l'agenda « Repas », « 🧲 MyMeals : fridge memo (ne pas

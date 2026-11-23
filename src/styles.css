@@ -2340,3 +2340,42 @@ html {
   width: 16px;
   height: 16px;
 }
+
+/* Fridge memo : modifier un mémo, et saisie en bas quand les mémos sont en haut */
+.postit-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.postit-edit textarea {
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  color: inherit;
+  background: rgb(255 255 255 / 45%);
+  border: 1px solid rgb(0 0 0 / 25%);
+  border-radius: 6px;
+  resize: vertical;
+}
+.postit-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: inherit;
+  font-size: 0.8rem;
+}
+.postit-btn.strong {
+  background: rgb(0 0 0 / 14%);
+  font-weight: 600;
+}
+.postit-btn:disabled {
+  opacity: 0.45;
+}
+.memo-form.bottom {
+  position: sticky;
+  bottom: calc(-14px - env(safe-area-inset-bottom));
+  z-index: 2;
+  margin: 12px -16px calc(-14px - env(safe-area-inset-bottom));
+  padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
+  background: var(--card);
+  box-shadow: 0 -1px 0 var(--line);
+}

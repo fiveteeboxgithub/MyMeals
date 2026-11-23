@@ -17,6 +17,7 @@ export const KEYS = {
   calendars: 'mymeals.calendars.shown',
   images: 'mymeals.images.show',
   weekLayout: 'mymeals.weekLayout',
+  memoOnTop: 'mymeals.memo.top',
 } as const;
 
 export function readPref(key: string): string | null {

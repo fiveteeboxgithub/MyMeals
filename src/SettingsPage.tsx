@@ -44,6 +44,8 @@ interface SettingsProps {
   setPendingOnly: (value: boolean) => void;
   weekLayout: WeekLayout;
   setWeekLayout: (layout: WeekLayout) => void;
+  memoOnTop: boolean;
+  setMemoOnTop: (value: boolean) => void;
   showImages: boolean;
   setShowImages: (value: boolean) => void;
   blacklist: Blacklist;
@@ -110,6 +112,22 @@ export function SettingsPage(props: SettingsProps) {
           Une photo trouvée sur Wikipédia à côté des plats prévus et proposés, sans aucune IA : seul le nom du plat est envoyé
           à Wikipédia, une fois par plat. Réglage propre à cet appareil.
           {props.showImages && <HiddenImages />}
+        </p>
+      </section>
+
+      <section>
+        <h2>Fridge memo</h2>
+        <div className="segmented" role="group" aria-label="Position des mémos">
+          <button aria-pressed={props.memoOnTop} onClick={() => props.setMemoOnTop(true)}>
+            Mémos en haut
+          </button>
+          <button aria-pressed={!props.memoOnTop} onClick={() => props.setMemoOnTop(false)}>
+            Mémos en bas
+          </button>
+        </div>
+        <p className="blacklist-help">
+          Dans la fenêtre du Fridge memo : les mémos au-dessus du champ d'écriture (qui reste visible en bas), ou en dessous.
+          Réglage propre à cet appareil.
         </p>
       </section>
 

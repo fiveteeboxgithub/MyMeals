@@ -55,6 +55,8 @@ export interface MealStore {
   addMemo: (text: string) => 'ok' | 'full' | 'empty';
   /** N'importe qui peut supprimer n'importe quel mémo. */
   removeMemo: (id: string) => void;
+  /** Modifie le texte d'un mémo (l'auteur et la date d'origine sont gardés). */
+  editMemo: (id: string, text: string) => 'ok' | 'full' | 'empty';
   /** Déplace un repas vers un autre jour ou créneau (sa note le suit). */
   moveMeal: (id: string, date: string, slot: Slot) => void;
   /** Remplace la note d'un repas (texte vide : la retire). */
