@@ -1,7 +1,7 @@
 /** Message en haut de page, avec éventuellement une action (« Annuler »). `floating` : bandeau fixe, au-dessus des fenêtres. */
-export function Notice({ text, onClose, action, floating }: { text: string; onClose: () => void; action?: { label: string; onClick: () => void }; floating?: boolean }) {
+export function Notice({ text, onClose, action, floating, bottom }: { text: string; onClose: () => void; action?: { label: string; onClick: () => void }; floating?: boolean; bottom?: boolean }) {
   return (
-    <p className={`notice${floating ? ' toast' : ''}`} role="status">
+    <p className={`notice${floating ? ' toast' : ''}${floating && bottom ? ' bottom' : ''}`} role="status">
       <span>
         {text}
         {action && (

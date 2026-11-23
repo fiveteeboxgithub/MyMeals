@@ -101,7 +101,7 @@ export function Planner(props: PlannerProps) {
     setWeekLayoutState(layout);
     writePref(KEYS.weekLayout, layout);
   }, []);
-  // Fridge memo : la liste des mémos au-dessus de la saisie (« en haut »), ou en dessous (« en bas », par défaut).
+  // Fridge memo : la fenêtre s'ouvre collée en haut de l'écran, ou en bas (par défaut).
   const [memoOnTop, setMemoOnTop] = useState(() => readPref(KEYS.memoOnTop) === '1');
   const [showImages, setShowImages] = useState(() => readPref(KEYS.images) !== '0');
   const [flash, setFlash] = useState<{ text: string; undo?: () => void } | null>(null);
@@ -281,6 +281,7 @@ export function Planner(props: PlannerProps) {
       {flash && (
         <Notice
           floating
+          bottom={memoOpen && memoOnTop}
           text={flash.text}
           onClose={() => setFlash(null)}
           action={
@@ -384,7 +385,7 @@ export function Planner(props: PlannerProps) {
         <FridgeMemo
           memos={store.memos}
           me={store.me}
-          listFirst={memoOnTop}
+          atTop={memoOnTop}
           onAdd={store.addMemo}
           onEdit={store.editMemo}
           onRemove={(memo) => {

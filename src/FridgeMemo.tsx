@@ -7,8 +7,8 @@ import { useScrollLock } from './useScrollLock';
 interface MemoProps {
   memos: Memo[];
   me?: string;
-  /** Les mémos au-dessus du champ d'écriture (sinon en dessous). */
-  listFirst?: boolean;
+  /** La fenêtre s'ouvre collée en haut de l'écran (sinon en bas). */
+  atTop?: boolean;
   onAdd: (text: string) => 'ok' | 'full' | 'empty';
   onEdit: (id: string, text: string) => 'ok' | 'full' | 'empty';
   onRemove: (memo: Memo) => void;
@@ -21,7 +21,7 @@ const shortDay = (at: number) => (at > 0 ? new Date(at).toLocaleDateString('fr-F
  * « Fridge memo » : un pense-bête partagé, comme les post-it sur un frigo. Texte libre (envies de plats, restes à
  * finir…). Chacun peut supprimer n'importe quel mémo. Ces mémos ne servent jamais à proposer un plat.
  */
-export function FridgeMemo({ memos, me, listFirst, onAdd, onEdit, onRemove, onClose }: MemoProps) {
+export function FridgeMemo({ memos, me, atTop, onAdd, onEdit, onRemove, onClose }: MemoProps) {
   useScrollLock();
   const [text, setText] = useState('');
   const [message, setMessage] = useState('');
@@ -57,7 +57,7 @@ export function FridgeMemo({ memos, me, listFirst, onAdd, onEdit, onRemove, onCl
 
   const form = (
     <form
-      className={`memo-form${listFirst ? ' bottom' : ''}`}
+      className="memo-form"
       onSubmit={(e) => {
         e.preventDefault();
         submit();
@@ -142,8 +142,8 @@ export function FridgeMemo({ memos, me, listFirst, onAdd, onEdit, onRemove, onCl
     );
 
   return (
-    <div className="backdrop" onClick={onClose}>
-      <div className="sheet memo-sheet" role="dialog" aria-modal="true" aria-label="Fridge memo" onClick={(e) => e.stopPropagation()}>
+    <div className={`backdrop${atTop ? ' top' : ''}`} onClick={onClose}>
+      <div className={`sheet memo-sheet${atTop ? ' at-top' : ''}`} role="dialog" aria-modal="true" aria-label="Fridge memo" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <h2>Fridge memo</h2>
           <button className="icon" onClick={onClose} aria-label="Fermer">
@@ -154,14 +154,13 @@ export function FridgeMemo({ memos, me, listFirst, onAdd, onEdit, onRemove, onCl
           Un pense-bête pour tous : une envie de plat, un reste à finir… Chacun peut effacer les mémos des autres. Ils ne
           servent jamais à proposer un plat.
         </p>
-        {!listFirst && form}
+        {form}
         {message && (
           <p className="dup-error" role="alert">
             {message}
           </p>
         )}
         {list}
-        {listFirst && form}
       </div>
     </div>
   );

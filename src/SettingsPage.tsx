@@ -117,17 +117,16 @@ export function SettingsPage(props: SettingsProps) {
 
       <section>
         <h2>Fridge memo</h2>
-        <div className="segmented" role="group" aria-label="Position des mémos">
+        <div className="segmented" role="group" aria-label="Position de la fenêtre du Fridge memo">
           <button aria-pressed={props.memoOnTop} onClick={() => props.setMemoOnTop(true)}>
-            Mémos en haut
+            En haut de l'écran
           </button>
           <button aria-pressed={!props.memoOnTop} onClick={() => props.setMemoOnTop(false)}>
-            Mémos en bas
+            En bas de l'écran
           </button>
         </div>
         <p className="blacklist-help">
-          Dans la fenêtre du Fridge memo : les mémos au-dessus du champ d'écriture (qui reste visible en bas), ou en dessous.
-          Réglage propre à cet appareil.
+          Où s'ouvre la fenêtre du Fridge memo : collée en haut de l'écran, ou en bas (par défaut). Réglage propre à cet appareil.
         </p>
       </section>
 
