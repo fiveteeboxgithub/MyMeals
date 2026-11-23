@@ -224,7 +224,8 @@ libre. Le bouton **Fridge memo** (en haut de chaque page, avec le nombre de mém
   l'auteur et la date d'origine sont gardés, seule la propriété de ce mémo est réécrite).
 - **Toujours visible** : Réglages → Fridge memo → « Toujours afficher les mémos sur le planning » affiche un panneau
   en tête du planning (champ d'écriture et post-it en une rangée qui défile de côté ; on y écrit, modifie et supprime
-  sans ouvrir la fenêtre). Seulement sur l'onglet Planning ; le bouton « Fridge memo » reste disponible. Réglage propre
+  sans ouvrir la fenêtre). On peut aussi l'activer ou le désactiver avec le bouton « Épingler » / « Épinglé » en haut de
+  la fenêtre du Fridge memo (même réglage). Seulement sur l'onglet Planning ; le bouton « Fridge memo » reste disponible. Réglage propre
   à cet appareil.
 - **Position** : Réglages → Fridge memo → « En haut de l'écran » ou « En bas de l'écran » (par défaut) : la fenêtre
   s'ouvre collée en haut ou en bas de l'écran. Réglage propre à cet appareil.

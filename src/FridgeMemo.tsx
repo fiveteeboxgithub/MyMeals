@@ -145,7 +145,7 @@ export function MemoBoard({ memos, me, row, onAdd, onEdit, onRemove }: BoardProp
  * « Fridge memo » : un pense-bête partagé, comme les post-it sur un frigo. Texte libre (envies de plats, restes à
  * finir…). Chacun peut supprimer n'importe quel mémo. Ces mémos ne servent jamais à proposer un plat.
  */
-export function FridgeMemo({ atTop, onClose, ...board }: BoardProps & { atTop?: boolean; onClose: () => void }) {
+export function FridgeMemo({ atTop, pinned, onTogglePin, onClose, ...board }: BoardProps & { atTop?: boolean; pinned: boolean; onTogglePin: () => void; onClose: () => void }) {
   useScrollLock();
 
   useEffect(() => {
@@ -161,9 +161,20 @@ export function FridgeMemo({ atTop, onClose, ...board }: BoardProps & { atTop?: 
       <div className={`sheet memo-sheet${atTop ? ' at-top' : ''}`} role="dialog" aria-modal="true" aria-label="Fridge memo" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <h2>Fridge memo</h2>
-          <button className="icon" onClick={onClose} aria-label="Fermer">
-            ✕
-          </button>
+          <span className="sheet-head-actions">
+            <button
+              className="act sm"
+              onClick={onTogglePin}
+              aria-pressed={pinned}
+              title={pinned ? 'Les mémos sont affichés en tête du planning : touche pour les détacher' : 'Afficher toujours les mémos en tête du planning'}
+            >
+              <Icon name="pin" filled={pinned} />
+              {pinned ? 'Épinglé' : 'Épingler'}
+            </button>
+            <button className="icon" onClick={onClose} aria-label="Fermer">
+              ✕
+            </button>
+          </span>
         </div>
         <p className="memo-help">
           Un pense-bête pour tous : une envie de plat, un reste à finir… Chacun peut effacer les mémos des autres. Ils ne

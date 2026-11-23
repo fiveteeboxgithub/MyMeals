@@ -2432,3 +2432,9 @@ html {
   /* Un mémo ajouté en tête ne doit pas faire glisser la rangée (ancrage du défilement du navigateur). */
   overflow-anchor: none;
 }
+
+.sheet-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

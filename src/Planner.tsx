@@ -405,6 +405,11 @@ export function Planner(props: PlannerProps) {
           memos={store.memos}
           me={store.me}
           atTop={memoOnTop}
+          pinned={memoAlways}
+          onTogglePin={() => {
+            setMemoAlways(!memoAlways);
+            writePref(KEYS.memoAlways, memoAlways ? '0' : '1');
+          }}
           onAdd={store.addMemo}
           onEdit={store.editMemo}
           onRemove={removeMemo}
