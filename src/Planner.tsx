@@ -12,7 +12,7 @@ import { parseIdeas } from './lib/surprise';
 import type { BlacklistOutcome, ImagesSync, MealStore, SettingsSync } from './lib/types';
 import { CustomImagesContext, useCustomImages } from './lib/customImages';
 import { useAppSettings } from './lib/useAppSettings';
-import { FridgeMemo } from './FridgeMemo';
+import { FridgeMemo, MemoPanel } from './FridgeMemo';
 import { Icon } from './Icons';
 import { Notice } from './Notice';
 import { PlanningView, type SlotMode, type WeekLayout } from './PlanningView';
@@ -103,9 +103,19 @@ export function Planner(props: PlannerProps) {
   }, []);
   // Fridge memo : la fenêtre s'ouvre collée en haut de l'écran, ou en bas (par défaut).
   const [memoOnTop, setMemoOnTop] = useState(() => readPref(KEYS.memoOnTop) === '1');
+  // Fridge memo toujours visible en tête du planning, sans ouvrir la fenêtre.
+  const [memoAlways, setMemoAlways] = useState(() => readPref(KEYS.memoAlways) === '1');
   const [showImages, setShowImages] = useState(() => readPref(KEYS.images) !== '0');
   const [flash, setFlash] = useState<{ text: string; undo?: () => void } | null>(null);
   const showFlash = useCallback((text: string, undo?: () => void) => setFlash({ text, undo }), []);
+  /** Supprime un mémo (le sien ou celui d'un autre), avec « Annuler ». */
+  const removeMemo = useCallback(
+    (memo: { id: string; text: string }) => {
+      store.removeMemo(memo.id);
+      showFlash('Mémo supprimé.', () => store.addMemo(memo.text));
+    },
+    [store, showFlash],
+  );
   // Le message s'efface tout seul après quelques secondes (un peu plus quand il propose « Annuler »).
   useEffect(() => {
     if (!flash) return;
@@ -298,6 +308,10 @@ export function Planner(props: PlannerProps) {
         />
       )}
 
+      {view === 'planning' && memoAlways && (
+        <MemoPanel memos={store.memos} me={store.me} onAdd={store.addMemo} onEdit={store.editMemo} onRemove={removeMemo} />
+      )}
+
       {view === 'planning' && (
         <PlanningView
           store={store}
@@ -346,6 +360,11 @@ export function Planner(props: PlannerProps) {
           }}
           weekLayout={weekLayout}
           setWeekLayout={setWeekLayout}
+          memoAlways={memoAlways}
+          setMemoAlways={(value) => {
+            setMemoAlways(value);
+            writePref(KEYS.memoAlways, value ? '1' : '0');
+          }}
           memoOnTop={memoOnTop}
           setMemoOnTop={(value) => {
             setMemoOnTop(value);
@@ -388,10 +407,7 @@ export function Planner(props: PlannerProps) {
           atTop={memoOnTop}
           onAdd={store.addMemo}
           onEdit={store.editMemo}
-          onRemove={(memo) => {
-            store.removeMemo(memo.id);
-            showFlash('Mémo supprimé.', () => store.addMemo(memo.text));
-          }}
+          onRemove={removeMemo}
           onClose={() => setMemoOpen(false)}
         />
       )}

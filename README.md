@@ -222,6 +222,10 @@ libre. Le bouton **Fridge memo** (en haut de chaque page, avec le nombre de mém
 - **Chacun peut supprimer n'importe quel mémo**, y compris ceux des autres (poubelle sur le post-it ; « Annuler »
   le remet), et **le modifier** (crayon : le texte devient un champ, Entrée ou « Enregistrer » valide, Échap annule ;
   l'auteur et la date d'origine sont gardés, seule la propriété de ce mémo est réécrite).
+- **Toujours visible** : Réglages → Fridge memo → « Toujours afficher les mémos sur le planning » affiche un panneau
+  en tête du planning (champ d'écriture et post-it en une rangée qui défile de côté ; on y écrit, modifie et supprime
+  sans ouvrir la fenêtre). Seulement sur l'onglet Planning ; le bouton « Fridge memo » reste disponible. Réglage propre
+  à cet appareil.
 - **Position** : Réglages → Fridge memo → « En haut de l'écran » ou « En bas de l'écran » (par défaut) : la fenêtre
   s'ouvre collée en haut ou en bas de l'écran. Réglage propre à cet appareil.
 - **Jamais un plat** : les mémos ne servent ni aux propositions, ni à l'historique, ni à « Surprise Me », ni aux

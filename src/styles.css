@@ -2389,3 +2389,46 @@ html {
   top: auto;
   bottom: max(8px, env(safe-area-inset-bottom));
 }
+
+/* Fridge memo toujours visible, en tête du planning */
+.memo-panel {
+  margin: 4px 0 12px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+.memo-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+.memo-list.row {
+  display: flex;
+  gap: 12px;
+  margin: 10px -12px 0;
+  padding: 4px 12px 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+.memo-list.row .postit {
+  flex: 0 0 min(220px, 72%);
+  scroll-snap-align: start;
+}
+.memo-panel .memo-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.memo-list.row {
+  /* Un mémo ajouté en tête ne doit pas faire glisser la rangée (ancrage du défilement du navigateur). */
+  overflow-anchor: none;
+}

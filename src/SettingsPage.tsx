@@ -44,6 +44,8 @@ interface SettingsProps {
   setPendingOnly: (value: boolean) => void;
   weekLayout: WeekLayout;
   setWeekLayout: (layout: WeekLayout) => void;
+  memoAlways: boolean;
+  setMemoAlways: (value: boolean) => void;
   memoOnTop: boolean;
   setMemoOnTop: (value: boolean) => void;
   showImages: boolean;
@@ -117,6 +119,13 @@ export function SettingsPage(props: SettingsProps) {
 
       <section>
         <h2>Fridge memo</h2>
+        <Switch checked={props.memoAlways} onChange={props.setMemoAlways}>
+          Toujours afficher les mémos sur le planning
+        </Switch>
+        <p className="blacklist-help">
+          Les mémos restent sous les yeux en haut du planning (on y écrit, modifie et supprime directement), sans ouvrir la
+          fenêtre. Le bouton « Fridge memo » reste disponible. Réglage propre à cet appareil.
+        </p>
         <div className="segmented" role="group" aria-label="Position de la fenêtre du Fridge memo">
           <button aria-pressed={props.memoOnTop} onClick={() => props.setMemoOnTop(true)}>
             En haut de l'écran
@@ -126,7 +135,7 @@ export function SettingsPage(props: SettingsProps) {
           </button>
         </div>
         <p className="blacklist-help">
-          Où s'ouvre la fenêtre du Fridge memo : collée en haut de l'écran, ou en bas (par défaut). Réglage propre à cet appareil.
+          Où s'ouvre la fenêtre du Fridge memo (le bouton en haut de page) : collée en haut de l'écran, ou en bas (par défaut). Réglage propre à cet appareil.
         </p>
       </section>
 

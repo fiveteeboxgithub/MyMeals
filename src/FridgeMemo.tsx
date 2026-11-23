@@ -4,37 +4,24 @@ import { displayName } from './lib/people';
 import { MAX_MEMO_CHARS, type Memo } from './lib/memos';
 import { useScrollLock } from './useScrollLock';
 
-interface MemoProps {
+const shortDay = (at: number) => (at > 0 ? new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '');
+
+interface BoardProps {
   memos: Memo[];
   me?: string;
-  /** La fenêtre s'ouvre collée en haut de l'écran (sinon en bas). */
-  atTop?: boolean;
+  /** Mémos en une rangée qui défile de côté (panneau du planning), sinon en grille (fenêtre). */
+  row?: boolean;
   onAdd: (text: string) => 'ok' | 'full' | 'empty';
   onEdit: (id: string, text: string) => 'ok' | 'full' | 'empty';
   onRemove: (memo: Memo) => void;
-  onClose: () => void;
 }
 
-const shortDay = (at: number) => (at > 0 ? new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '');
-
-/**
- * « Fridge memo » : un pense-bête partagé, comme les post-it sur un frigo. Texte libre (envies de plats, restes à
- * finir…). Chacun peut supprimer n'importe quel mémo. Ces mémos ne servent jamais à proposer un plat.
- */
-export function FridgeMemo({ memos, me, atTop, onAdd, onEdit, onRemove, onClose }: MemoProps) {
-  useScrollLock();
+/** Champ d'écriture et post-it (modifier, supprimer) : partagé par la fenêtre et le panneau du planning. */
+export function MemoBoard({ memos, me, row, onAdd, onEdit, onRemove }: BoardProps) {
   const [text, setText] = useState('');
   const [message, setMessage] = useState('');
   // Mémo en cours de modification.
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   function submit() {
     const outcome = onAdd(text);
@@ -86,7 +73,7 @@ export function FridgeMemo({ memos, me, atTop, onAdd, onEdit, onRemove, onClose 
     memos.length === 0 ? (
       <p className="memo-empty">Rien d'écrit pour l'instant.</p>
     ) : (
-      <ul className="memo-list" aria-label="Mémos">
+      <ul className={`memo-list${row ? ' row' : ''}`} aria-label="Mémos">
         {memos.map((memo) => (
           <li key={memo.id} className="postit">
             {editing?.id === memo.id ? (
@@ -142,6 +129,34 @@ export function FridgeMemo({ memos, me, atTop, onAdd, onEdit, onRemove, onClose 
     );
 
   return (
+    <>
+      {form}
+      {message && (
+        <p className="dup-error" role="alert">
+          {message}
+        </p>
+      )}
+      {list}
+    </>
+  );
+}
+
+/**
+ * « Fridge memo » : un pense-bête partagé, comme les post-it sur un frigo. Texte libre (envies de plats, restes à
+ * finir…). Chacun peut supprimer n'importe quel mémo. Ces mémos ne servent jamais à proposer un plat.
+ */
+export function FridgeMemo({ atTop, onClose, ...board }: BoardProps & { atTop?: boolean; onClose: () => void }) {
+  useScrollLock();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
     <div className={`backdrop${atTop ? ' top' : ''}`} onClick={onClose}>
       <div className={`sheet memo-sheet${atTop ? ' at-top' : ''}`} role="dialog" aria-modal="true" aria-label="Fridge memo" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
@@ -154,14 +169,21 @@ export function FridgeMemo({ memos, me, atTop, onAdd, onEdit, onRemove, onClose 
           Un pense-bête pour tous : une envie de plat, un reste à finir… Chacun peut effacer les mémos des autres. Ils ne
           servent jamais à proposer un plat.
         </p>
-        {form}
-        {message && (
-          <p className="dup-error" role="alert">
-            {message}
-          </p>
-        )}
-        {list}
+        <MemoBoard {...board} />
       </div>
     </div>
+  );
+}
+
+/** Les mémos toujours sous les yeux, en tête du planning (réglage « Toujours afficher les mémos »). */
+export function MemoPanel(board: BoardProps) {
+  return (
+    <section className="memo-panel" aria-label="Fridge memo">
+      <h2>
+        Fridge memo
+        {board.memos.length > 0 && <span className="memo-count">{board.memos.length}</span>}
+      </h2>
+      <MemoBoard {...board} row />
+    </section>
   );
 }
