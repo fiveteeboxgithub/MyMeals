@@ -22,6 +22,9 @@ import {
   renameEvent,
   moveEvent,
   setLikeEvent,
+  patchSpecialShared,
+  FRIDGE_EVENT,
+  FRIDGE_EVENT_ID,
   signIn,
   storedToken,
   tokenRemainingMs,
@@ -36,6 +39,7 @@ import { parseImagesRecord, type ImagesRecord } from './customImages';
 import type { Meal, MealStore, Slot } from './types';
 import { withNote } from './store';
 import { clearLikes } from './people';
+import { MAX_MEMO_CHARS, encodeMemo, memoKey, memoRoom, parseMemos, pickMemoId, type Memo } from './memos';
 
 const CACHE_KEY = 'mymeals.google.v1';
 
@@ -48,6 +52,9 @@ interface Cache {
   notes?: boolean;
   /** Vrai une fois l'agenda relu avec qui a choisi chaque plat et qui l'aime. */
   likes?: boolean;
+  /** Fridge memo : mémos lus dans l'événement spécial, et propriétés vidées (réutilisables). */
+  memos?: Memo[];
+  memoFree?: string[];
   meals: Meal[];
 }
 
@@ -143,6 +150,9 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   const settingsTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Repas retirés pendant leur création : ils seront supprimés dès que Google leur aura donné un identifiant.
   const pendingDeletes = useRef(new Set<string>());
+  // Mémos ajoutés ou supprimés ici mais pas encore confirmés par Google : une synchronisation ne doit pas les défaire.
+  const pendingMemoAdds = useRef(new Map<string, Memo>());
+  const pendingMemoRemoves = useRef(new Set<string>());
 
   const commit = useCallback((fn: (current: Cache) => Cache) => {
     const next = fn(cacheRef.current);
@@ -195,6 +205,14 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
         }
         const { events, syncToken } = changes;
         commit((c) => ({ ...c, syncToken, notes: true, likes: true, meals: applyEvents(full ? keepPending(c.meals) : c.meals, events) }));
+        // Fridge memo : relu quand son événement a changé (ou à chaque lecture complète).
+        const fridge = events.find((event) => event.id === FRIDGE_EVENT_ID);
+        if (fridge || full) {
+          const parsed = fridge && fridge.status !== 'cancelled' ? parseMemos(fridge.extendedProperties?.shared) : { memos: [], free: [] };
+          const kept = parsed.memos.filter((m) => !pendingMemoRemoves.current.has(m.id));
+          for (const [id, memo] of pendingMemoAdds.current) if (!kept.some((m) => m.id === id)) kept.unshift(memo);
+          commit((c) => ({ ...c, memos: kept, memoFree: parsed.free }));
+        }
         // Les réglages se relisent une fois par session, et quand l'événement spécial a changé.
         if (!settingsLoaded.current || events.some((event) => event.id === SETTINGS_EVENT_ID)) {
           try {
@@ -449,6 +467,58 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     [commit, fail, withAccess],
   );
 
+  /** Ajoute un mémo : une propriété de plus sur l'événement spécial, sans toucher à celles des autres. */
+  const addMemo = useCallback(
+    (raw: string): 'ok' | 'full' | 'empty' => {
+      const text = raw.trim().slice(0, MAX_MEMO_CHARS);
+      if (!text) return 'empty';
+      if (memoRoom(cacheRef.current.memos ?? [], text) === 'full') return 'full';
+      const me = cacheRef.current.account;
+      const { id, reused } = pickMemoId(cacheRef.current.memoFree ?? []);
+      const memo: Memo = { id, text, at: Date.now(), ...(me ? { by: me } : {}) };
+      pendingMemoAdds.current.set(id, memo);
+      commit((c) => ({
+        ...c,
+        memos: [memo, ...(c.memos ?? []).filter((m) => m.id !== id)],
+        memoFree: reused ? (c.memoFree ?? []).filter((f) => f !== id) : c.memoFree,
+      }));
+      withAccess((a) => {
+        patchSpecialShared(a.token, a.calendar, FRIDGE_EVENT, { [memoKey(id)]: encodeMemo(memo) }).then(
+          () => pendingMemoAdds.current.delete(id),
+          (e) => {
+            pendingMemoAdds.current.delete(id);
+            commit((c) => ({ ...c, memos: (c.memos ?? []).filter((m) => m.id !== id) }));
+            fail(e);
+          },
+        );
+      });
+      return 'ok';
+    },
+    [commit, fail, withAccess],
+  );
+
+  /** Supprime un mémo (le sien ou celui d'un autre) : sa propriété est vidée, les autres restent. */
+  const removeMemo = useCallback(
+    (id: string) => {
+      const memo = (cacheRef.current.memos ?? []).find((m) => m.id === id);
+      if (!memo) return;
+      pendingMemoRemoves.current.add(id);
+      pendingMemoAdds.current.delete(id);
+      commit((c) => ({ ...c, memos: (c.memos ?? []).filter((m) => m.id !== id), memoFree: [...new Set([...(c.memoFree ?? []), id])] }));
+      withAccess((a) => {
+        patchSpecialShared(a.token, a.calendar, FRIDGE_EVENT, { [memoKey(id)]: '' }).then(
+          () => pendingMemoRemoves.current.delete(id),
+          (e) => {
+            pendingMemoRemoves.current.delete(id);
+            commit((c) => ({ ...c, memos: [memo, ...(c.memos ?? [])].sort((x, y) => y.at - x.at), memoFree: (c.memoFree ?? []).filter((f) => f !== id) }));
+            fail(e);
+          },
+        );
+      });
+    },
+    [commit, fail, withAccess],
+  );
+
   /** J'aime ce repas (ou je ne l'aime plus) : visible de tous ceux qui partagent l'agenda. */
   const toggleLike = useCallback(
     (id: string) => {
@@ -645,6 +715,9 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     setNote,
     moveMeal,
     toggleLike,
+    memos: cache.memos ?? [],
+    addMemo,
+    removeMemo,
     me: cache.account,
     settings,
     saveSettings,

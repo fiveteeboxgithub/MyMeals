@@ -12,6 +12,8 @@ import { parseIdeas } from './lib/surprise';
 import type { BlacklistOutcome, ImagesSync, MealStore, SettingsSync } from './lib/types';
 import { CustomImagesContext, useCustomImages } from './lib/customImages';
 import { useAppSettings } from './lib/useAppSettings';
+import { FridgeMemo } from './FridgeMemo';
+import { Icon } from './Icons';
 import { Notice } from './Notice';
 import { PlanningView, type SlotMode, type WeekLayout } from './PlanningView';
 import { SettingsPage } from './SettingsPage';
@@ -78,6 +80,7 @@ export function Planner(props: PlannerProps) {
   const { store } = props;
   const [view, setView] = useView();
   const today = todayIso();
+  const [memoOpen, setMemoOpen] = useState(false);
   const [resetToken, setResetToken] = useState(0);
   const bump = useCallback(() => setResetToken((t) => t + 1), []);
   const { shared, update } = useAppSettings(props.settingsSync, bump);
@@ -253,7 +256,14 @@ export function Planner(props: PlannerProps) {
     <div className={`app${view === 'planning' && weekLayout === 'columns' ? ' wide' : ''}`}>
       <header className="top">
         <h1>MyMeals</h1>
-        {props.headerAction && <div className="top-actions">{props.headerAction}</div>}
+        <div className="top-actions">
+          <button className="memo-btn" onClick={() => setMemoOpen(true)} aria-label={`Fridge memo (${store.memos.length})`} title="Fridge memo : le pense-bête partagé">
+            <Icon name="note" />
+            Fridge memo
+            {store.memos.length > 0 && <span className="memo-count">{store.memos.length}</span>}
+          </button>
+          {props.headerAction}
+        </div>
       </header>
 
       {props.banner}
@@ -362,6 +372,18 @@ export function Planner(props: PlannerProps) {
           {store.meals.length} repas · {labelCount} {labelCount > 1 ? 'libellés' : 'libellé'} · {dishes.dishes.length}{' '}
           {dishes.dishes.length > 1 ? 'plats' : 'plat'} · {props.footer}
         </footer>
+      )}
+      {memoOpen && (
+        <FridgeMemo
+          memos={store.memos}
+          me={store.me}
+          onAdd={store.addMemo}
+          onRemove={(memo) => {
+            store.removeMemo(memo.id);
+            showFlash('Mémo supprimé.', () => store.addMemo(memo.text));
+          }}
+          onClose={() => setMemoOpen(false)}
+        />
       )}
     </div>
     </CustomImagesContext.Provider>

@@ -1,4 +1,6 @@
+import type { Memo } from './memos';
 import type { SettingsRecord } from './settings';
+export type { Memo } from './memos';
 export type { ImagesSync } from './customImages';
 
 export type Slot = 'midi' | 'soir';
@@ -48,6 +50,11 @@ export interface MealStore {
   me?: string;
   /** J'aime ce repas (ou je ne l'aime plus). */
   toggleLike: (id: string) => void;
+  /** Fridge memo : pense-bête en texte libre, jamais utilisé comme un plat. */
+  memos: Memo[];
+  addMemo: (text: string) => 'ok' | 'full' | 'empty';
+  /** N'importe qui peut supprimer n'importe quel mémo. */
+  removeMemo: (id: string) => void;
   /** Déplace un repas vers un autre jour ou créneau (sa note le suit). */
   moveMeal: (id: string, date: string, slot: Slot) => void;
   /** Remplace la note d'un repas (texte vide : la retire). */

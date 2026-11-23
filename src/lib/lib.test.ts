@@ -1217,3 +1217,43 @@ describe('J’aime et créneaux passés', () => {
     expect(likeVisible([{ by: 'a@x.fr', likes: ['b@x.fr'] }], 'b@x.fr', true)).toBe(true);
   });
 });
+
+describe('Fridge memo', () => {
+  it('lit les mémos (récents d’abord) et repère les propriétés vidées', async () => {
+    const { parseMemos, encodeMemo, memoKey } = await import('./memos');
+    const shared = {
+      [memoKey('a1')]: encodeMemo({ text: 'envie de crêpes', by: 'Marie@x.fr', at: 100 }),
+      [memoKey('b2')]: encodeMemo({ text: 'finir le gruyère', at: 200 }),
+      [memoKey('c3')]: '',
+      [memoKey('d4')]: 'pas du json',
+      mmby: 'x@x.fr',
+    };
+    const { memos, free } = parseMemos(shared);
+    expect(memos.map((m) => m.text)).toEqual(['finir le gruyère', 'envie de crêpes']);
+    expect(memos[1].by).toBe('marie@x.fr');
+    expect(free).toEqual(['c3']);
+    expect(parseMemos(undefined)).toEqual({ memos: [], free: [] });
+  });
+
+  it('limite le nombre et la taille des mémos pour tenir dans un événement', async () => {
+    const { memoRoom, MAX_MEMOS, MAX_MEMO_TOTAL, pickMemoId, REUSE_FREE_AFTER } = await import('./memos');
+    expect(memoRoom([], 'a')).toBe('ok');
+    const many = Array.from({ length: MAX_MEMOS }, (_, i) => ({ id: String(i), text: 'x', at: i }));
+    expect(memoRoom(many, 'a')).toBe('full');
+    const heavy = Array.from({ length: 30 }, (_, i) => ({ id: String(i), text: 'y'.repeat(200), at: i }));
+    expect(memoRoom(heavy, 'z'.repeat(200))).toBe('full');
+    expect(MAX_MEMO_TOTAL).toBeLessThan(8000);
+    // Peu de mémos supprimés : un identifiant neuf ; beaucoup : on réutilise un des supprimés.
+    expect(pickMemoId(['a']).reused).toBe(false);
+    const free = Array.from({ length: REUSE_FREE_AFTER + 1 }, (_, i) => `f${i}`);
+    const picked = pickMemoId(free);
+    expect(picked.reused).toBe(true);
+    expect(free).toContain(picked.id);
+  });
+
+  it('l’événement du Fridge memo n’est jamais un repas', async () => {
+    const { eventToMeal, FRIDGE_EVENT_ID, FRIDGE_EVENT } = await import('./google');
+    expect(FRIDGE_EVENT_ID).toMatch(/^[a-v0-9]{5,}$/);
+    expect(eventToMeal({ id: FRIDGE_EVENT_ID, summary: FRIDGE_EVENT.title, start: { date: '2100-01-03' } })).toBeNull();
+  });
+});
