@@ -2448,3 +2448,21 @@ html {
 .memo-sync .link {
   font-size: inherit;
 }
+
+.memo-diag {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.memo-diag summary {
+  cursor: pointer;
+  text-align: center;
+}
+.memo-diag ul {
+  margin: 6px 0;
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+}
+.memo-diag p {
+  margin: 4px 0 0;
+}

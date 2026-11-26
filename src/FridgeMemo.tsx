@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from './Icons';
 import { displayName } from './lib/people';
 import { MAX_MEMO_CHARS, type Memo } from './lib/memos';
-import type { MemoOutcome } from './lib/types';
+import type { MemoDiag, MemoOutcome } from './lib/types';
 import { useScrollLock } from './useScrollLock';
 
 const shortDay = (at: number) => (at > 0 ? new Date(at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '');
@@ -157,7 +157,7 @@ export function MemoBoard({ memos, me, row, onAdd, onEdit, onRemove }: BoardProp
  * « Fridge memo » : un pense-bête partagé, comme les post-it sur un frigo. Texte libre (envies de plats, restes à
  * finir…). Chacun peut supprimer n'importe quel mémo. Ces mémos ne servent jamais à proposer un plat.
  */
-export function FridgeMemo({ atTop, pinned, onTogglePin, onClose, syncedAt, onRefresh, ...board }: BoardProps & { atTop?: boolean; pinned: boolean; onTogglePin: () => void; onClose: () => void; syncedAt?: number; onRefresh?: () => void }) {
+export function FridgeMemo({ atTop, pinned, onTogglePin, onClose, syncedAt, onRefresh, diag, ...board }: BoardProps & { atTop?: boolean; pinned: boolean; onTogglePin: () => void; onClose: () => void; syncedAt?: number; onRefresh?: () => void; diag?: MemoDiag }) {
   useScrollLock();
   // À l'ouverture, on relit l'agenda : on voit tout de suite ce qu'un autre appareil vient d'écrire.
   useEffect(() => onRefresh?.(), [onRefresh]);
@@ -203,6 +203,21 @@ export function FridgeMemo({ atTop, pinned, onTogglePin, onClose, syncedAt, onRe
               Actualiser
             </button>
           </p>
+        )}
+        {diag && (
+          <details className="memo-diag">
+            <summary>Diagnostic (un mémo n'arrive pas ?)</summary>
+            <ul>
+              <li>Compte Google : {diag.account ?? 'inconnu'}</li>
+              <li>Agenda lu : {diag.calendarId ? `${diag.calendarId.slice(0, 14)}…` : 'aucun'}</li>
+              <li>
+                Événement du Fridge memo :{' '}
+                {diag.found === undefined ? 'pas encore lu' : diag.found ? `trouvé (visibilité : ${diag.visibility ?? 'inconnue'})` : 'introuvable dans cet agenda'}
+              </li>
+              <li>Mémos lus : {board.memos.length}</li>
+            </ul>
+            <p>Compare ces lignes sur les deux appareils : même agenda, et l'événement doit être trouvé des deux côtés.</p>
+          </details>
         )}
       </div>
     </div>

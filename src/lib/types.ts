@@ -33,6 +33,16 @@ export interface SettingsSync {
   save: (record: SettingsRecord) => void;
 }
 
+export interface MemoDiag {
+  account?: string;
+  calendarId?: string;
+  /** L'événement spécial a été trouvé dans l'agenda lu par cet appareil (undefined : pas encore su). */
+  found?: boolean;
+  visibility?: string;
+  /** Nombre de propriétés de mémo lues (vides comprises). */
+  props?: number;
+}
+
 /** Résultat d'un ajout ou d'une modification de mémo : « failed » = pas enregistré (connexion, refus de Google). */
 export type MemoOutcome = 'ok' | 'full' | 'empty' | 'failed';
 
@@ -60,6 +70,8 @@ export interface MealStore {
   removeMemo: (id: string) => void;
   /** Modifie le texte d'un mémo (l'auteur et la date d'origine sont gardés). */
   editMemo: (id: string, text: string) => Promise<MemoOutcome>;
+  /** Ce que cet appareil voit de l'événement du Fridge memo (pour comprendre un mémo qui n'arrive pas). */
+  memoDiag?: MemoDiag;
   /** Relit l'agenda tout de suite (Google seulement). */
   refresh?: () => void;
   /** Dernière lecture réussie de l'agenda (ms), si on la connaît. */

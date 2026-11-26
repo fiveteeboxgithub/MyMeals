@@ -130,6 +130,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   const [token, setToken] = useState<string | null>(storedToken);
   const [syncing, setSyncing] = useState(false);
   const [syncedAt, setSyncedAt] = useState<number | undefined>(undefined);
+  const [fridgeDiag, setFridgeDiag] = useState<{ found: boolean; visibility?: string; props: number } | undefined>(undefined);
   const [error, setError] = useState('');
   // Le message d'erreur actuel vient d'une connexion expirée : il disparaît dès qu'on est reconnecté et synchronisé.
   const authError = useRef(false);
@@ -213,6 +214,12 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
           const kept = parsed.memos.filter((m) => !pendingMemoRemoves.current.has(m.id));
           for (const [id, memo] of pendingMemoAdds.current) if (!kept.some((m) => m.id === id)) kept.unshift(memo);
           commit((c) => ({ ...c, memos: kept, memoFree: parsed.free }));
+          const found = !!fridge && fridge.status !== 'cancelled';
+          setFridgeDiag({ found, visibility: fridge?.visibility, props: parsed.memos.length + parsed.free.length });
+          // Un événement créé « privé » par une version précédente cache son contenu aux autres : on le rend visible.
+          if (found && fridge.visibility === 'private') {
+            void patchSpecialShared(accessToken, calendar, FRIDGE_EVENT, {}).catch(() => undefined);
+          }
         }
         // Les réglages se relisent une fois par session, et quand l'événement spécial a changé.
         if (!settingsLoaded.current || events.some((event) => event.id === SETTINGS_EVENT_ID)) {
@@ -760,6 +767,7 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     toggleLike,
     memos: cache.memos ?? [],
     syncedAt,
+    memoDiag: { account: cache.account, calendarId: cache.calendar?.id, ...fridgeDiag },
     refresh,
     addMemo,
     removeMemo,

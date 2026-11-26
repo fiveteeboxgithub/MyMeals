@@ -74,6 +74,7 @@ export interface GoogleEvent {
   summary?: string;
   description?: string;
   creator?: { email?: string };
+  visibility?: string;
   extendedProperties?: { shared?: Record<string, string> };
   start?: { dateTime?: string; date?: string };
 }
@@ -279,7 +280,7 @@ export async function listChanges(
     const query = new URLSearchParams({
       singleEvents: 'true',
       maxResults: '2500',
-      fields: 'items(id,status,summary,description,start,creator(email),extendedProperties(shared)),nextPageToken,nextSyncToken',
+      fields: 'items(id,status,summary,description,start,visibility,creator(email),extendedProperties(shared)),nextPageToken,nextSyncToken',
     });
     if (syncToken) query.set('syncToken', syncToken);
     if (pageToken) query.set('pageToken', pageToken);
@@ -499,7 +500,8 @@ export async function writeSpecialEvent(token: string, calendar: GoogleCalendar,
     start: { date: kind.date },
     end: { date: addDays(kind.date, 1) },
     transparency: 'transparent',
-    visibility: 'private',
+    // « default » : tous ceux qui ont accès à l'agenda voient l'événement ; « private » en cacherait le contenu aux autres.
+    visibility: 'default',
     reminders: { useDefault: false },
     extendedProperties: { private: { mymeals: kind.marker.toLowerCase() } },
     status: 'confirmed',
@@ -524,7 +526,8 @@ export async function patchSpecialShared(token: string, calendar: GoogleCalendar
     start: { date: kind.date },
     end: { date: addDays(kind.date, 1) },
     transparency: 'transparent',
-    visibility: 'private',
+    // « default » : tous ceux qui ont accès à l'agenda voient l'événement ; « private » en cacherait le contenu aux autres.
+    visibility: 'default',
     reminders: { useDefault: false },
     extendedProperties: { private: { mymeals: kind.marker.toLowerCase() }, shared },
     status: 'confirmed',

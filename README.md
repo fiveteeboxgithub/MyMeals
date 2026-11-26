@@ -237,6 +237,13 @@ libre. Le bouton **Fridge memo** (en haut de chaque page, avec le nombre de mém
   (`mmmemo_…`) : ajouter ou supprimer un mémo ne touche que sa propriété, donc deux personnes qui écrivent en même
   temps ne perdent rien (les mémos se fusionnent un par un). Supprimer l'événement dans Google Agenda efface tous les
   mémos.
+- **Visibilité** : les événements spéciaux (réglages, images, Fridge memo) sont créés « par défaut » et non « privés » :
+  un événement privé cache son contenu aux autres personnes qui ont accès à l'agenda. Un événement du Fridge memo créé
+  « privé » par une version précédente est rendu visible à la première synchronisation (il faut que la personne qui l'a
+  créé ouvre l'appli) ; les réglages et les images le sont à leur prochaine écriture.
+- **Diagnostic** : en bas de la fenêtre, « Diagnostic » montre le compte Google, l'agenda lu, si l'événement du
+  Fridge memo a été trouvé (et sa visibilité) et le nombre de mémos lus : à comparer sur deux appareils quand un
+  mémo n'arrive pas.
 - **Limites** : 200 caractères par mémo, 40 mémos au plus et environ 6 500 caractères en tout, pour tenir dans un
   événement Google ; au-delà, l'appli demande de supprimer quelques mémos. Un mémo supprimé libère sa propriété, qui
   est réutilisée quand il y en a beaucoup (Google limite le nombre de propriétés d'un événement).

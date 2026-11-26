@@ -407,6 +407,7 @@ export function Planner(props: PlannerProps) {
           atTop={memoOnTop}
           syncedAt={store.syncedAt}
           onRefresh={store.refresh}
+          diag={store.memoDiag}
           pinned={memoAlways}
           onTogglePin={() => {
             setMemoAlways(!memoAlways);
