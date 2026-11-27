@@ -2,6 +2,7 @@
 export const KEYS = {
   blacklistText: 'mymeals.blacklist.text',
   includeBlacklist: 'mymeals.blacklist.include',
+  useRatings: 'mymeals.ratings.use',
   randomness: 'mymeals.randomness',
   historyMonths: 'mymeals.historyMonths',
   surprisePeriod: 'mymeals.surprise.months',

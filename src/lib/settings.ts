@@ -9,6 +9,8 @@ import { DEFAULT_PERIOD_MONTHS, PERIODS } from './surprise';
 export interface SharedSettings {
   blacklistText: string;
   includeBlacklist: boolean;
+  /** Les notes des plats influencent les propositions. */
+  useRatings: boolean;
   /** Plats favoris, même syntaxe que la liste noire : ils reviennent plus souvent. */
   favoritesText: string;
   randomness: number;
@@ -32,6 +34,7 @@ export interface SettingsRecord {
 export const DEFAULT_SETTINGS: SharedSettings = {
   blacklistText: '',
   includeBlacklist: false,
+  useRatings: true,
   favoritesText: '',
   randomness: DEFAULT_RANDOMNESS,
   historyMonths: DEFAULT_HISTORY_MONTHS,
@@ -95,6 +98,7 @@ export function parseSettingsRecord(payload: unknown): SettingsRecord | null {
     settings: {
       blacklistText: typeof s.blacklistText === 'string' ? s.blacklistText.slice(0, MAX_BLACKLIST_CHARS) : DEFAULT_SETTINGS.blacklistText,
       includeBlacklist: s.includeBlacklist === true,
+      useRatings: s.useRatings !== false,
       favoritesText: typeof s.favoritesText === 'string' ? s.favoritesText.slice(0, MAX_FAVORITES_CHARS) : DEFAULT_SETTINGS.favoritesText,
       randomness: pick(s.randomness, RANDOMNESS_LEVELS.map((_, i) => i), DEFAULT_SETTINGS.randomness),
       historyMonths: pick(s.historyMonths, HISTORY_WINDOWS.map((w) => w.months), DEFAULT_SETTINGS.historyMonths),

@@ -3,6 +3,7 @@ import type { BlacklistFilter } from './lib/blacklist';
 import { addDays, dayName, longDate, mondayOf, shortDate, tinyDate, weekday } from './lib/dates';
 import type { CalendarInfo, TimedEvent } from './lib/google';
 import type { PastNote } from './lib/notes';
+import type { DishRating } from './lib/ratings';
 import { overlapsBySlot, weekRange, type OtherEvent } from './lib/otherCalendars';
 import type { SharedSettings } from './lib/settings';
 import {
@@ -76,6 +77,11 @@ interface PlanningProps {
   loading: boolean;
   flash: (text: string, undo?: () => void) => void;
   favoriteKeys: ReadonlySet<string>;
+  /** Note moyenne des plats de l'historique (clé → moyenne). */
+  ratingMap: ReadonlyMap<string, number>;
+  /** Notes d'un plat (absent : on ne peut pas noter, faute de savoir qui je suis). */
+  ratingOf?: (name: string) => DishRating;
+  onRate: (name: string, n: number | null) => void;
   isFavorite: (name: string) => boolean;
   toggleFavorite: (name: string) => void;
   isBlacklisted: (name: string) => boolean;
@@ -293,7 +299,16 @@ export function PlanningView(props: PlanningProps) {
           pendingLeftover = null;
           continue;
         }
-        const ranked = suggest(dishes, date, slot, { exclude: used, weekWords, historyMonths, blacklist: blacklistKeys, includeBlacklist, favorites: favoriteKeys });
+        const ranked = suggest(dishes, date, slot, {
+          exclude: used,
+          weekWords,
+          historyMonths,
+          blacklist: blacklistKeys,
+          includeBlacklist,
+          favorites: favoriteKeys,
+          ratings: props.ratingMap,
+          useRatings: shared.useRatings,
+        });
         // Chaque appui sur ↻ change le tirage (on compte les appuis, pas les plats distincts).
         const draw = `${seed}|${key}|${rejected[key]?.length ?? 0}`;
         // Liste noire incluse : une proposition sur dix environ en vient, les autres jamais.
@@ -309,7 +324,7 @@ export function PlanningView(props: PlanningProps) {
       }
     }
     return out;
-  }, [days, monday, today, bySlot, usual, habits, dishes, rejected, skipped, randomness, historyMonths, seed, activeSlots, blacklistKeys, includeBlacklist, favoriteKeys]);
+  }, [days, monday, today, bySlot, usual, habits, dishes, rejected, skipped, randomness, historyMonths, seed, activeSlots, blacklistKeys, includeBlacklist, favoriteKeys, props.ratingMap, shared.useRatings]);
 
   /** Un créneau attend une décision s'il est à venir, vide, non retiré et habituellement rempli. */
   const needsDecision = (date: string, slot: Slot) => {
@@ -390,6 +405,8 @@ export function PlanningView(props: PlanningProps) {
       historyMonths,
       blacklist: blacklistKeys,
       favorites: favoriteKeys,
+      ratings: props.ratingMap,
+      useRatings: shared.useRatings,
     });
     const pick = pickProposal(ranked, randomness, `${Math.random()}|${key}`);
     if (!pick) {
@@ -777,7 +794,9 @@ export function PlanningView(props: PlanningProps) {
           current={bySlot.get(`${editing.date}|${editing.slot}`)}
           proposal={editing.fromProposal && !bySlot.has(`${editing.date}|${editing.slot}`) ? shownFor(`${editing.date}|${editing.slot}`) : undefined}
           others={others.get(`${editing.date}|${editing.slot}`)}
-          suggestions={suggest(dishes, editing.date, editing.slot, { blacklist: blacklistKeys, includeBlacklist: true, favorites: favoriteKeys })}
+          suggestions={suggest(dishes, editing.date, editing.slot, { blacklist: blacklistKeys, includeBlacklist: true, favorites: favoriteKeys, ratings: props.ratingMap })}
+          ratingOf={props.ratingOf}
+          onRate={props.onRate}
           showImages={props.showImages}
           isFavorite={isFavorite}
           onToggleFavorite={toggleFavorite}

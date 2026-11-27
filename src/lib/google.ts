@@ -1,5 +1,6 @@
 import { noteFromDescription } from './notes';
-import { BY_KEY, likeKey, readLikes } from './people';
+import { BY_KEY, displayName, likeKey, readLikes } from './people';
+import { RATINGS_EVENT_PREFIX, ratingsEventId } from './ratings';
 import { addDays } from './dates';
 import { LUNCH_LIMIT_HOUR, type Meal, type Slot } from './types';
 
@@ -384,7 +385,7 @@ export function deleteEvent(token: string, calendar: GoogleCalendar, eventId: st
 
 /** Un événement devient un repas ; renvoie null s'il est annulé, sans titre ou sans date. */
 export function eventToMeal(event: GoogleEvent): Meal | null {
-  if (event.id === SETTINGS_EVENT_ID || event.id === IMAGES_EVENT_ID || event.id === FRIDGE_EVENT_ID) return null;
+  if (event.id === SETTINGS_EVENT_ID || event.id === IMAGES_EVENT_ID || event.id === FRIDGE_EVENT_ID || event.id.startsWith(RATINGS_EVENT_PREFIX)) return null;
   const name = event.summary?.trim();
   if (event.status === 'cancelled' || !name || !event.start) return null;
   // Google renvoie l'heure dans le fuseau de l'agenda : on lit la date et l'heure telles quelles.
@@ -444,6 +445,25 @@ export const FRIDGE_EVENT: SpecialEvent = {
   tooLong: 'Le pense-bête est plein : supprime quelques mémos.',
   date: '2100-01-03',
 };
+
+const RATINGS_MARKER = 'MYMEALS-NOTES';
+
+/** Événement spécial des notes d'une personne (un par personne : chacun n'écrit que le sien). */
+export function ratingsKind(email: string): SpecialEvent {
+  return {
+    id: ratingsEventId(email),
+    title: `⭐ MyMeals : notes de ${displayName(email)} (ne pas supprimer)`,
+    marker: RATINGS_MARKER,
+    intro: "Notes des plats (de 1 à 5) données dans l'application MyMeals par cette personne. Ne pas supprimer ni modifier à la main.",
+    tooLong: "Trop de notes pour tenir dans l'agenda : retire quelques notes anciennes.",
+    date: '2100-01-10',
+  };
+}
+
+/** Relit les notes dans le texte d'un événement de notes. */
+export function decodeRatings(description: string | undefined): unknown {
+  return decodeSpecial({ ...SETTINGS_EVENT, marker: RATINGS_MARKER }, description);
+}
 
 /** Texte d'un événement spécial : une phrase d'explication puis les données en JSON sur une seule ligne. */
 function encodeSpecial(kind: SpecialEvent, payload: unknown): string {

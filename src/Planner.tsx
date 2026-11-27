@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { DuplicatesPage } from './Duplicates';
 import { addToBlacklist, blacklistedKeys, parseBlacklist, removeFromList, type BlacklistFilter } from './lib/blacklist';
 import { dishKeyOf, notesByDish } from './lib/notes';
+import { averageRatings, dishRating, ratingKeys, type DishRating } from './lib/ratings';
 import { addDays, todayIso } from './lib/dates';
 import { setMealTimes, type CalendarInfo, type TimedEvent } from './lib/google';
 import { shownByDefault } from './lib/otherCalendars';
@@ -228,6 +229,24 @@ export function Planner(props: PlannerProps) {
   );
   const notes = useMemo(() => notesByDish(store.meals, dishes), [store.meals, dishes]);
 
+  // Notes des plats (1 à 5), une par personne et par plat.
+  const ratingMap = useMemo(() => averageRatings(dishes.dishes, store.ratings), [dishes, store.ratings]);
+  const keysOf = useCallback((name: string) => ratingKeys(dishes.byKey.get(normalize(name)), name), [dishes]);
+  const ratingOf = useCallback((name: string): DishRating => dishRating(store.ratings, keysOf(name), store.ratingUser), [store.ratings, store.ratingUser, keysOf]);
+  /** Note un plat (ou retire ma note) et le confirme dans un message, avec « Annuler ». */
+  const rate = useCallback(
+    async (name: string, n: number | null) => {
+      const keys = keysOf(name);
+      const previous = dishRating(store.ratings, keys, store.ratingUser).mine ?? null;
+      const outcome = await store.rateDish(keys, n);
+      if (outcome !== 'ok') return;
+      const undo = () => void store.rateDish(keys, previous);
+      if (n === null) showFlash(`Ta note pour « ${name} » est supprimée.`, undo);
+      else showFlash(`Ta note pour « ${name} » : ${'★'.repeat(n)}${'☆'.repeat(5 - n)} (${n}/5).`, undo);
+    },
+    [keysOf, store, showFlash],
+  );
+
   // Créneaux « Pas de repas » : partagés avec les réglages (sans effacer les tirages en cours).
   const skipped = useMemo<ReadonlySet<string>>(() => new Set(parseSkipped(shared.skippedSlots)), [shared.skippedSlots]);
   const skippedRef = useRef(shared.skippedSlots);
@@ -332,6 +351,9 @@ export function Planner(props: PlannerProps) {
           loading={props.loading ?? false}
           flash={showFlash}
           favoriteKeys={favoriteKeys}
+          ratingMap={ratingMap}
+          ratingOf={store.ratingUser ? ratingOf : undefined}
+          onRate={rate}
           isFavorite={isFavorite}
           toggleFavorite={toggleFavorite}
           isBlacklisted={isBlacklisted}

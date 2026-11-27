@@ -213,6 +213,27 @@ Le nom du plat en titre, l'étoile des favoris à droite, l'image avec sa source
 Les messages avec « Annuler » sont un bandeau fixe en haut de l'écran : ils restent atteignables même quand une
 fenêtre est ouverte.
 
+## Noter les plats
+
+Chaque personne peut donner **une note de 1 à 5 à chaque plat** (et non à chaque repas) : la note est la même pour
+toutes les fois où cette personne mange ce plat, sous toutes ses écritures (« lasagnes », « Lasagne »…). Un plat peut
+ne pas avoir de note.
+
+- **Noter** : dans la fiche d'un plat (repas prévu ou proposition), « Ta note » et cinq étoiles ; toucher une étoile
+  valide tout de suite et un message confirme la note (« ★★★★☆ (4/5) », avec « Annuler »). « Supprimer ma note » la
+  retire. Sous les étoiles : la moyenne, le nombre de notes et la note de chacun des autres.
+- **Dans les propositions** : la liste des plats d'un créneau affiche « ★ 4,5 » pour les plats notés, et, si
+  Réglages → Propositions → « Tenir compte des notes des plats » est coché (par défaut, réglage partagé), la moyenne
+  change un peu les chances d'un plat d'être proposé : ×1,6 pour 5/5, ×1,3 pour 4/5, rien pour 3/5, ×0,8 pour 2/5,
+  ×0,6 pour 1/5. Assez pour qu'un plat aimé revienne de temps en temps plus souvent, sans écraser l'historique, les
+  favoris ni la variété de la semaine.
+- **Où c'est stocké** : chaque personne a son propre événement spécial dans l'agenda « Repas », « ⭐ MyMeals : notes de
+  … (ne pas supprimer) », le 10 janvier 2100, avec toutes ses notes (identifiant `mmealsnotes…`) : chacun n'écrit que
+  le sien, donc deux personnes qui notent en même temps ne s'écrasent pas. Les notes d'une même personne partent une
+  par une, dans l'ordre. L'application ne compte jamais ces événements comme des repas. Environ 250 notes par personne
+  tiennent dans un événement.
+- Sans connexion Google (mode import de fichier), les notes restent dans le navigateur.
+
 ## Fridge memo
 
 Un pense-bête partagé, comme les post-it sur un frigo : envies de plats, restes du frigo à finir, courses… en texte

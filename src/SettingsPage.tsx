@@ -141,6 +141,13 @@ export function SettingsPage(props: SettingsProps) {
 
       <section>
         <h2>Propositions</h2>
+        <Switch checked={shared.useRatings} onChange={(value) => update({ useRatings: value })}>
+          Tenir compte des notes des plats
+        </Switch>
+        <p className="blacklist-help">
+          Un plat bien noté revient un peu plus souvent (jusqu'à ×1,6 pour 5/5), un plat mal noté un peu moins (×0,6 pour
+          1/5) ; sans note, rien ne change. La moyenne des notes de chacun compte. Réglage partagé.
+        </p>
         <label className="setting">
           Hasard
           <select value={shared.randomness} onChange={(e) => update({ randomness: Number(e.target.value) })}>

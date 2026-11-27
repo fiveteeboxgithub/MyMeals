@@ -23,6 +23,7 @@ export function loadSharedSettings(): SharedSettings {
   return {
     blacklistText: (readPref(KEYS.blacklistText) ?? '').slice(0, MAX_BLACKLIST_CHARS),
     includeBlacklist: readPref(KEYS.includeBlacklist) === '1',
+    useRatings: readPref(KEYS.useRatings) !== '0',
     favoritesText: (readPref(KEYS.favoritesText) ?? '').slice(0, MAX_FAVORITES_CHARS),
     randomness: readChoice(KEYS.randomness, RANDOMNESS_LEVELS.map((_, i) => i), DEFAULT_SETTINGS.randomness),
     historyMonths: readChoice(KEYS.historyMonths, HISTORY_WINDOWS.map((w) => w.months), DEFAULT_SETTINGS.historyMonths),
@@ -47,6 +48,7 @@ function legacySkipped(): string {
 function saveSharedSettings(settings: SharedSettings): void {
   writePref(KEYS.blacklistText, settings.blacklistText);
   writePref(KEYS.includeBlacklist, settings.includeBlacklist ? '1' : '0');
+  writePref(KEYS.useRatings, settings.useRatings ? '1' : '0');
   writePref(KEYS.randomness, String(settings.randomness));
   writePref(KEYS.historyMonths, String(settings.historyMonths));
   writePref(KEYS.surprisePeriod, String(settings.surprisePeriod));

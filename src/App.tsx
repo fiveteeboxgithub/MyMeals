@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { longDate } from './lib/dates';
 import { useGoogleMeals } from './lib/googleStore';
 import { parseIcs } from './lib/ics';
-import { useLocalMemos, useMeals } from './lib/store';
+import { useLocalMemos, useLocalRatings, useMeals } from './lib/store';
 import { Notice } from './Notice';
 import { Planner } from './Planner';
 
@@ -69,6 +69,7 @@ function GoogleApp() {
 
 function LocalApp() {
   const memoStore = useLocalMemos();
+  const ratingStore = useLocalRatings();
   const { meals, importMeals, setSlot, addMeal, clearSlot, removeMeal, clearAll, renameMeals, setNote, moveMeal } = useMeals();
   const [notice, setNotice] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
@@ -109,7 +110,7 @@ function LocalApp() {
 
   return (
     <Planner
-      store={{ meals, setSlot, addMeal, clearSlot, removeMeal, renameMeals, setNote, moveMeal, toggleLike: () => undefined, ...memoStore }}
+      store={{ meals, setSlot, addMeal, clearSlot, removeMeal, renameMeals, setNote, moveMeal, toggleLike: () => undefined, ...memoStore, ...ratingStore }}
       headerAction={importButton}
       banner={
         <>

@@ -25,6 +25,8 @@ import {
   patchSpecialShared,
   FRIDGE_EVENT,
   FRIDGE_EVENT_ID,
+  ratingsKind,
+  decodeRatings,
   signIn,
   storedToken,
   tokenRemainingMs,
@@ -39,6 +41,7 @@ import { parseImagesRecord, type ImagesRecord } from './customImages';
 import type { Meal, MealStore, MemoOutcome, Slot } from './types';
 import { withNote } from './store';
 import { clearLikes } from './people';
+import { RATINGS_EVENT_PREFIX, parseRatingsPayload, ratingsEventId, ratingsPayload, withRating, type Ratings } from './ratings';
 import { MAX_MEMO_CHARS, encodeMemo, memoKey, memoRoom, parseMemos, pickMemoId, type Memo } from './memos';
 
 const CACHE_KEY = 'mymeals.google.v1';
@@ -55,6 +58,9 @@ interface Cache {
   /** Fridge memo : mémos lus dans l'événement spécial, et propriétés vidées (réutilisables). */
   memos?: Memo[];
   memoFree?: string[];
+  /** Notes des plats de chaque personne, et quel événement de notes appartient à qui. */
+  ratings?: Ratings;
+  ratingIds?: Record<string, string>;
   meals: Meal[];
 }
 
@@ -155,6 +161,10 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
   // Mémos ajoutés ou supprimés ici mais pas encore confirmés par Google : une synchronisation ne doit pas les défaire.
   const pendingMemoAdds = useRef(new Map<string, Memo>());
   const pendingMemoRemoves = useRef(new Set<string>());
+  // Notes : mes notes telles que l'agenda les a confirmées, écritures en cours (une à la fois, dans l'ordre).
+  const ratingConfirmed = useRef<Record<string, number> | null>(null);
+  const ratingQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const ratingBusy = useRef(0);
 
   const commit = useCallback((fn: (current: Cache) => Cache) => {
     const next = fn(cacheRef.current);
@@ -220,6 +230,27 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
           if (found && fridge.visibility === 'private') {
             void patchSpecialShared(accessToken, calendar, FRIDGE_EVENT, {}).catch(() => undefined);
           }
+        }
+        // Notes des plats : un événement par personne.
+        const ratingEvents = events.filter((event) => event.id.startsWith(RATINGS_EVENT_PREFIX));
+        if (ratingEvents.length > 0 || full) {
+          const me = cacheRef.current.account;
+          const ratings: Ratings = full ? {} : { ...(cacheRef.current.ratings ?? {}) };
+          const ids: Record<string, string> = full ? {} : { ...(cacheRef.current.ratingIds ?? {}) };
+          for (const event of ratingEvents) {
+            const previous = ids[event.id];
+            if (previous) delete ratings[previous];
+            delete ids[event.id];
+            if (event.status === 'cancelled') continue;
+            const parsed = parseRatingsPayload(decodeRatings(event.description));
+            if (!parsed || ratingsEventId(parsed.email) !== event.id) continue;
+            ratings[parsed.email] = parsed.ratings;
+            ids[event.id] = parsed.email;
+            if (parsed.email === me) ratingConfirmed.current = parsed.ratings;
+          }
+          // Une note en cours d'envoi ne doit pas être défaite par une lecture.
+          if (me && ratingBusy.current > 0) ratings[me] = cacheRef.current.ratings?.[me] ?? {};
+          commit((c) => ({ ...c, ratings, ratingIds: ids }));
         }
         // Les réglages se relisent une fois par session, et quand l'événement spécial a changé.
         if (!settingsLoaded.current || events.some((event) => event.id === SETTINGS_EVENT_ID)) {
@@ -474,6 +505,41 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
       });
     },
     [commit, fail, withAccess],
+  );
+
+  /**
+   * Note un plat (ou retire ma note). Affiché tout de suite ; l'envoi réécrit mon événement de notes, un envoi à la
+   * fois et toujours avec mes notes les plus récentes. En cas d'échec, on revient aux notes confirmées par l'agenda.
+   */
+  const rateDish = useCallback(
+    async (keys: string[], n: number | null): Promise<'ok' | 'failed'> => {
+      const me = cacheRef.current.account;
+      if (!me || keys.length === 0) return 'failed';
+      const a = await access();
+      if (!a) return 'failed';
+      if (ratingConfirmed.current === null) ratingConfirmed.current = cacheRef.current.ratings?.[me] ?? {};
+      const mine = withRating(cacheRef.current.ratings?.[me], keys, n);
+      commit((c) => ({ ...c, ratings: { ...(c.ratings ?? {}), [me]: mine } }));
+      ratingBusy.current++;
+      const send = ratingQueue.current.then(async () => {
+        const latest = cacheRef.current.ratings?.[me] ?? {};
+        await writeSpecialEvent(a.token, a.calendar, ratingsPayload(me, latest), ratingsKind(me));
+        ratingConfirmed.current = latest;
+      });
+      ratingQueue.current = send.catch(() => undefined);
+      try {
+        await send;
+        return 'ok';
+      } catch (e) {
+        const confirmed = ratingConfirmed.current ?? {};
+        commit((c) => ({ ...c, ratings: { ...(c.ratings ?? {}), [me]: confirmed } }));
+        fail(e);
+        return 'failed';
+      } finally {
+        ratingBusy.current--;
+      }
+    },
+    [access, commit, fail],
   );
 
   /** Relit l'agenda tout de suite ; sans connexion valable, tente de la renouveler (à appeler lors d'un toucher). */
@@ -766,6 +832,9 @@ export function useGoogleMeals(clientId: string, calendarName: string): GoogleMe
     moveMeal,
     toggleLike,
     memos: cache.memos ?? [],
+    ratings: cache.ratings ?? {},
+    ratingUser: cache.account,
+    rateDish,
     syncedAt,
     memoDiag: { account: cache.account, calendarId: cache.calendar?.id, ...fridgeDiag },
     refresh,

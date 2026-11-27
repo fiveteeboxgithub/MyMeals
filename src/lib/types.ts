@@ -1,4 +1,5 @@
 import type { Memo } from './memos';
+import type { Ratings } from './ratings';
 import type { SettingsRecord } from './settings';
 export type { Memo } from './memos';
 export type { ImagesSync } from './customImages';
@@ -70,6 +71,12 @@ export interface MealStore {
   removeMemo: (id: string) => void;
   /** Modifie le texte d'un mémo (l'auteur et la date d'origine sont gardés). */
   editMemo: (id: string, text: string) => Promise<MemoOutcome>;
+  /** Notes des plats (1 à 5) : adresse de la personne → clé du plat → note. */
+  ratings: Ratings;
+  /** Identité sous laquelle je note (mon adresse Google ; « moi » sans Google). Sans elle, pas de note. */
+  ratingUser?: string;
+  /** Note un plat (ou retire ma note avec null). `keys[0]` est la clé du plat, les autres ses autres écritures. */
+  rateDish: (keys: string[], n: number | null) => Promise<'ok' | 'failed'>;
   /** Ce que cet appareil voit de l'événement du Fridge memo (pour comprendre un mémo qui n'arrive pas). */
   memoDiag?: MemoDiag;
   /** Relit l'agenda tout de suite (Google seulement). */

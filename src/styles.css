@@ -2466,3 +2466,51 @@ html {
 .memo-diag p {
   margin: 4px 0 0;
 }
+
+/* Notes des plats : 5 étoiles dans la fiche */
+.rating {
+  margin: 10px 0 0;
+}
+.rating-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.rating-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.stars {
+  display: inline-flex;
+  gap: 2px;
+}
+.star {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--line);
+}
+.star svg {
+  width: 26px;
+  height: 26px;
+}
+.star.on {
+  color: #d29a12;
+}
+.star:hover:not(.on) {
+  color: var(--muted);
+}
+.rating-summary {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+}
+.tag.rate {
+  background: transparent;
+  color: #b07d0a;
+  padding: 0 2px;
+}

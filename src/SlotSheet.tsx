@@ -5,7 +5,8 @@ import { DishPicture } from './DishThumb';
 import { Icon, type IconName } from './Icons';
 import { useScrollLock } from './useScrollLock';
 import { MAX_NOTE_CHARS, dishKeyOf, splitLinks, type PastNote } from './lib/notes';
-import { canLike, likeSummary, likedBy } from './lib/people';
+import { canLike, displayName, likeSummary, likedBy } from './lib/people';
+import { formatRating, type DishRating } from './lib/ratings';
 import { clock, type OtherEvent } from './lib/otherCalendars';
 import { fold, normalize, type DishIndex, type Suggestion } from './lib/suggest';
 import { PERIODS, pickSurprise, surpriseIdeas, type Surprise } from './lib/surprise';
@@ -34,6 +35,9 @@ interface SheetProps {
   onNextProposal: () => void;
   /** Remplace ce repas prévu par un autre plat tiré au hasard (↻). */
   onRerollMeal: (meal: Meal) => void;
+  /** Notes d'un plat (absent : pas de note possible). */
+  ratingOf?: (name: string) => DishRating;
+  onRate: (name: string, n: number | null) => void;
   /** Utilisateur connecté (adresse Google) : sans lui, pas de « J'aime ». */
   me?: string;
   onToggleLike: (id: string) => void;
@@ -166,6 +170,7 @@ export function SlotSheet(sheetProps: SheetProps) {
               </div>
               <FavoriteButton name={chosenName || proposal.name} {...props} />
             </div>
+            {props.ratingOf && <StarRating name={proposal.name} info={props.ratingOf(proposal.name)} onRate={props.onRate} />}
             <button className="ghost-btn primary choose" disabled={!chosenName} onClick={() => onPick(chosenName)}>
               <Icon name="check" />
               Choisir ce plat
@@ -240,6 +245,7 @@ export function SlotSheet(sheetProps: SheetProps) {
                 <span>
                   {s.label}
                   {s.favorite && <small className="tag fav">⭐</small>}
+                  {s.rating !== undefined && <small className="tag rate">★ {formatRating(s.rating)}</small>}
                   {s.blacklisted && <small className="tag">liste noire</small>}
                   {s.variants.length > 0 && <small className="variants">aussi écrit : {variantsLine(s.variants)}</small>}
                 </span>
@@ -255,6 +261,45 @@ export function SlotSheet(sheetProps: SheetProps) {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Ma note d'un plat en 5 étoiles (validée dès qu'on touche), les notes des autres et la moyenne. */
+function StarRating({ name, info, onRate }: { name: string; info: DishRating; onRate: (name: string, n: number | null) => void }) {
+  const mine = info.mine ?? 0;
+  return (
+    <div className="rating">
+      <div className="rating-row">
+        <span className="rating-label">Ta note</span>
+        <span className="stars" role="radiogroup" aria-label={`Ta note pour ${name}`}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              className={`star${mine >= n ? ' on' : ''}`}
+              role="radio"
+              aria-checked={info.mine === n}
+              aria-label={`${n} sur 5`}
+              title={`${n}/5`}
+              onClick={() => onRate(name, n)}
+            >
+              <Icon name="star" filled={mine >= n} />
+            </button>
+          ))}
+        </span>
+        {info.mine !== undefined && (
+          <button className="act sm" onClick={() => onRate(name, null)} title="Supprimer ma note pour ce plat">
+            <Icon name="trash" />
+            Supprimer ma note
+          </button>
+        )}
+      </div>
+      {info.count > 0 && (
+        <small className="rating-summary">
+          Moyenne {formatRating(info.avg ?? 0)}/5 ({info.count} {info.count > 1 ? 'notes' : 'note'})
+          {info.others.length > 0 && ` · ${info.others.map((o) => `${displayName(o.who)} : ${o.n}`).join(', ')}`}
+        </small>
+      )}
     </div>
   );
 }
@@ -353,6 +398,7 @@ function MealCard(props: SheetProps & { meal: Meal; onRemove: () => void }) {
         </div>
         <FavoriteButton name={meal.name} {...props} />
       </div>
+      {props.ratingOf && <StarRating name={meal.name} info={props.ratingOf(meal.name)} onRate={props.onRate} />}
       <DishPicture name={meal.name} enabled={props.showImages} />
       <div className="act-row">
         {canLike(meal, props.me) && props.date >= props.today && (

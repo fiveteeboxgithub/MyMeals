@@ -45,6 +45,8 @@ export interface Suggestion {
   blacklisted?: boolean;
   /** Plat favori (score multiplié par `FAVORITE_BOOST`). */
   favorite?: boolean;
+  /** Moyenne des notes (1 à 5) données à ce plat, s'il en a. */
+  rating?: number;
   /** Jours écoulés depuis la dernière fois (s'il a déjà été mangé). */
   daysSince?: number;
   reason: string;
@@ -267,6 +269,15 @@ export const BLACKLIST_CHANCE = 0.1;
 /** Les plats favoris comptent pour deux fois et demie : ils reviennent nettement plus souvent, sans tout écraser. */
 export const FAVORITE_BOOST = 2.5;
 
+/**
+ * Effet de la note moyenne d'un plat sur ses chances d'être proposé : de ×0,6 (1/5) à ×1,6 (5/5), sans effet à 3/5.
+ * Assez pour qu'un plat aimé revienne un peu plus souvent, sans écraser le reste.
+ */
+export function ratingFactor(avg: number | undefined): number {
+  if (avg === undefined) return 1;
+  return avg >= 3 ? 1 + 0.3 * (avg - 3) : 1 - 0.2 * (3 - avg);
+}
+
 function seasonWeight(a: number, b: number): number {
   const diff = Math.abs(a - b);
   const distance = Math.min(diff, 12 - diff);
@@ -314,6 +325,10 @@ export interface SuggestOptions {
   includeBlacklist?: boolean;
   /** Clés des plats favoris. */
   favorites?: ReadonlySet<string>;
+  /** Note moyenne des plats (clé du plat → moyenne de 1 à 5), affichée dans les suggestions. */
+  ratings?: ReadonlyMap<string, number>;
+  /** Les notes changent aussi les chances d'un plat d'être proposé (`ratingFactor`). */
+  useRatings?: boolean;
 }
 
 /**
@@ -325,7 +340,7 @@ export interface SuggestOptions {
  * semaine contient déjà un plat proche.
  */
 export function suggest(index: DishIndex, date: string, slot: Slot, options: SuggestOptions = {}): Suggestion[] {
-  const { exclude, weekWords, historyMonths, blacklist, includeBlacklist, favorites } = options;
+  const { exclude, weekWords, historyMonths, blacklist, includeBlacklist, favorites, ratings, useRatings } = options;
   const target = dayNumber(date);
   const now = dayNumber(options.today ?? todayIso());
   const windowDays = historyMonths ? Math.round(historyMonths * 30.44) : undefined;
@@ -370,6 +385,8 @@ export function suggest(index: DishIndex, date: string, slot: Slot, options: Sug
     const favorite = !listed && (favorites?.has(dish.key) ?? false);
     if (listed) score *= BLACKLIST_PENALTY;
     if (favorite) score *= FAVORITE_BOOST;
+    const rating = ratings?.get(dish.key);
+    if (useRatings) score *= ratingFactor(rating);
     out.push({
       key: dish.key,
       label: dish.label,
@@ -380,8 +397,9 @@ export function suggest(index: DishIndex, date: string, slot: Slot, options: Sug
       recent: !dish.generic && nearestGap < 7,
       blacklisted: listed,
       favorite,
+      ...(rating !== undefined ? { rating } : {}),
       daysSince: eaten ? now - lastEaten : undefined,
-      reason: `${favorite ? '⭐ favori · ' : ''}${eaten ? `${count} fois · ${ago(now - lastEaten)}` : `${count} fois`}`,
+      reason: `${favorite ? '⭐ favori · ' : ''}${rating !== undefined ? `★ ${(Math.round(rating * 10) / 10).toLocaleString('fr-FR')} · ` : ''}${eaten ? `${count} fois · ${ago(now - lastEaten)}` : `${count} fois`}`,
     });
   }
   return out.sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));

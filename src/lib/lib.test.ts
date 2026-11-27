@@ -826,7 +826,7 @@ describe('réglages partagés et connexion', async () => {
   });
 
   it('valide les réglages venus de l’agenda', () => {
-    const full = { blacklistText: 'kebab\nwafu', includeBlacklist: true, favoritesText: '', randomness: 4, historyMonths: 120, surprisePeriod: 0, ideasText: 'poulet yassa', lunchTime: '12:30', dinnerTime: '19:45', skippedSlots: '2026-11-20|soir' };
+    const full = { blacklistText: 'kebab\nwafu', includeBlacklist: true, useRatings: true, favoritesText: '', randomness: 4, historyMonths: 120, surprisePeriod: 0, ideasText: 'poulet yassa', lunchTime: '12:30', dinnerTime: '19:45', skippedSlots: '2026-11-20|soir' };
     expect(parseSettingsRecord({ updatedAt: 12, settings: full })).toEqual({ updatedAt: 12, settings: full });
     // Réglages enregistrés par une version plus ancienne : les nouveaux champs prennent leur valeur par défaut.
     const old = parseSettingsRecord({ updatedAt: 12, settings: { blacklistText: 'kebab', includeBlacklist: false, randomness: 3, historyMonths: 60, surprisePeriod: 60 } })!;
@@ -1255,5 +1255,58 @@ describe('Fridge memo', () => {
     const { eventToMeal, FRIDGE_EVENT_ID, FRIDGE_EVENT } = await import('./google');
     expect(FRIDGE_EVENT_ID).toMatch(/^[a-v0-9]{5,}$/);
     expect(eventToMeal({ id: FRIDGE_EVENT_ID, summary: FRIDGE_EVENT.title, start: { date: '2100-01-03' } })).toBeNull();
+  });
+});
+
+describe('Notes des plats', () => {
+  it('une note par personne et par plat, retrouvée sous toutes les écritures du plat', async () => {
+    const { ratingKeys, withRating, dishRating, personRating } = await import('./ratings');
+    const dish = { key: 'lasagne', variants: ['Lasagnes', 'lasagnes bolognaise'] };
+    const keys = ratingKeys(dish, 'Lasagnes');
+    expect(keys[0]).toBe('lasagne');
+    expect(keys.length).toBe(2);
+    // Une note posée sous une ancienne écriture est retrouvée, puis remplacée sous la clé du plat.
+    let mine: Record<string, number> = { [keys[1]]: 2 };
+    expect(personRating(mine, keys)).toBe(2);
+    mine = withRating(mine, keys, 5);
+    expect(mine).toEqual({ lasagne: 5 });
+    expect(withRating(mine, keys, null)).toEqual({});
+    const ratings = { 'a@x.fr': { lasagne: 5 }, 'b@x.fr': { lasagne: 4 }, 'c@x.fr': {} };
+    const info = dishRating(ratings, keys, 'a@x.fr');
+    expect(info).toEqual({ mine: 5, others: [{ who: 'b@x.fr', n: 4 }], avg: 4.5, count: 2 });
+    expect(dishRating(ratings, ratingKeys(undefined, 'pizza'), 'a@x.fr')).toEqual({ mine: undefined, others: [], avg: undefined, count: 0 });
+  });
+
+  it('relit un événement de notes et refuse les valeurs hors de 1 à 5', async () => {
+    const { parseRatingsPayload, ratingsEventId, ratingsPayload } = await import('./ratings');
+    expect(ratingsEventId('A@x.fr')).toBe(ratingsEventId('a@x.fr'));
+    expect(ratingsEventId('a@x.fr')).toMatch(/^[a-v0-9]{5,}$/);
+    expect(parseRatingsPayload(ratingsPayload('A@x.fr', { pizza: 4 }))).toEqual({ email: 'a@x.fr', ratings: { pizza: 4 } });
+    expect(parseRatingsPayload({ e: 'a@x.fr', r: { pizza: 7, curry: 0, tacos: 3.5, raclette: 2 } })).toEqual({ email: 'a@x.fr', ratings: { raclette: 2 } });
+    expect(parseRatingsPayload('n’importe quoi')).toBeNull();
+  });
+
+  it('un plat bien noté est proposé un peu plus souvent, un plat mal noté un peu moins', async () => {
+    const { ratingFactor } = await import('./suggest');
+    expect(ratingFactor(undefined)).toBe(1);
+    expect(ratingFactor(3)).toBe(1);
+    expect(ratingFactor(5)).toBeCloseTo(1.6);
+    expect(ratingFactor(1)).toBeCloseTo(0.6);
+    const meals: Meal[] = [];
+    for (let i = 0; i < 4; i++) meals.push({ id: `p${i}`, date: addDays('2026-01-05', i * 40), slot: 'soir', name: 'pizza', source: 'google' });
+    const index = buildIndex(meals);
+    const plain = suggest(index, '2026-11-20', 'soir', { today: '2026-11-17' })[0];
+    const rated = suggest(index, '2026-11-20', 'soir', { today: '2026-11-17', ratings: new Map([['pizza', 5]]), useRatings: true })[0];
+    const shownOnly = suggest(index, '2026-11-20', 'soir', { today: '2026-11-17', ratings: new Map([['pizza', 5]]) })[0];
+    expect(rated.score).toBeCloseTo(plain.score * 1.6);
+    expect(shownOnly.score).toBeCloseTo(plain.score);
+    expect(shownOnly.rating).toBe(5);
+    expect(shownOnly.reason).toContain('★ 5');
+  });
+
+  it('les événements de notes ne sont jamais des repas', async () => {
+    const { eventToMeal } = await import('./google');
+    const { ratingsEventId } = await import('./ratings');
+    expect(eventToMeal({ id: ratingsEventId('a@x.fr'), summary: 'notes', start: { date: '2100-01-10' } })).toBeNull();
   });
 });

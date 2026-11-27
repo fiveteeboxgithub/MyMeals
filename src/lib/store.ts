@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { MAX_MEMO_CHARS, memoRoom, newMemoId, type Memo } from './memos';
+import { LOCAL_RATER, withRating, type Ratings } from './ratings';
 import type { Meal, MemoOutcome, Slot } from './types';
 
 const STORAGE_KEY = 'mymeals.v1';
@@ -69,6 +70,33 @@ export function useLocalMemos() {
     return 'ok';
   };
   return { memos, addMemo, removeMemo, editMemo };
+}
+
+const RATINGS_KEY = 'mymeals.ratings';
+
+/** Notes des plats sans Google : une seule personne (« moi »), gardées dans le navigateur. */
+export function useLocalRatings() {
+  const [ratings, setRatings] = useState<Ratings>(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(RATINGS_KEY) ?? '{}') as unknown;
+      const ratings: Ratings = {};
+      if (parsed && typeof parsed === 'object') ratings[LOCAL_RATER] = parsed as Record<string, number>;
+      return ratings;
+    } catch {
+      return {} as Ratings;
+    }
+  });
+  const rateDish = async (keys: string[], n: number | null): Promise<'ok' | 'failed'> => {
+    const mine = withRating(ratings[LOCAL_RATER], keys, n);
+    setRatings({ [LOCAL_RATER]: mine });
+    try {
+      localStorage.setItem(RATINGS_KEY, JSON.stringify(mine));
+    } catch {
+      // la note vaut pour cette session
+    }
+    return 'ok';
+  };
+  return { ratings, ratingUser: LOCAL_RATER, rateDish };
 }
 
 export function useMeals() {
